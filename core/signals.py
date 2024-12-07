@@ -1,3 +1,13 @@
+from django.core.mail import EmailMultiAlternatives
+from django.dispatch import receiver
+from django.db.models.signals import post_save
+from django.template.loader import render_to_string
+from django.conf import settings
+from django_rest_passwordreset.signals import reset_password_token_created
+from .models import User
+
+
+@receiver(post_save, sender=User)
 def user_login_profile_cration_post_save_signal(sender, instance, created, **kwargs):
     from .models import UserProfile
 
@@ -9,3 +19,37 @@ def user_login_profile_cration_post_save_signal(sender, instance, created, **kwa
             profile.save()
         except UserProfile.DoesNotExist:
             UserProfile.objects.create(user=instance)
+
+
+@receiver(reset_password_token_created)
+def password_reset_token_created(sender, reset_password_token, *args, **kwargs):
+
+    # send an e-mail to the user
+    site_full_name = "Hiringdog"
+    site_domain = "hdip.vercel.app"
+    site_protocol = "https"
+
+    # uid = urlsafe_base64_encode(
+    #     force_bytes(reset_password_token.user.pk)
+    # )  # .decode("utf-8")
+
+    context = {
+        "current_user": reset_password_token.user,
+        "name": reset_password_token.user.email,
+        "email": reset_password_token.user.email,
+        "reset_password_url": "/password-reset/{}".format(reset_password_token.key),
+        "site_domain": site_domain,
+        "site_protocol": site_protocol,
+    }
+
+    email_html_message = render_to_string("reset_password.html", context)
+    email_plaintext_message = render_to_string("reset_password.txt", context)
+
+    msg = EmailMultiAlternatives(
+        "Password Reset for {}".format(site_full_name),
+        email_plaintext_message,
+        settings.EMAIL_HOST_USER,
+        [reset_password_token.user.email],
+    )
+    msg.attach_alternative(email_html_message, "text/html")
+    msg.send()

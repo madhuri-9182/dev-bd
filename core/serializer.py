@@ -1,9 +1,17 @@
-from typing import Dict
+from django.core.exceptions import ValidationError
+from django.http import Http404
+from django.utils.translation import gettext_lazy as _
 from django.contrib.auth import password_validation, authenticate
+from django.contrib.auth.hashers import check_password
+from django.shortcuts import get_object_or_404
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.exceptions import InvalidToken
+from django_rest_passwordreset import models
+from django_rest_passwordreset.serializers import (
+    PasswordTokenSerializer,
+)
 from .models import User
 from hiringdogbackend.utils import validate_incoming_data
 
@@ -91,3 +99,30 @@ class CookieTokenRefreshSerializer(TokenRefreshSerializer):
             return super().validate(data)
 
         return InvalidToken({"error": "No valid token found in cookie"})
+
+
+class ResetPasswordConfirmSerailizer(PasswordTokenSerializer):
+    def validate(self, data):
+        try:
+            reset_password_token = get_object_or_404(
+                models.ResetPasswordToken, key=data.get("token")
+            )
+        except (
+            TypeError,
+            ValueError,
+            ValidationError,
+            Http404,
+            models.ResetPasswordToken.DoesNotExist,
+        ):
+            raise Http404(
+                _("The OTP password entered is not valid. Please check and try again.")
+            )
+
+        if check_password(data.get("password"), reset_password_token.user.password):
+            raise ValidationError(
+                {
+                    "error": "The new password cannot be the same as your current password. Please choose a different password."
+                }
+            )
+
+        return super().validate(data)

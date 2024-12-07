@@ -2,7 +2,6 @@ from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
 from phonenumber_field.modelfields import PhoneNumberField
 from django.db.models.signals import post_save
-from .signals import user_login_profile_cration_post_save_signal
 
 
 class UserManager(BaseUserManager):
@@ -57,14 +56,10 @@ class User(AbstractBaseUser):
         return self.is_admin
 
 
-post_save.connect(
-    receiver=user_login_profile_cration_post_save_signal,
-    sender=User,
-)
-
-
 class UserProfile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='userprofile')
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name="userprofile"
+    )
     name = models.CharField(max_length=100)
     create_at = models.DateTimeField(auto_now_add=True)
     update_at = models.DateTimeField(auto_now=True)

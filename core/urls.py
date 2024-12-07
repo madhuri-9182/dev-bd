@@ -5,6 +5,8 @@ from .views import (
     CookieTokenRefreshView,
     LogoutView,
     LogoutAllView,
+    PasswordResetView,
+    PasswordResetConfirmView,
 )
 
 urlpatterns = [
@@ -13,4 +15,10 @@ urlpatterns = [
     path("signup/", UserSignupView.as_view(), name="user_signup"),
     path("logout/", LogoutView.as_view(), name="logout"),
     path("logout-all/", LogoutAllView.as_view(), name="logout-all"),
+    path("password_reset/", PasswordResetView.as_view(), name="password_reset_token"),
+    path(
+        "password_reset/confirm/",
+        PasswordResetConfirmView.as_view(),
+        name="password_reset_confirm",
+    ),
 ]

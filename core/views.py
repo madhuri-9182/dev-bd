@@ -10,10 +10,15 @@ from rest_framework_simplejwt.token_blacklist.models import (
     BlacklistedToken,
 )
 from rest_framework.permissions import IsAuthenticated
+from django_rest_passwordreset.views import (
+    ResetPasswordRequestToken,
+    ResetPasswordConfirm,
+)
 from .serializer import (
     UserSerializer,
     UserLoginSerializer,
     CookieTokenRefreshSerializer,
+    ResetPasswordConfirmSerailizer,
 )
 
 
@@ -128,4 +133,40 @@ class LogoutAllView(APIView):
 
     def finalize_response(self, request, response, *args, **kwargs):
         response.delete_cookie("refresh_token")
+        return super().finalize_response(request, response, *args, **kwargs)
+
+
+class PasswordResetView(ResetPasswordRequestToken):
+    def finalize_response(self, request, response, *args, **kwargs):
+        data = response.data
+        if response.status_code == 200:
+            data["status"] = "success"
+            data["message"] = (
+                "If an account with the provided email exists, a password reset link has been sent. Please check your inbox to proceed."
+            )
+        else:
+            data["status"] = "failed"
+            data["message"] = "Token creation failed"
+            if data.get("detail"):
+                data["error"] = data["detail"]
+                del data["detail"]
+        return super().finalize_response(request, response, *args, **kwargs)
+
+
+class PasswordResetConfirmView(ResetPasswordConfirm):
+    serializer_class = ResetPasswordConfirmSerailizer
+
+    def finalize_response(self, request, response, *args, **kwargs):
+        data = response.data
+        if response.status_code == 200:
+            data["status"] = "success"
+            data["message"] = (
+                "Your password has been reset successfully. You can now log in with your new credentials."
+            )
+        else:
+            data["status"] = "failed"
+            data["message"] = "Password reset failed. Please try again."
+            if data.get("detail"):
+                data["error"] = [data["detail"]]
+                del data["detail"]
         return super().finalize_response(request, response, *args, **kwargs)
