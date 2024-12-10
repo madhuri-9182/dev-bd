@@ -2,6 +2,16 @@ from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
 from phonenumber_field.modelfields import PhoneNumberField
 from django.db.models.signals import post_save
+from organizations.models import Organization
+
+
+class Role(models.TextChoices):
+    ADMIN = ("super_admin", "Super Admin")
+    CLIENT = ("client_admin", "Client Admin")
+    MEMBER = ("team_member", "Team Member")
+    USER = ("user", "User")
+    INTERVIEWER = ("interviewer", "Interviewer")
+    AGENCY = ("agency", "Agency")
 
 
 class UserManager(BaseUserManager):
@@ -36,6 +46,7 @@ class User(AbstractBaseUser):
     phone = PhoneNumberField(region="IN", unique=True)
     is_active = models.BooleanField(default=True)
     is_admin = models.BooleanField(default=False)
+    role = models.CharField(max_length=15, choices=Role.choices, default=Role.USER)
 
     objects = UserManager()
 
@@ -57,12 +68,13 @@ class User(AbstractBaseUser):
 
 
 class UserProfile(models.Model):
-    user = models.OneToOneField(
-        User, on_delete=models.CASCADE, related_name="userprofile"
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.CASCADE, related_name="profiles"
     )
-    name = models.CharField(max_length=100)
-    create_at = models.DateTimeField(auto_now_add=True)
-    update_at = models.DateTimeField(auto_now=True)
+    name = models.CharField(max_length=100, help_text="User's Full Name")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self) -> str:
-        return self.user.email
+        return f"{self.name} ({self.user.email})"
