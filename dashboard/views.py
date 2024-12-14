@@ -1,3 +1,10 @@
 from dashboard.Views import (
-    ClientUserView
+    ClientUserView,
+    InternalClientView,
+    InternalClientDetailsView,
+    ClientPointOfContactView,
+    ClientPointOfContactDetailsView,
+    InterviewerView,
+    InterviewerDetails
+    
 )
