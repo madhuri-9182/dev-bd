@@ -216,32 +216,53 @@ class InternalClientDetailsView(APIView):
         return super().finalize_response(request, response, *args, **kwargs)
 
 
-class InterviewerView(APIView):
+class InterviewerView(APIView, LimitOffsetPagination):
 
     def get(self, request):
-        interviewers = InternalInterviewer.objects.all()
-        serializer = InterviewerSerializer(interviewers, many=True)
+        interviewers_qs = InternalInterviewer.objects.all()
+        paginated_qs = self.paginate_queryset(interviewers_qs, request)
+        serializer = InterviewerSerializer(paginated_qs, many=True)
+        paginated_data = self.get_paginated_response(serializer.data)
+
         return Response(
             {
                 "status": "success",
                 "message": "Interviewer list retrieved successfully.",
-                "data": serializer.data,
+                **paginated_data.data,
             },
             status=status.HTTP_200_OK,
         )
 
     def post(self, request):
         serializer = InterviewerSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {
+                    "status": "success",
+                    "message": "Interviewer added successfully.",
+                    "data": serializer.data,
+                },
+                status=status.HTTP_201_CREATED,
+            )
+        custom_error = serializer.errors.pop("errors", None)
         return Response(
             {
-                "status": "success",
-                "message": "Interviewer added successfully.",
-                "data": serializer.data,
+                "status": "failed",
+                "message": "Invalid data.",
+                "errors": serializer.errors if not custom_error else custom_error,
             },
-            status=status.HTTP_201_CREATED,
+            status=status.HTTP_400_BAD_REQUEST,
         )
+
+    def finalize_response(self, request, response, *args, **kwargs):
+        if response.data.get("errors"):
+            response.data["status"] = "failed"
+            response.data["message"] = "Invalid data"
+            errors = response.data["errors"]
+            del response.data["errors"]
+            response.data["errors"] = errors
+        return super().finalize_response(request, response, *args, **kwargs)
 
 
 class InterviewerDetails(APIView):
@@ -251,7 +272,7 @@ class InterviewerDetails(APIView):
             interviewer = InternalInterviewer.objects.get(pk=pk)
         except InternalInterviewer.DoesNotExist:
             return Response(
-                {"error": "Interviewer not found"}, status=status.HTTP_404_NOT_FOUND
+                {"errors": "Interviewer not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
         serializer = InterviewerSerializer(interviewer)
@@ -269,7 +290,7 @@ class InterviewerDetails(APIView):
             interviewer = InternalInterviewer.objects.get(pk=pk)
         except InternalInterviewer.DoesNotExist:
             return Response(
-                {"error": "Interviewer not found"}, status=status.HTTP_404_NOT_FOUND
+                {"errors": "Interviewer not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
         serializer = InterviewerSerializer(interviewer, data=request.data, partial=True)
@@ -296,5 +317,14 @@ class InterviewerDetails(APIView):
             )
         except InternalInterviewer.DoesNotExist:
             return Response(
-                {"error": "Interviewer not found"}, status=status.HTTP_404_NOT_FOUND
+                {"errors": "Interviewer not found"}, status=status.HTTP_404_NOT_FOUND
             )
+
+    def finalize_response(self, request, response, *args, **kwargs):
+        if response.data.get("errors"):
+            response.data["status"] = "failed"
+            response.data["message"] = "Invalid data"
+            errors = response.data["errors"]
+            del response.data["errors"]
+            response.data["errors"] = errors
+        return super().finalize_response(request, response, *args, **kwargs)

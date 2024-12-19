@@ -86,15 +86,45 @@ class ClientPointOfContact(models.Model):
         return self.name
 
 
-# Internal Interviewrer Model
 class InternalInterviewer(models.Model):
     objects = SoftDelete()
-    name = models.CharField(max_length=255)
-    email = models.EmailField(unique=True)
-    phone_number = models.CharField(max_length=15, unique=True)
-    current_company = models.CharField(max_length=255, blank=True, null=True)
-    previous_company = models.CharField(max_length=255, blank=True, null=True)
-    current_designation = models.CharField(max_length=255, blank=True, null=True)
+    object_all = models.Manager()
+
+    ROLE_CHOICES = (
+        ("SDE_1", "SDE-1"),
+        ("SDE_2", "SDE-2"),
+        ("SDE_3", "SDE-3"),
+        ("PRINCIPAL_ENGINEER", "Principal Engineer"),
+        ("ENGINEERING_MANAGER", "Engineering Manager"),
+        ("TECHNICAL_LEAD", "Technical Lead"),
+        ("VP_ENGINEERING", "VP Engineering"),
+        ("DOE", "Director of Engineering"),
+        ("DEVOPS_ENGINEER", "DevOps Engineer"),
+        ("SENIOR_DEVOPS_ENGINEER", "Senior DevOps Engineer"),
+        ("LEAD_DEVOPS_ENGINEER", "Lead DevOps Engineer"),
+        ("SDET", "SDET"),
+        ("SR_SDET", "Sr. SDET"),
+        ("MANAGER_SDET", "Manager-SDET"),
+        ("DIRECTOR_SDET", "Director-SDET"),
+        ("ML_SCIENTIST", "ML Scientist"),
+        ("SR_ML_SCIENTIST", "Sr. ML Scientist"),
+        ("LEAD_ML_SCIENTIST", "Lead ML Scientist"),
+        ("PRINCIPAL_ML_SCIENTIST", "Principal ML Scientist"),
+        ("DATA_ENGINEER", "Data Engineer"),
+        ("SR_DATA_ENGINEER", "Sr. Data Engineer"),
+        ("LEAD_DATA_ENGINEER", "Lead Data Engineer"),
+        ("PRINCIPAL_DATA_ENGINEER", "Principal Data Engineer"),
+    )
+
+    organization = models.ManyToManyField(
+        Organization, related_name="interviewers", blank=True
+    )
+    name = models.CharField(max_length=255, blank=True)
+    email = models.EmailField(unique=True, blank=True)
+    phone_number = models.CharField(max_length=15, unique=True, blank=True)
+    current_company = models.CharField(max_length=255, blank=True)
+    previous_company = models.CharField(max_length=255, blank=True)
+    current_designation = models.CharField(max_length=255, blank=True)
     total_experience_years = models.IntegerField(default=0)
     total_experience_months = models.IntegerField(default=0)
     interview_experience_years = models.IntegerField(default=0)
@@ -103,11 +133,11 @@ class InternalInterviewer(models.Model):
         default=list, blank=True
     )  # e.g., ["SDE III", "EM"]
     skills = models.JSONField(default=list, blank=True)  # e.g., ["Java", "Python"]
-    strength = models.CharField(max_length=50, blank=True, null=True)  # e.g., Backend
-    cv = models.FileField(upload_to="interviewer_cvs/", blank=True, null=True)
+    strength = models.CharField(max_length=50, blank=True)  # e.g., Backend
+    cv = models.FileField(upload_to="interviewer_cvs", blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     archived = models.BooleanField(default=False)
 
     def __str__(self):
-        return self.name
+        return f"{self.name} - {self.organization}"

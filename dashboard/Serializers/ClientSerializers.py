@@ -260,12 +260,10 @@ class InternalClientSerializer(serializers.ModelSerializer):
 
 class InterviewerSerializer(serializers.ModelSerializer):
 
-    created_at = serializers.DateTimeField(format="%d/%m/%Y", read_only=True)
-    updated_at = serializers.DateTimeField(format="%d/%m/%Y", read_only=True)
-
     class Meta:
         model = InternalInterviewer
         fields = (
+            "id",
             "name",
             "email",
             "phone_number",
@@ -280,14 +278,59 @@ class InterviewerSerializer(serializers.ModelSerializer):
             "skills",
             "strength",
             "cv",
-            "created_at",
-            "updated_at",
         )
+
+    def run_validation(self, data=...):
+        errors = []
+        email = data.get("email")
+        phone = data.get("phone")
+        if User.objects.filter(email=email).exists():
+            errors.append({"email": "This email is already used."})
+        if User.objects.filter(phone=phone).exists():
+            errors.append({"phone": "This phone is already used."})
+        if errors:
+            raise serializers.ValidationError({"errors": errors})
+        return super().run_validation(data)
 
     def validate(self, data):
         # Ensure total experience is logical
+        errors = validate_incoming_data(
+            self.initial_data,
+            required_keys=[
+                "name",
+                "email",
+                "phone_number",
+                "previous_company",
+                "current_designation",
+                "total_experience_years",
+                "total_experience_months",
+                "interview_experience_years",
+                "interview_experience_months",
+                "assigned_roles",
+                "skills",
+                "strength",
+                "cv",
+            ],
+            original_data=data,
+            form=True,
+        )
+        if errors:
+            raise serializers.ValidationError({"errors": errors})
         if "total_experience_years" < "interview_experience_years":
             raise serializers.ValidationError(
-                "Total experience must be greater than interview experience."
+                {
+                    "errors": "Total experience must be greater than interview experience."
+                }
             )
         return data
+
+    def create(self, validated_data):
+        email = validated_data.get("email")
+        phone = validated_data.get("phone")
+        User.objects.create_user(
+            email,
+            phone,
+            get_random_password(),
+            role=Role.INTERVIEWER,
+        )
+        return super().create(validated_data)
