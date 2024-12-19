@@ -19,7 +19,12 @@ from hiringdogbackend.utils import validate_incoming_data
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
 
-    return {"refresh": str(refresh), "access": str(refresh.access_token), "id": user.id}
+    return {
+        "refresh": str(refresh),
+        "access": str(refresh.access_token),
+        "id": user.id,
+        "role": user.role,
+    }
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -39,14 +44,14 @@ class UserSerializer(serializers.ModelSerializer):
         errors = validate_incoming_data(data, list(self.fields.keys()))
 
         if errors:
-            raise serializers.ValidationError({"error": errors})
+            raise serializers.ValidationError({"errors": errors})
 
         password = data.get("password")
         confirm_password = data.get("confirm_password")
 
         if password != confirm_password:
             raise serializers.ValidationError(
-                {"error": "Password and confirm_password are not the same."}
+                {"errors": "Password and confirm_password are not the same."}
             )
         password_validation.validate_password(password)
         return data
@@ -66,14 +71,14 @@ class UserLoginSerializer(serializers.ModelSerializer):
     def validate(self, data):
         request = self.context.get("request")
 
-        errors = validate_incoming_data(data, list(self.fields.keys()))
+        errors = validate_incoming_data(self.initial_data, ["email", "password"])
 
         user = authenticate(request, **data)
         if not user:
-            errors.append({"error": "Invalid credentials"})
+            errors.append({"errors": "Invalid credentials"})
 
         if errors:
-            raise serializers.ValidationError({"error": errors})
+            raise serializers.ValidationError({"errors": errors})
 
         tokens = get_tokens_for_user(user)
         data["tokens"] = tokens
@@ -98,7 +103,7 @@ class CookieTokenRefreshSerializer(TokenRefreshSerializer):
         if data["refresh"]:
             return super().validate(data)
 
-        return InvalidToken({"error": "No valid token found in cookie"})
+        return InvalidToken({"errors": "No valid token found in cookie"})
 
 
 class ResetPasswordConfirmSerailizer(PasswordTokenSerializer):
@@ -121,7 +126,7 @@ class ResetPasswordConfirmSerailizer(PasswordTokenSerializer):
         if check_password(data.get("password"), reset_password_token.user.password):
             raise ValidationError(
                 {
-                    "error": "The new password cannot be the same as your current password. Please choose a different password."
+                    "errors": "The new password cannot be the same as your current password. Please choose a different password."
                 }
             )
 

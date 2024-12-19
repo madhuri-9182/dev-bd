@@ -100,7 +100,7 @@ class LogoutView(APIView):
             refresh.blacklist()
         except TokenError:
             return Response(
-                {"status": "fail", "message": "Token error"},
+                {"status": "fail", "message": "Token errors"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         return Response(
@@ -148,7 +148,7 @@ class PasswordResetView(ResetPasswordRequestToken):
             data["status"] = "failed"
             data["message"] = "Token creation failed"
             if data.get("detail"):
-                data["error"] = data["detail"]
+                data["errors"] = data["detail"]
                 del data["detail"]
         return super().finalize_response(request, response, *args, **kwargs)
 
@@ -167,6 +167,6 @@ class PasswordResetConfirmView(ResetPasswordConfirm):
             data["status"] = "failed"
             data["message"] = "Password reset failed. Please try again."
             if data.get("detail"):
-                data["error"] = [data["detail"]]
+                data["errors"] = [data["detail"]]
                 del data["detail"]
         return super().finalize_response(request, response, *args, **kwargs)

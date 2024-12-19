@@ -70,7 +70,7 @@ class User(AbstractBaseUser):
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
     organization = models.ForeignKey(
-        Organization, on_delete=models.CASCADE, related_name="profiles"
+        Organization, on_delete=models.CASCADE, related_name="profiles", null=True
     )
     name = models.CharField(max_length=100, help_text="User's Full Name")
     created_at = models.DateTimeField(auto_now_add=True)

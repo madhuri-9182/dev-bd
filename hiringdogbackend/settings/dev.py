@@ -12,3 +12,9 @@ DATABASES = {
         "NAME": BASE_DIR / "db.sqlite3",
     }
 }
+
+
+REGEX_GSTIN_BASIC = r"^(?=.*[a-zA-Z])(?=.*\d)[a-zA-Z\d]{15}$"
+REGEX_GSTIN = "^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$"
+REGEX_PAN = r"^[A-Za-z]{5}[0-9]{4}[A-Za-z]$"
+REGEX_PAN_BASIC = r"^(?=.*[a-zA-Z])(?=.*\d)[a-zA-Z\d]{10}$"
