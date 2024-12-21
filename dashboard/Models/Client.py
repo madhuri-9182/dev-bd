@@ -1,6 +1,6 @@
-from organizations.utils import create_organization
 from organizations.models import Organization
 from django.db import models
+from django.core.validators import MinValueValidator, MaxValueValidator
 from phonenumber_field.modelfields import PhoneNumberField
 from core.models import User
 from hiringdogbackend.ModelUtils import SoftDelete
@@ -116,24 +116,45 @@ class InternalInterviewer(models.Model):
         ("PRINCIPAL_DATA_ENGINEER", "Principal Data Engineer"),
     )
 
+    STRENGTH_CHOICES = (
+        ("backend", "Backend"),
+        ("frontend", "Frontend"),
+        ("devops", "DevOps"),
+        ("testing", "Strength"),
+        ("aiml", "AI/ML"),
+        ("data_engineer", "Data Engineer"),
+    )
+
     organization = models.ManyToManyField(
         Organization, related_name="interviewers", blank=True
     )
     name = models.CharField(max_length=255, blank=True)
     email = models.EmailField(unique=True, blank=True)
-    phone_number = models.CharField(max_length=15, unique=True, blank=True)
+    phone_number = PhoneNumberField(region="IN", unique=True, blank=True)
     current_company = models.CharField(max_length=255, blank=True)
     previous_company = models.CharField(max_length=255, blank=True)
     current_designation = models.CharField(max_length=255, blank=True)
-    total_experience_years = models.IntegerField(default=0)
-    total_experience_months = models.IntegerField(default=0)
-    interview_experience_years = models.IntegerField(default=0)
-    interview_experience_months = models.IntegerField(default=0)
+    total_experience_years = models.PositiveSmallIntegerField(
+        validators=[
+            MinValueValidator(1, message="Expereince should be more than 1 year"),
+            MaxValueValidator(50, message="Enter a valid Experience"),
+        ],
+    )
+    total_experience_months = models.PositiveSmallIntegerField(default=0)
+    interview_experience_years = models.PositiveSmallIntegerField(
+        validators=[
+            MinValueValidator(1, message="Expereince should be more than 1 year"),
+            MaxValueValidator(50, message="Enter a valid Experience"),
+        ],
+    )
+    interview_experience_months = models.PositiveSmallIntegerField(default=0)
     assigned_roles = models.JSONField(
         default=list, blank=True
     )  # e.g., ["SDE III", "EM"]
     skills = models.JSONField(default=list, blank=True)  # e.g., ["Java", "Python"]
-    strength = models.CharField(max_length=50, blank=True)  # e.g., Backend
+    strength = models.CharField(
+        max_length=50, blank=True, choices=STRENGTH_CHOICES
+    )  # e.g., Backend
     cv = models.FileField(upload_to="interviewer_cvs", blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

@@ -281,13 +281,31 @@ class InterviewerSerializer(serializers.ModelSerializer):
         )
 
     def run_validation(self, data=...):
+
+        if self.partial:
+            data.pop("email", None)
+            data.pop("phone_number", None)
+
         errors = []
         email = data.get("email")
-        phone = data.get("phone")
+        phone = data.get("phone_number")
+        strength = data.get("strength")
         if User.objects.filter(email=email).exists():
             errors.append({"email": "This email is already used."})
         if User.objects.filter(phone=phone).exists():
             errors.append({"phone": "This phone is already used."})
+        if strength and strength not in [
+            "frontend",
+            "backend",
+            "devops",
+            "aiml",
+            "data_engineer",
+        ]:
+            errors.append(
+                {
+                    "strength": "Invalid strength type. Valid types are frontend, backend, devops, aiml and data_engineer."
+                }
+            )
         if errors:
             raise serializers.ValidationError({"errors": errors})
         return super().run_validation(data)
@@ -311,22 +329,29 @@ class InterviewerSerializer(serializers.ModelSerializer):
                 "strength",
                 "cv",
             ],
+            partial=self.partial,
             original_data=data,
             form=True,
         )
         if errors:
             raise serializers.ValidationError({"errors": errors})
+        for key in ["total_experience_years", "interview_experience_years"]:
+            if key in data and not 1 <= data[key] <= 50:
+                errors.append({key: "Invalid Experience"})
+        for key in ["total_experience_months", "interview_experience_months"]:
+            if key in data and not 0 <= data[key] <= 12:
+                errors.append({key: "Invalid Experience"})
         if "total_experience_years" < "interview_experience_years":
-            raise serializers.ValidationError(
-                {
-                    "errors": "Total experience must be greater than interview experience."
-                }
+            errors.append(
+                {"years": "Total experience must be greater than interview experience."}
             )
+        if errors:
+            raise serializers.ValidationError({"errors": errors})
         return data
 
     def create(self, validated_data):
         email = validated_data.get("email")
-        phone = validated_data.get("phone")
+        phone = validated_data.get("phone_number")
         User.objects.create_user(
             email,
             phone,

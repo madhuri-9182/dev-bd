@@ -66,6 +66,9 @@ class User(AbstractBaseUser):
     def is_staff(self):
         return self.is_admin
 
+    class Meta:
+        indexes = [models.Index(fields=["email", "phone"])]
+
 
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
@@ -78,3 +81,6 @@ class UserProfile(models.Model):
 
     def __str__(self) -> str:
         return f"{self.name} ({self.user.email})"
+
+    class Meta:
+        indexes = [models.Index(fields=["name"])]

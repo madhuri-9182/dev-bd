@@ -293,7 +293,8 @@ class InterviewerDetails(APIView):
                 {"errors": "Interviewer not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
-        serializer = InterviewerSerializer(interviewer, data=request.data, partial=True)
+        serializer = InterviewerSerializer(
+            interviewer, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response(
@@ -302,9 +303,19 @@ class InterviewerDetails(APIView):
                     "message": "Interviewer added successfully.",
                     "data": serializer.data,
                 },
-                status=status.HTTP_201_CREATED,
+                status=status.HTTP_200_OK,
             )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        custom_error = serializer.errors.pop("errors", None)
+
+        return Response(
+            {
+                "status": "failed",
+                "message": "Invalid data.",
+                "errors": serializer.errors if not custom_error else custom_error,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
     def delete(self, request, pk):
         try:
