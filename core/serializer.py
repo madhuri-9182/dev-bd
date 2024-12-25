@@ -60,8 +60,8 @@ class UserSerializer(serializers.ModelSerializer):
         validated_data.pop("confirm_password", None)
         name = validated_data.pop("name", None)
         user = User.objects.create_user(**validated_data)
-        user.userprofile.name = name
-        user.userprofile.save()
+        user.profile.name = name
+        user.profile.save()
         return user
 
 
