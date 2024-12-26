@@ -1,1 +1,2 @@
-from ..Models.Client import ClientUser , InternalClient , ClientPointOfContact , InternalInterviewer
+from .Client import ClientUser
+from .Internal import ClientPointOfContact, InternalClient, InternalInterviewer

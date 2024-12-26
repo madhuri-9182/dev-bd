@@ -1,1 +1,6 @@
-from .ClientSerializers import ClientUserSerializer , ClientPointOfContactSerializer , InternalClientSerializer , InterviewerSerializer
+from .ClientSerializers import ClientUserSerializer
+from .InternalSerializers import (
+    ClientPointOfContactSerializer,
+    InternalClientSerializer,
+    InterviewerSerializer,
+)

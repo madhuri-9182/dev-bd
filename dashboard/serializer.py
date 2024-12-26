@@ -1,6 +1,6 @@
-from dashboard.Serializers.ClientSerializers import (
+from .Serializers import (
     ClientUserSerializer,
-    InternalClientSerializer, 
+    InternalClientSerializer,
     ClientPointOfContactSerializer,
-    InterviewerSerializer
+    InterviewerSerializer,
 )

@@ -1,7 +1,6 @@
-from dashboard.Models.Client import (
+from .Models import (
     ClientUser,
     InternalClient,
-    ClientPointOfContact, 
-    InternalInterviewer
-    
-    )
+    ClientPointOfContact,
+    InternalInterviewer,
+)
