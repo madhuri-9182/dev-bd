@@ -13,6 +13,7 @@ from hiringdogbackend.utils import (
     is_valid_pan,
     get_boolean,
 )
+from ..tasks import send_welcome_mail_upon_successful_onboarding
 
 
 class ClientPointOfContactSerializer(serializers.ModelSerializer):
@@ -152,14 +153,23 @@ class InternalClientSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         points_of_contact_data = validated_data.pop("points_of_contact")
         name = validated_data.get("name")
+        password = get_random_password()
 
         user_and_points_of_contact = []
         for _, point_of_contact in enumerate(points_of_contact_data):
+            email = point_of_contact.get("email")
+            name_ = point_of_contact.get("name")
             user = User.objects.create_user(
-                point_of_contact.get("email"),
+                email,
                 point_of_contact.get("phone"),
-                get_random_password(),
+                password,
                 role=Role.CLIENT,
+            )
+            send_welcome_mail_upon_successful_onboarding.delay(
+                email=email,
+                user_name=name_,
+                password=password,
+                login_url="https://hdip.vercel.app/auth/signin/loginmail",
             )
             if _ == 0:
                 organization = create_organization(user, name, is_active=False)
@@ -206,11 +216,20 @@ class InternalClientSerializer(serializers.ModelSerializer):
                     setattr(contact, key, value)
                 contact.save()
             else:
+                email = contact_data.get("email")
+                name = contact_data.get("name")
+                password = get_random_password()
                 user = User.objects.create_user(
                     contact_data.get("email"),
                     contact_data.get("phone"),
-                    get_random_password(),
+                    password,
                     role=Role.CLIENT,
+                )
+                send_welcome_mail_upon_successful_onboarding.delay(
+                    email=email,
+                    user_name=name,
+                    password=password,
+                    login_url="https://hdip.vercel.app/auth/signin/loginmail",
                 )
                 ClientPointOfContact.objects.create(client=instance, **contact_data)
 
@@ -311,10 +330,17 @@ class InterviewerSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         email = validated_data.get("email")
         phone = validated_data.get("phone_number")
-        User.objects.create_user(
+        password = get_random_password()
+        user = User.objects.create_user(
             email,
             phone,
-            get_random_password(),
+            password,
             role=Role.INTERVIEWER,
+        )
+        send_welcome_mail_upon_successful_onboarding.delay(
+            email=email,
+            user_name=validated_data.get("name"),
+            password=password,
+            login_url="https://hdip.vercel.app/auth/signin/loginmail",
         )
         return super().create(validated_data)
