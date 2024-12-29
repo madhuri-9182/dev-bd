@@ -95,9 +95,9 @@ class LogoutView(APIView):
                 {"status": "fail", "message": "Invalid request"},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
-        refresh = RefreshToken(refresh)
         try:
-            refresh.blacklist()
+            refresh_obj = RefreshToken(refresh)
+            refresh_obj.blacklist()
         except TokenError:
             return Response(
                 {"status": "fail", "message": "Token errors"},
