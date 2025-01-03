@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from organizations.utils import create_organization
 from django.core.validators import EmailValidator
+from django.core.exceptions import ValidationError
 from core.models import User, Role
 from ..models import (
     InternalClient,
@@ -29,9 +30,12 @@ class ClientPointOfContactSerializer(serializers.ModelSerializer):
         errors = []
 
         email = data.get("email")
-        if not isinstance(email, str) or not EmailValidator()(email):
+        validator = EmailValidator()
+        try:
+            validator(email)
+        except ValidationError:
             errors.append({"email": "Invalid email."})
-        elif User.objects.filter(email=email).exists():
+        if User.objects.filter(email=email).exists():
             errors.append({"email": "This email is already used."})
 
         phone = data.get("phone")
