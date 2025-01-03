@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from organizations.utils import create_organization
+from django.core.validators import EmailValidator
 from core.models import User, Role
 from ..models import (
     InternalClient,
@@ -26,12 +27,19 @@ class ClientPointOfContactSerializer(serializers.ModelSerializer):
 
     def run_validation(self, data=...):
         errors = []
+
         email = data.get("email")
-        phone = data.get("phone")
-        if User.objects.filter(email=email).exists():
+        if not isinstance(email, str) or not EmailValidator()(email):
+            errors.append({"email": "Invalid email."})
+        elif User.objects.filter(email=email).exists():
             errors.append({"email": "This email is already used."})
-        if User.objects.filter(phone=phone).exists():
+
+        phone = data.get("phone")
+        if not isinstance(phone, str) or len(phone) != 13 or phone[:3] != "+91":
+            errors.append({"phone": "Invalid phone number"})
+        elif User.objects.filter(phone=phone).exists():
             errors.append({"phone": "This phone is already used."})
+
         if errors:
             raise serializers.ValidationError({"errors": errors})
         return super().run_validation(data)
