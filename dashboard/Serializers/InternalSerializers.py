@@ -28,24 +28,30 @@ class ClientPointOfContactSerializer(serializers.ModelSerializer):
 
     def run_validation(self, data=...):
         errors = []
-
         email = data.get("email")
-        validator = EmailValidator()
-        try:
-            validator(email)
-        except ValidationError:
-            errors.append({"email": "Invalid email."})
-        if User.objects.filter(email=email).exists():
-            errors.append({"email": "This email is already used."})
-
         phone = data.get("phone")
-        if not isinstance(phone, str) or len(phone) != 13 or phone[:3] != "+91":
-            errors.append({"phone": "Invalid phone number"})
-        elif User.objects.filter(phone=phone).exists():
-            errors.append({"phone": "This phone is already used."})
+
+        if email:
+            try:
+                EmailValidator()(email)
+            except ValidationError:
+                errors.append({"email": "Invalid email"})
+            if User.objects.filter(email=email).exists():
+                errors.append({"email": "This email is already used."})
+
+        if phone:
+            if (
+                not isinstance(phone, str)
+                or len(phone) != 13
+                or not phone.startswith("+91")
+            ):
+                errors.append({"phone": "Invalid phone number"})
+            elif User.objects.filter(phone=phone).exists():
+                errors.append({"phone": "This phone is already used."})
 
         if errors:
             raise serializers.ValidationError({"errors": errors})
+
         return super().run_validation(data)
 
     def validate(self, data):
