@@ -181,7 +181,7 @@ class InternalClientSerializer(serializers.ModelSerializer):
                 email,
                 point_of_contact.get("phone"),
                 password,
-                role=Role.CLIENT,
+                role=Role.CLIENT_ADMIN,
             )
             send_welcome_mail_upon_successful_onboarding.delay(
                 email=email,
@@ -241,7 +241,7 @@ class InternalClientSerializer(serializers.ModelSerializer):
                     contact_data.get("email"),
                     contact_data.get("phone"),
                     password,
-                    role=Role.CLIENT,
+                    role=Role.CLIENT_ADMIN,
                 )
                 send_welcome_mail_upon_successful_onboarding.delay(
                     email=email,

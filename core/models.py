@@ -1,14 +1,14 @@
 from django.db import models
-from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, Group
 from phonenumber_field.modelfields import PhoneNumberField
-from django.db.models.signals import post_save
 from organizations.models import Organization
 
 
 class Role(models.TextChoices):
-    ADMIN = ("super_admin", "Super Admin")
-    CLIENT = ("client_admin", "Client Admin")
-    MEMBER = ("team_member", "Team Member")
+    SUPER_ADMIN = ("super_admin", "Super Admin")
+    MODERATOR = ("moderator", "Moderator")
+    CLIENT_ADMIN = ("client_admin", "Client Admin")
+    CLIENT_USER = ("client_user", "Client User")
     USER = ("user", "User")
     INTERVIEWER = ("interviewer", "Interviewer")
     AGENCY = ("agency", "Agency")
@@ -84,3 +84,12 @@ class UserProfile(models.Model):
 
     class Meta:
         indexes = [models.Index(fields=["name"])]
+
+
+class ClientCustomRole(Group):
+    created_by = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="clientcustomrole"
+    )
+    organization = models.ForeignKey(
+        Organization, on_delete=models.CASCADE, related_name="clientcustomrole"
+    )

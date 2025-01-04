@@ -12,6 +12,7 @@ from ..serializer import (
     InterviewerSerializer,
 )
 
+
 class InternalClientView(APIView, LimitOffsetPagination):
     serializer_class = InternalClientSerializer
     permission_classes = [IsAuthenticated]
@@ -210,8 +211,7 @@ class InterviewerDetails(APIView):
                 {"errors": "Interviewer not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
-        serializer = InterviewerSerializer(
-            interviewer, data=request.data, partial=True)
+        serializer = InterviewerSerializer(interviewer, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response(
@@ -256,4 +256,3 @@ class InterviewerDetails(APIView):
             del response.data["errors"]
             response.data["errors"] = errors
         return super().finalize_response(request, response, *args, **kwargs)
-
