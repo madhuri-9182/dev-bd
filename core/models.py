@@ -57,7 +57,11 @@ class User(AbstractBaseUser):
         return self.email
 
     def has_perm(self, perm, obj=None):
-        return True
+        if self.is_admin:
+            return True
+        return Group.objects.filter(
+            name=self.role, permissions__codename=perm.split(".")[1]
+        ).exists()
 
     def has_module_perms(self, app_label):
         return self.is_admin

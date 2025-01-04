@@ -3,6 +3,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from core.permissions import IsSuperAdmin, IsModerator
 from ..models import (
     InternalClient,
     InternalInterviewer,
@@ -15,7 +16,7 @@ from ..serializer import (
 
 class InternalClientView(APIView, LimitOffsetPagination):
     serializer_class = InternalClientSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsSuperAdmin | IsModerator]
 
     def get(self, request):
         internal_clients = InternalClient.objects.prefetch_related(
@@ -57,7 +58,7 @@ class InternalClientView(APIView, LimitOffsetPagination):
     def finalize_response(self, request, response, *args, **kwargs):
         if response.data.get("errors"):
             response.data["status"] = "failed"
-            response.data["message"] = "Invalid data"
+            response.data["message"] = response.data.get("message", "Invalid data")
             errors = response.data["errors"]
             del response.data["errors"]
             response.data["errors"] = errors
@@ -65,7 +66,11 @@ class InternalClientView(APIView, LimitOffsetPagination):
 
 
 class InternalClientDetailsView(APIView):
+    serializer_class = InternalClientSerializer
+    permission_classes = [IsAuthenticated, IsSuperAdmin | IsModerator]
+
     def get(self, request, pk):
+
         try:
             client = InternalClient.objects.get(pk=pk)
         except InternalClient.DoesNotExist:
@@ -73,7 +78,7 @@ class InternalClientDetailsView(APIView):
                 {"errors": "Client not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
-        serializer = InternalClientSerializer(client)
+        serializer = self.serializer_class(client)
         return Response(
             {
                 "status": "success",
@@ -91,7 +96,7 @@ class InternalClientDetailsView(APIView):
                 {"errors": "Client not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
-        serializer = InternalClientSerializer(
+        serializer = self.serializer_class(
             client, data=request.data, partial=True, context={"request": request}
         )
         if serializer.is_valid():
@@ -127,7 +132,7 @@ class InternalClientDetailsView(APIView):
     def finalize_response(self, request, response, *args, **kwargs):
         if response.data.get("errors"):
             response.data["status"] = "failed"
-            response.data["message"] = "Invalid data"
+            response.data["message"] = response.data.get("message", "Invalid data")
             errors = response.data["errors"]
             del response.data["errors"]
             response.data["errors"] = errors
@@ -135,11 +140,13 @@ class InternalClientDetailsView(APIView):
 
 
 class InterviewerView(APIView, LimitOffsetPagination):
+    serializer_class = InterviewerSerializer
+    permission_classes = [IsAuthenticated, IsModerator | IsSuperAdmin]
 
     def get(self, request):
         interviewers_qs = InternalInterviewer.objects.all()
         paginated_qs = self.paginate_queryset(interviewers_qs, request)
-        serializer = InterviewerSerializer(paginated_qs, many=True)
+        serializer = self.serializer_class(paginated_qs, many=True)
         paginated_data = self.get_paginated_response(serializer.data)
 
         return Response(
@@ -152,7 +159,7 @@ class InterviewerView(APIView, LimitOffsetPagination):
         )
 
     def post(self, request):
-        serializer = InterviewerSerializer(data=request.data)
+        serializer = self.serializer_class(data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(
@@ -176,7 +183,7 @@ class InterviewerView(APIView, LimitOffsetPagination):
     def finalize_response(self, request, response, *args, **kwargs):
         if response.data.get("errors"):
             response.data["status"] = "failed"
-            response.data["message"] = "Invalid data"
+            response.data["message"] = response.data.get("message", "Invalid data")
             errors = response.data["errors"]
             del response.data["errors"]
             response.data["errors"] = errors
@@ -184,6 +191,8 @@ class InterviewerView(APIView, LimitOffsetPagination):
 
 
 class InterviewerDetails(APIView):
+    serializer_class = InterviewerSerializer
+    permission_classes = [IsAuthenticated, IsSuperAdmin | IsModerator]
 
     def get(self, request, pk):
         try:
@@ -193,7 +202,7 @@ class InterviewerDetails(APIView):
                 {"errors": "Interviewer not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
-        serializer = InterviewerSerializer(interviewer)
+        serializer = self.serializer_class(interviewer)
         return Response(
             {
                 "status": "success",
@@ -211,7 +220,7 @@ class InterviewerDetails(APIView):
                 {"errors": "Interviewer not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
-        serializer = InterviewerSerializer(interviewer, data=request.data, partial=True)
+        serializer = self.serializer_class(interviewer, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response(
@@ -251,7 +260,7 @@ class InterviewerDetails(APIView):
     def finalize_response(self, request, response, *args, **kwargs):
         if response.data.get("errors"):
             response.data["status"] = "failed"
-            response.data["message"] = "Invalid data"
+            response.data["message"] = response.data.get("message", "Invalid data")
             errors = response.data["errors"]
             del response.data["errors"]
             response.data["errors"] = errors

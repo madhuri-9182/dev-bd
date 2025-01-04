@@ -34,9 +34,11 @@ class Command(BaseCommand):
                     "organizationinvitation",
                     "organizationowner",
                     "organizationuser",
+                    "clientcustomrole",
+                    "clientuser",
                 ]
             )
-            | Q(content_type__app_label__in=["auth"])
+            | Q(content_type__app_label__in=["auth", "django_rest_passwordreset"])
         )
         roles["moderator"].permissions.set(moderator_permission_qs)
         client_admin_permissions_qs = all_permission_qs.filter(
@@ -51,16 +53,7 @@ class Command(BaseCommand):
             )
         )
         roles["client_admin"].permissions.set(client_admin_permissions_qs)
-        client_user_permission_qs = client_admin_permissions_qs.exclude(
-            content_type__model__in=[
-                "user",
-                "clientcustomrole",
-                "clientuser",
-                "organizationinvitation",
-                "organizationuser",
-                "organizationowner",
-            ]
-        )
+        client_user_permission_qs = client_admin_permissions_qs.none()
         roles["client_user"].permissions.set(client_user_permission_qs)
         self.stdout.write(
             self.style.SUCCESS("Roles and permissions added successfully.")
