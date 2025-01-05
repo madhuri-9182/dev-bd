@@ -1,5 +1,6 @@
-from django.db import models
+from django.db import models, IntegrityError
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, Group
+from django.core.exceptions import ValidationError
 from phonenumber_field.modelfields import PhoneNumberField
 from organizations.models import Organization
 
@@ -20,13 +21,20 @@ class UserManager(BaseUserManager):
             raise ValueError("User must have an email address")
         if not phone:
             raise ValueError("User must have a phone number")
+
         user = self.model(
             email=self.normalize_email(email),
             phone=phone,
             **extra_field,
         )
         user.set_password(password)
-        user.save(using=self._db)
+        try:
+            user.save(using=self._db)
+        except IntegrityError as e:
+            if "phone" in str(e):
+                raise ValidationError("phone number already taken.")
+            else:
+                raise e
         return user
 
     def create_superuser(self, email, phone, password=None, **extra_field):
@@ -37,6 +45,7 @@ class UserManager(BaseUserManager):
         user = self.create_user(email, phone, password, **extra_field)
         user.is_admin = True
         user.is_active = True
+        user.role = Role.SUPER_ADMIN
         user.save(using=self._db)
         return user
 
