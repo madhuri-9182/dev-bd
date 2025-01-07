@@ -3,4 +3,7 @@ from .Models import (
     InternalClient,
     ClientPointOfContact,
     InternalInterviewer,
+    Job,
+    Candidate,
+    Interview,
 )

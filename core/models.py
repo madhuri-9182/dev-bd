@@ -3,12 +3,14 @@ from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, Group
 from django.core.exceptions import ValidationError
 from phonenumber_field.modelfields import PhoneNumberField
 from organizations.models import Organization
+from hiringdogbackend.ModelUtils import CreateUpdateDateTimeAndArchivedField
 
 
 class Role(models.TextChoices):
     SUPER_ADMIN = ("super_admin", "Super Admin")
     MODERATOR = ("moderator", "Moderator")
     CLIENT_ADMIN = ("client_admin", "Client Admin")
+    CLIENT_OWNER = ("client_owner", "Client Owner")
     CLIENT_USER = ("client_user", "Client User")
     USER = ("user", "User")
     INTERVIEWER = ("interviewer", "Interviewer")
@@ -83,14 +85,12 @@ class User(AbstractBaseUser):
         indexes = [models.Index(fields=["email", "phone"])]
 
 
-class UserProfile(models.Model):
+class UserProfile(CreateUpdateDateTimeAndArchivedField):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
     organization = models.ForeignKey(
         Organization, on_delete=models.CASCADE, related_name="profiles", null=True
-    )
+    )  # comment this when you run you first makemigration command
     name = models.CharField(max_length=100, help_text="User's Full Name")
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self) -> str:
         return f"{self.name} ({self.user.email})"
@@ -105,4 +105,4 @@ class ClientCustomRole(Group):
     )
     organization = models.ForeignKey(
         Organization, on_delete=models.CASCADE, related_name="clientcustomrole"
-    )
+    )  # comment this when you run you first makemigration command

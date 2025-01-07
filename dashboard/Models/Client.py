@@ -1,39 +1,54 @@
 from organizations.models import Organization
 from django.db import models
 from phonenumber_field.modelfields import PhoneNumberField
-from core.models import User, Role
+from core.models import User
 from hiringdogbackend.ModelUtils import SoftDelete, CreateUpdateDateTimeAndArchivedField
 from .Internal import InternalInterviewer
 
 
-class ClientUser(models.Model, CreateUpdateDateTimeAndArchivedField):
+class ClientUser(CreateUpdateDateTimeAndArchivedField):
+    STATUS_CHOICES = (
+        ("ACT", "Active"),
+        ("INACT", "Inactive"),
+        ("PEND", "Pending"),
+    )
+
+    objects = SoftDelete()
+
+    organization = models.ForeignKey(
+        Organization, on_delete=models.CASCADE, related_name="clientuser", blank=True
+    )
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name="clientuser", blank=True
+    )
+    name = models.CharField(max_length=100, blank=True)
+    designation = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,  # Allows null values to prevent empty strings from being stored as null
+    )
+    invited_by = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+        related_name="invited_by_clientuser",
+    )
+    status = models.CharField(
+        max_length=15,
+        choices=STATUS_CHOICES,
+        blank=True,
+        help_text="verification status",
+        default="PEND",
+    )
+
+
+class Job(CreateUpdateDateTimeAndArchivedField):
     REASON_FOR_ARCHIVED_CHOICES = (
         ("PF", "Postition Filled"),
         ("POH", "Position On Hold"),
         ("OTH", "Other"),
     )
-    objects = SoftDelete()
-    Organization = models.ForeignKey(
-        Organization, on_delete=models.CASCADE, related_name="clientuser", blank=True
-    )
-    User = models.OneToOneField(
-        User, on_delete=models.CASCADE, related_name="clientuser", blank=True
-    )
-    name = models.CharField(max_length=100, blank=True)
-    email = models.EmailField(max_length=100, unique=True, blank=True)
-    designation = models.CharField(max_length=100, blank=True)
-    role = models.CharField(
-        max_length=15,
-        choices=Role.choices,
-        blank=True,
-        verbose_name="user_type",
-    )
-    reason_for_archived = models.CharField(
-        max_length=15, choices=REASON_FOR_ARCHIVED_CHOICES, blank=True, null=True
-    )
-
-
-class Job(models.Model, CreateUpdateDateTimeAndArchivedField):
     objects = SoftDelete()
     object_all = models.Manager()
     client = models.ForeignKey(
@@ -52,9 +67,12 @@ class Job(models.Model, CreateUpdateDateTimeAndArchivedField):
     mandatory_skills = models.TextField(blank=True)
     interview_time = models.CharField(max_length=50)
     other_details = models.JSONField(default=dict, blank=True)
+    reason_for_archived = models.CharField(
+        max_length=15, choices=REASON_FOR_ARCHIVED_CHOICES, blank=True, null=True
+    )
 
 
-class Candidate(models.Model, CreateUpdateDateTimeAndArchivedField):
+class Candidate(CreateUpdateDateTimeAndArchivedField):
     STATUS_CHOICES = (
         ("REC", "Recommended"),
         ("NREC", "Not Recommended"),
@@ -103,7 +121,7 @@ class Candidate(models.Model, CreateUpdateDateTimeAndArchivedField):
     total_score = models.PositiveSmallIntegerField(default=0)
 
 
-class Interview(models.Model, CreateUpdateDateTimeAndArchivedField):
+class Interview(CreateUpdateDateTimeAndArchivedField):
     candidate = models.ForeignKey(
         Candidate, on_delete=models.DO_NOTHING, related_name="interview", blank=True
     )

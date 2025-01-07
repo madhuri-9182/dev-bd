@@ -2,10 +2,10 @@ from organizations.models import Organization
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 from phonenumber_field.modelfields import PhoneNumberField
-from hiringdogbackend.ModelUtils import SoftDelete
+from hiringdogbackend.ModelUtils import SoftDelete, CreateUpdateDateTimeAndArchivedField
 
 
-class InternalClient(models.Model):
+class InternalClient(CreateUpdateDateTimeAndArchivedField):
     objects = SoftDelete()
     object_all = models.Manager()
     organization = models.OneToOneField(
@@ -22,15 +22,12 @@ class InternalClient(models.Model):
     is_signed = models.BooleanField(default=False)
     assigned_to = models.CharField(max_length=255, blank=True)
     address = models.TextField(max_length=255, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    archived = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
 
 
-class ClientPointOfContact(models.Model):
+class ClientPointOfContact(CreateUpdateDateTimeAndArchivedField):
     objects = SoftDelete()
     object_all = models.Manager()
 
@@ -43,15 +40,12 @@ class ClientPointOfContact(models.Model):
     name = models.CharField(max_length=255, blank=True)
     email = models.EmailField(unique=True, blank=True)
     phone = PhoneNumberField(region="IN", unique=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    archived = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
 
 
-class InternalInterviewer(models.Model):
+class InternalInterviewer(CreateUpdateDateTimeAndArchivedField):
     objects = SoftDelete()
     object_all = models.Manager()
 
@@ -121,9 +115,6 @@ class InternalInterviewer(models.Model):
         max_length=50, blank=True, choices=STRENGTH_CHOICES
     )  # e.g., Backend
     cv = models.FileField(upload_to="interviewer_cvs", blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    archived = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.name} - {self.organization}"

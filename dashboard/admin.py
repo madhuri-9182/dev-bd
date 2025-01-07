@@ -5,7 +5,7 @@ from django.contrib import admin
 from django.contrib import admin
 from django.db.models.query import QuerySet
 from django.http import HttpRequest
-from .models import InternalClient, ClientPointOfContact
+from .models import InternalClient, ClientPointOfContact, Job
 
 
 @admin.register(InternalClient)
@@ -22,3 +22,12 @@ class ClientPointOfContactAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         return ClientPointOfContact.object_all.all()
+
+
+@admin.register(Job)
+class ClientPointOfContactAdmin(admin.ModelAdmin):
+    list_display = ("name", "job_id")
+    search_fields = ("name", "job_id")
+
+    def get_queryset(self, request):
+        return Job.object_all.all()

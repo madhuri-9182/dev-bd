@@ -6,7 +6,10 @@ class SoftDelete(models.Manager):
         return super().get_queryset().filter(archived=False)
 
 
-class CreateUpdateDateTimeAndArchivedField:
+class CreateUpdateDateTimeAndArchivedField(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     archived = models.BooleanField(default=False)
+
+    class Meta:
+        abstract = True
