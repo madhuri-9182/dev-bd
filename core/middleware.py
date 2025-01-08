@@ -13,8 +13,6 @@ class VerificationMiddleWare:
 
     def __call__(self, request):
 
-        # Debugging statements to see what's happening
-        print(f"User is authenticated: {request.user.is_authenticated}")
         if request.user.is_authenticated:
             if not request.user.email_verified or not request.user.phone_verified:
                 return JsonResponse(
