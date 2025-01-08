@@ -5,15 +5,13 @@ from django.conf import settings
 
 
 @shared_task()
-def send_welcome_mail_upon_successful_onboarding(email, password, **kwargs):
+def send_mail(email, subject, template, **kwargs):
     context = {
         "email": email,
-        "password": password,
         **kwargs,
     }
-    subject = "Welcome to Hiring Dog"
 
-    content = render_to_string("onboard.html", context=context)
+    content = render_to_string(template, context=context)
     email = EmailMultiAlternatives(
         subject,
         "",
@@ -21,4 +19,4 @@ def send_welcome_mail_upon_successful_onboarding(email, password, **kwargs):
         [email],
     )
     email.attach_alternative(content, "text/html")
-    email.send()
+    email.send(fail_silently=True)

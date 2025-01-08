@@ -3,4 +3,5 @@ from .Serializers import (
     InternalClientSerializer,
     ClientPointOfContactSerializer,
     InterviewerSerializer,
+    ClientUserSerializer,
 )

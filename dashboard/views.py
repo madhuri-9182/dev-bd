@@ -4,4 +4,5 @@ from dashboard.Views import (
     InternalClientDetailsView,
     InterviewerView,
     InterviewerDetails,
+    ClientInvitationActivateView,
 )

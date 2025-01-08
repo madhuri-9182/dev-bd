@@ -14,6 +14,7 @@ class ClientUser(CreateUpdateDateTimeAndArchivedField):
     )
 
     objects = SoftDelete()
+    object_all = models.Manager()
 
     organization = models.ForeignKey(
         Organization, on_delete=models.CASCADE, related_name="clientuser", blank=True
@@ -65,7 +66,7 @@ class Job(CreateUpdateDateTimeAndArchivedField):
     total_positions = models.PositiveSmallIntegerField(default=0)
     job_description_file = models.FileField(upload_to="job_descriptions")
     mandatory_skills = models.TextField(blank=True)
-    interview_time = models.CharField(max_length=50)
+    interview_time = models.CharField(max_length=50, help_text="duration")
     other_details = models.JSONField(default=dict, blank=True)
     reason_for_archived = models.CharField(
         max_length=15, choices=REASON_FOR_ARCHIVED_CHOICES, blank=True, null=True

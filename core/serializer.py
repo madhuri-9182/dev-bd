@@ -75,7 +75,19 @@ class UserLoginSerializer(serializers.ModelSerializer):
 
         user = authenticate(request, **data)
         if not user:
-            errors.append({"errors": "Invalid credentials"})
+            errors.append({"credentails": "Invalid credentials"})
+
+        clientuser = getattr(user, "clientuser")
+        if (
+            clientuser
+            and user.role not in ["client_admin", "client_owner"]
+            and clientuser.status != "ACT"
+        ):
+            errors.append(
+                {
+                    "account": "Your account is not activated. Please check your organization invitation email for activation link."
+                }
+            )
 
         if errors:
             raise serializers.ValidationError({"errors": errors})

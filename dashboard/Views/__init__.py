@@ -1,6 +1,4 @@
-from .ClientViews import (
-    ClientUserView,
-)
+from .ClientViews import ClientUserView, ClientInvitationActivateView
 
 from .InternalViews import (
     InternalClientView,

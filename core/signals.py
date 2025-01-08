@@ -26,8 +26,6 @@ def password_reset_token_created(sender, reset_password_token, *args, **kwargs):
 
     # send an e-mail to the user
     site_full_name = "Hiringdog"
-    site_domain = "hdip.vercel.app"
-    site_protocol = "https"
 
     # uid = urlsafe_base64_encode(
     #     force_bytes(reset_password_token.user.pk)
@@ -38,8 +36,7 @@ def password_reset_token_created(sender, reset_password_token, *args, **kwargs):
         "name": reset_password_token.user.email,
         "email": reset_password_token.user.email,
         "reset_password_url": "/password-reset/{}".format(reset_password_token.key),
-        "site_domain": site_domain,
-        "site_protocol": site_protocol,
+        "site_domain": settings.SITE_DOMAIN,
     }
 
     email_html_message = render_to_string("reset_password.html", context)

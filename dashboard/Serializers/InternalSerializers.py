@@ -1,12 +1,13 @@
 from rest_framework import serializers
 from organizations.utils import create_organization
-from django.core.validators import EmailValidator
-from django.core.exceptions import ValidationError
+from django.conf import settings
+from django.db import transaction
 from core.models import User, Role
 from ..models import (
     InternalClient,
     ClientPointOfContact,
     InternalInterviewer,
+    ClientUser,
 )
 from hiringdogbackend.utils import (
     validate_incoming_data,
@@ -14,8 +15,12 @@ from hiringdogbackend.utils import (
     is_valid_gstin,
     is_valid_pan,
     get_boolean,
+    check_for_email_and_phone_uniqueness,
 )
-from ..tasks import send_welcome_mail_upon_successful_onboarding
+from ..tasks import send_mail
+
+ONBOARD_EMAIL_TEMPLATE = "onboard.html"
+WELCOME_MAIL_SUBJECT = "Welcome to Hiring Dog"
 
 
 class ClientPointOfContactSerializer(serializers.ModelSerializer):
@@ -27,28 +32,10 @@ class ClientPointOfContactSerializer(serializers.ModelSerializer):
         read_only_fields = ["created_at"]
 
     def run_validation(self, data=...):
-        errors = []
         email = data.get("email")
         phone = data.get("phone")
 
-        if email:
-            try:
-                EmailValidator()(email)
-            except ValidationError:
-                errors.append({"email": "Invalid email"})
-            if User.objects.filter(email=email).exists():
-                errors.append({"email": "This email is already used."})
-
-        if phone:
-            if (
-                not isinstance(phone, str)
-                or len(phone) != 13
-                or not phone.startswith("+91")
-            ):
-                errors.append({"phone": "Invalid phone number"})
-            elif User.objects.filter(phone=phone).exists():
-                errors.append({"phone": "This phone is already used."})
-
+        errors = check_for_email_and_phone_uniqueness(email, phone, User)
         if errors:
             raise serializers.ValidationError({"errors": errors})
 
@@ -170,39 +157,75 @@ class InternalClientSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         points_of_contact_data = validated_data.pop("points_of_contact")
-        name = validated_data.get("name")
-        password = get_random_password()
+        organization_name = validated_data.get("name")
 
-        user_and_points_of_contact = []
-        for _, point_of_contact in enumerate(points_of_contact_data):
-            email = point_of_contact.get("email")
-            name_ = point_of_contact.get("name")
-            user = User.objects.create_user(
-                email,
-                point_of_contact.get("phone"),
-                password,
-                role=Role.CLIENT_ADMIN,
-            )
-            send_welcome_mail_upon_successful_onboarding.delay(
-                email=email,
-                user_name=name_,
-                password=password,
-                login_url="https://hdip.vercel.app/auth/signin/loginmail",
-            )
-            if _ == 0:
-                organization = create_organization(user, name, is_active=False)
-            user_and_points_of_contact.append((user, organization, point_of_contact))
+        with transaction.atomic():
+            organization = None
+            client_user_objs = []
+            points_of_contact_objs = []
 
-        client = InternalClient.objects.create(
-            organization=organization, **validated_data
-        )
+            for index, point_of_contact in enumerate(points_of_contact_data):
+                email = point_of_contact.get("email")
+                name_ = point_of_contact.get("name")
+                password = get_random_password()
 
-        points_of_contact = []
-        for user, _, point_of_contact in user_and_points_of_contact:
-            points_of_contact.append(
-                ClientPointOfContact(client=client, **point_of_contact)
+                role = Role.CLIENT_OWNER if index == 0 else Role.CLIENT_ADMIN
+                user = User.objects.create_user(
+                    email,
+                    point_of_contact.get("phone"),
+                    password,
+                    role=role,
+                )
+
+                if index == 0:
+                    organization = create_organization(
+                        user, organization_name, is_active=False
+                    )
+                """ 
+                else:
+                    # Not using OrganizationUser for now, instead UserProfile works as a organization user
+                    # because it has a foreign key with organization
+                    OrganizationUser.objects.create(
+                        organization=organization, user=user
+                    )
+                """
+
+                points_of_contact_objs.append(
+                    ClientPointOfContact(client=None, **point_of_contact)
+                )
+                client_user_objs.append(
+                    ClientUser(organization=organization, user=user, name=name_)
+                )
+
+                point_of_contact["temporary_password"] = password
+
+            client = InternalClient.objects.create(
+                organization=organization, **validated_data
             )
-        ClientPointOfContact.objects.bulk_create(points_of_contact)
+
+            for poc in points_of_contact_objs:
+                poc.client = client
+
+            ClientPointOfContact.objects.bulk_create(points_of_contact_objs)
+            ClientUser.objects.bulk_create(client_user_objs)
+
+            def send_email_for_pocs():
+                for point_of_contact in points_of_contact_data:
+                    email = point_of_contact.get("email")
+                    name_ = point_of_contact.get("name")
+                    temporary_password = point_of_contact.get("temporary_password")
+
+                    send_mail.delay(
+                        email=email,
+                        subject=WELCOME_MAIL_SUBJECT,
+                        template=ONBOARD_EMAIL_TEMPLATE,
+                        user_name=name_,
+                        password=temporary_password,
+                        login_url=settings.LOGIN_URL,
+                    )
+
+            # Queue the email sending after the transaction is committed
+            transaction.on_commit(send_email_for_pocs)
 
         return client
 
@@ -243,11 +266,13 @@ class InternalClientSerializer(serializers.ModelSerializer):
                     password,
                     role=Role.CLIENT_ADMIN,
                 )
-                send_welcome_mail_upon_successful_onboarding.delay(
+                send_mail.delay(
                     email=email,
+                    subject=WELCOME_MAIL_SUBJECT,
+                    template=ONBOARD_EMAIL_TEMPLATE,
                     user_name=name,
                     password=password,
-                    login_url="https://hdip.vercel.app/auth/signin/loginmail",
+                    login_url=settings.LOGIN_URL,
                 )
                 ClientPointOfContact.objects.create(client=instance, **contact_data)
 
@@ -286,10 +311,7 @@ class InterviewerSerializer(serializers.ModelSerializer):
         email = data.get("email")
         phone = data.get("phone_number")
         strength = data.get("strength")
-        if User.objects.filter(email=email).exists():
-            errors.append({"email": "This email is already used."})
-        if User.objects.filter(phone=phone).exists():
-            errors.append({"phone": "This phone is already used."})
+        errors = check_for_email_and_phone_uniqueness(email, phone, User)
         if strength and strength not in [
             "frontend",
             "backend",
@@ -355,10 +377,12 @@ class InterviewerSerializer(serializers.ModelSerializer):
             password,
             role=Role.INTERVIEWER,
         )
-        send_welcome_mail_upon_successful_onboarding.delay(
+        send_mail.delay(
             email=email,
             user_name=validated_data.get("name"),
+            template=ONBOARD_EMAIL_TEMPLATE,
             password=password,
-            login_url="https://hdip.vercel.app/auth/signin/loginmail",
+            subject=WELCOME_MAIL_SUBJECT,
+            login_url=settings.LOGIN_URL,
         )
         return super().create(validated_data)

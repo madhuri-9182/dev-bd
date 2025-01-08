@@ -5,11 +5,22 @@ from .views import (
     InternalClientDetailsView,
     InterviewerView,
     InterviewerDetails,
+    ClientInvitationActivateView,
 )
 
 
 urlpatterns = [
     path("client-user/", ClientUserView.as_view(), name="client-user"),
+    path(
+        "client-user-activation/<str:uid>/",
+        ClientInvitationActivateView.as_view(),
+        name="client-user-activation",
+    ),
+    path(
+        "client-user/<int:client_user_id>/",
+        ClientUserView.as_view(),
+        name="client-user-details",
+    ),
     path("internal-client/", InternalClientView.as_view(), name="internal-client"),
     path(
         "internal-client/<int:pk>/",
