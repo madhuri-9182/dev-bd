@@ -2,6 +2,8 @@ import re
 import string
 import secrets
 from django.conf import settings
+from django.core.validators import EmailValidator
+from django.core.exceptions import ValidationError
 from typing import Dict, List
 
 
@@ -22,7 +24,7 @@ def validate_incoming_data(
 
     for key in data:
         if key not in required_keys + allowed_keys:
-            errors.append({"unexpected_key": key})
+            errors.append({key: "Unexpected key"})
 
     return errors
 
@@ -59,3 +61,28 @@ def is_valid_pan(
 
 def get_boolean(data: dict, key: str) -> bool:
     return True if str(data.get(key)).lower() == "true" else False
+
+
+def check_for_email_and_phone_uniqueness(
+    email: str, phone: str, user
+) -> List[Dict[str, str]]:
+    errors = []
+    if email:
+        try:
+            EmailValidator()(email)
+        except ValidationError:
+            errors.append({"email": "Invalid email"})
+        if user.objects.filter(email=email).exists():
+            errors.append({"email": "This email is already used."})
+
+    if phone:
+        if (
+            not isinstance(phone, str)
+            or len(phone) != 13
+            or not phone.startswith("+91")
+        ):
+            errors.append({"phone": "Invalid phone number"})
+        elif user.objects.filter(phone=phone).exists():
+            errors.append({"phone": "This phone is already used."})
+
+    return errors
