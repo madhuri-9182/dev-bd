@@ -5,4 +5,5 @@ from dashboard.Views import (
     InterviewerView,
     InterviewerDetails,
     ClientInvitationActivateView,
+    JobView,
 )

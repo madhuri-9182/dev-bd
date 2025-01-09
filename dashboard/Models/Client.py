@@ -46,7 +46,7 @@ class ClientUser(CreateUpdateDateTimeAndArchivedField):
 
 class Job(CreateUpdateDateTimeAndArchivedField):
     REASON_FOR_ARCHIVED_CHOICES = (
-        ("PF", "Postition Filled"),
+        ("PF", "Position Filled"),
         ("POH", "Position On Hold"),
         ("OTH", "Other"),
     )
@@ -64,10 +64,10 @@ class Job(CreateUpdateDateTimeAndArchivedField):
         blank=True,
     )
     total_positions = models.PositiveSmallIntegerField(default=0)
-    job_description_file = models.FileField(upload_to="job_descriptions")
+    job_description_file = models.FileField(upload_to="job_descriptions", blank=True)
     mandatory_skills = models.TextField(blank=True)
-    interview_time = models.CharField(max_length=50, help_text="duration")
-    other_details = models.JSONField(default=dict, blank=True)
+    interview_time = models.TimeField(help_text="duration", null=True)
+    other_details = models.JSONField(default=dict, blank=True, null=True)
     reason_for_archived = models.CharField(
         max_length=15, choices=REASON_FOR_ARCHIVED_CHOICES, blank=True, null=True
     )

@@ -8,10 +8,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from ..models import (
     ClientUser,
+    Job,
 )
-from ..serializer import (
-    ClientUserSerializer,
-)
+from ..serializer import ClientUserSerializer, JobSerializer
 
 
 class ClientUserView(APIView, LimitOffsetPagination):
@@ -21,7 +20,7 @@ class ClientUserView(APIView, LimitOffsetPagination):
     def get(self, request, **kwargs):
         client_user_qs = ClientUser.objects.filter(
             organization=request.user.clientuser.organization
-        )
+        ).select_related("user")
         paginated_queryset = self.paginate_queryset(client_user_qs, request)
         serializer = self.serializer_class(paginated_queryset, many=True)
         paginated_data = self.get_paginated_response(serializer.data)
@@ -60,8 +59,8 @@ class ClientUserView(APIView, LimitOffsetPagination):
         return self._update_delete_client_user(request, kwargs.get("client_user_id"))
 
     def _update_delete_client_user(self, request, client_user_id, partial=False):
-        """Update or delete a client user.
-        if not client_user_id or not client_user_id.isdigit():
+
+        if not client_user_id:
             return Response(
                 {
                     "status": "failed",
@@ -69,7 +68,6 @@ class ClientUserView(APIView, LimitOffsetPagination):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        """
 
         client_user_obj = ClientUser.objects.filter(pk=client_user_id).first()
         if not client_user_obj:
@@ -156,3 +154,134 @@ class ClientInvitationActivateView(APIView):
                 {"status": "failed", "message": "Invalid UID"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+
+class JobView(APIView, LimitOffsetPagination):
+    serializer_class = JobSerializer
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = self.serializer_class(
+            data=request.data, context={"org": request.user.clientuser.organization}
+        )
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {
+                    "status": "success",
+                    "message": "Job created successfully.",
+                    "data": serializer.data,
+                },
+                status=status.HTTP_201_CREATED,
+            )
+        custom_error = serializer.errors.pop("errors", None)
+        return Response(
+            {
+                "status": "failed",
+                "message": "Invalid data.",
+                "errors": serializer.errors if not custom_error else custom_error,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    def get(self, request, **kwargs):
+        job_id = kwargs.get("job_id")
+        jobs = Job.objects.filter(
+            client__organization_id=request.user.clientuser.organization_id
+        )
+
+        if job_id:
+            jobs = jobs.filter(pk=job_id)
+
+        paginated_jobs = self.paginate_queryset(jobs, request)
+        serializer = self.serializer_class(paginated_jobs, many=True)
+        response_data = self.get_paginated_response(serializer.data)
+
+        return Response(
+            {
+                "status": "success",
+                "message": "Jobs retrieved successfully.",
+                "data": response_data.data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    def patch(self, request, **kwargs):
+        job_id = kwargs.get("job_id")
+        if not job_id:
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "Invalid job_id in url.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            job = Job.objects.get(pk=job_id)
+        except Job.DoesNotExist:
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "Job not found.",
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = self.serializer_class(
+            job,
+            data=request.data,
+            partial=True,
+            context={"org": request.user.clientuser.organization},
+        )
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {
+                    "status": "success",
+                    "message": "Job updated successfully.",
+                    "data": serializer.data,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        custom_error = serializer.errors.pop("errors", None)
+        return Response(
+            {
+                "status": "failed",
+                "message": "Invalid data.",
+                "errors": serializer.errors if not custom_error else custom_error,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    def delete(self, request, **kwargs):
+        job_id = kwargs.get("job_id")
+        if not job_id:
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "Invalid job_id in url.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            job = Job.objects.get(pk=job_id)
+        except Job.DoesNotExist:
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "Job not found.",
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        job.archived = True
+        job.save()
+
+        return Response(
+            {
+                "status": "success",
+                "message": "Job deleted successfully.",
+            },
+            status=status.HTTP_204_NO_CONTENT,
+        )

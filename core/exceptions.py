@@ -1,5 +1,5 @@
 from rest_framework.views import exception_handler
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, NotAuthenticated
 
 
 def permission_denied_custom_exception_handler(exc, context):
@@ -11,6 +11,12 @@ def permission_denied_custom_exception_handler(exc, context):
                 "status": "failed",
                 "message": "Permission denied",
                 "errors": response.data.get("detail", "Permission denied"),
+            }
+        elif isinstance(exc, NotAuthenticated):
+            response.data = {
+                "status": "failed",
+                "message": "Authentication required",
+                "errors": response.data.get("detail"),
             }
 
     return response
