@@ -4,7 +4,9 @@ import secrets
 from django.conf import settings
 from django.core.validators import EmailValidator
 from django.core.exceptions import ValidationError
-from typing import Dict, List
+from jsonschema import validate
+from jsonschema.exceptions import ValidationError
+from typing import Dict, List, Any
 
 
 def validate_incoming_data(
@@ -85,4 +87,38 @@ def check_for_email_and_phone_uniqueness(
         elif user.objects.filter(phone=phone).exists():
             errors.append({"phone": "This phone is already used."})
 
+    return errors
+
+
+def validate_attachment(
+    field_name: str,
+    file,
+    allowed_extensions: List[str],
+    max_size_mb: int,
+) -> List[Dict[str, str]]:
+    errors = []
+
+    if file.size > max_size_mb * 1024 * 1024:
+        errors.append(
+            {field_name: f"File size must be less than or equal to {max_size_mb}MB"}
+        )
+
+    file_extension = file.name.split(".")[-1].lower()
+    if file_extension not in allowed_extensions:
+        errors.append(
+            {field_name: f"File type must be one of {', '.join(allowed_extensions)}"}
+        )
+
+    return errors
+
+
+def validate_json(
+    json_data: Dict[str, Any], field_name: str, schema: Dict[str, Any]
+) -> List[Dict[str, str]]:
+    errors: List[Dict[str, str]] = []
+
+    try:
+        validate(instance=json_data, schema=schema)
+    except ValidationError as e:
+        errors.append({field_name: f"Invalid JSON: {str(e)}"})
     return errors
