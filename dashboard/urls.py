@@ -10,7 +10,7 @@ from .views import (
 
 urlpatterns = [
     path("client-user/", ClientUserView.as_view(), name="client-user"),
-    path("internal-client/", InternalClientView.as_view(), name="internal-client"),
+    path("internal-clients/", InternalClientView.as_view(), name="internal-client"),
     path(
         "internal-client/<int:pk>/",
         InternalClientDetailsView.as_view(),
