@@ -1,4 +1,4 @@
-from django.db.models import Subquery
+from django.http import HttpResponseRedirect
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
@@ -14,12 +14,14 @@ from django_rest_passwordreset.views import (
     ResetPasswordRequestToken,
     ResetPasswordConfirm,
 )
+from .models import OAuthToken
 from .serializer import (
     UserSerializer,
     UserLoginSerializer,
     CookieTokenRefreshSerializer,
     ResetPasswordConfirmSerailizer,
 )
+from externals.google.google_calendar import GoogleCalendar
 
 
 class UserSignupView(APIView):
@@ -170,3 +172,103 @@ class PasswordResetConfirmView(ResetPasswordConfirm):
                 data["errors"] = [data["detail"]]
                 del data["detail"]
         return super().finalize_response(request, response, *args, **kwargs)
+
+
+class GoogleAuthInitView(APIView):
+    serializer_class = None
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        try:
+            google_calendar = GoogleCalendar()
+            state, authorization_url = google_calendar.auth_init()
+            print("INSDIE GOOGLE AUTH INIT", state)
+            request.session["state"] = state
+            print("AFTER THAT", request.session.get("state"))
+            return HttpResponseRedirect(authorization_url)
+
+        except Exception as e:
+            return Response(
+                {
+                    "status": "failed",
+                    "message": f"Error generating authorization URL: {str(e)}",
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class GoogleAuthCallbackView(APIView):
+    serializer_class = None
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        state = request.session.get("state")
+        # print("INSIDE GOOGLE AUTH CALLBACK", state, request.query_params.get("state"))
+        if not state or request.query_params.get("state") != state:
+            return Response(
+                {"status": "failed", "message": "Invalid state parameter"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            google_calendar = GoogleCalendar()
+            access_token, refresh_token, expired_time = google_calendar.auth_callback(
+                state, request.build_absolute_uri()
+            )
+            # print("ACCESS -------> ", access_token, refresh_token, expired_time)
+            OAuthToken.objects.update_or_create(
+                user=request.user,
+                defaults={
+                    "access_token": access_token,
+                    "refresh_token": refresh_token,
+                    "expires_at": expired_time,
+                },
+            )
+            return Response(
+                {
+                    "status": "success",
+                    "message": "Authentication Successful",
+                },
+                status=status.HTTP_200_OK,
+            )
+        except Exception as e:
+            return Response(
+                {
+                    "status": "failed",
+                    "message": f"Error during authentication callback: {str(e)}",
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class GoogleCalenderGetEventView(APIView):
+    serializer_class = None
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        page_token = request.query_params.get("page_token")
+        try:
+            oath_obj = OAuthToken.objects.get(user=request.user)
+        except OAuthToken.DoesNotExist:
+            return Response(
+                {"status": "failed", "message": "OAuth token not found for the user"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        google_calendar = GoogleCalendar()
+        try:
+            events = google_calendar.get_events(
+                oath_obj.access_token, oath_obj.refresh_token, request.user, page_token
+            )
+            return Response(
+                {
+                    "status": "success",
+                    "message": "Successfully retrieve event information",
+                    "data": events,
+                },
+                status=status.HTTP_200_OK,
+            )
+        except Exception as e:
+            return Response(
+                {"status": "failed", "message": f"error occured. {e}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )

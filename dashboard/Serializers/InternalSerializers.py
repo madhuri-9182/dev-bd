@@ -371,18 +371,20 @@ class InterviewerSerializer(serializers.ModelSerializer):
         email = validated_data.get("email")
         phone = validated_data.get("phone_number")
         password = get_random_password()
-        user = User.objects.create_user(
-            email,
-            phone,
-            password,
-            role=Role.INTERVIEWER,
-        )
-        send_mail.delay(
-            email=email,
-            user_name=validated_data.get("name"),
-            template=ONBOARD_EMAIL_TEMPLATE,
-            password=password,
-            subject=WELCOME_MAIL_SUBJECT,
-            login_url=settings.LOGIN_URL,
-        )
-        return super().create(validated_data)
+        with transaction.atomic():
+            user = User.objects.create_user(
+                email,
+                phone,
+                password,
+                role=Role.INTERVIEWER,
+            )
+            interviewer_obj = InternalInterviewer.objects.create(user=user, **validated_data)
+            send_mail.delay(
+                email=email,
+                user_name=validated_data.get("name"),
+                template=ONBOARD_EMAIL_TEMPLATE,
+                password=password,
+                subject=WELCOME_MAIL_SUBJECT,
+                login_url=settings.LOGIN_URL,
+            )
+        return interviewer_obj

@@ -6,4 +6,5 @@ from dashboard.Views import (
     InterviewerDetails,
     ClientInvitationActivateView,
     JobView,
+    InterviewerAvailabilityView,
 )

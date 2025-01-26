@@ -71,13 +71,19 @@ class UserLoginSerializer(serializers.ModelSerializer):
     def validate(self, data):
         request = self.context.get("request")
 
-        errors = validate_incoming_data(self.initial_data, ["email", "password"])
+        errors = validate_incoming_data(
+            self.initial_data, ["email", "password"], ["csrfmiddlewaretoken"]
+        )
 
         user = authenticate(request, **data)
         if not user:
             errors.append({"credentails": "Invalid credentials"})
 
-        clientuser = getattr(user, "clientuser")
+        clientuser = (
+            getattr(user, "clientuser")
+            if user and hasattr(user, "clientuser")
+            else None
+        )
         if (
             clientuser
             and user.role not in ["client_admin", "client_owner"]

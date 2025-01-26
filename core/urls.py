@@ -7,6 +7,9 @@ from .views import (
     LogoutAllView,
     PasswordResetView,
     PasswordResetConfirmView,
+    GoogleAuthInitView,
+    GoogleAuthCallbackView,
+    GoogleCalenderGetEventView,
 )
 
 urlpatterns = [
@@ -21,4 +24,15 @@ urlpatterns = [
         PasswordResetConfirmView.as_view(),
         name="password_reset_confirm",
     ),
+    path(
+        "google-auth/init/",
+        GoogleAuthInitView.as_view(),
+        name="google_auth_initialization",
+    ),
+    path(
+        "google-auth/callback/",
+        GoogleAuthCallbackView.as_view(),
+        name="google_call_back",
+    ),
+    path("events/", GoogleCalenderGetEventView.as_view(), name="google_events"),
 ]

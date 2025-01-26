@@ -5,4 +5,5 @@ from .Serializers import (
     InterviewerSerializer,
     ClientUserSerializer,
     JobSerializer,
+    InterviewerAvailabilitySerializer,
 )

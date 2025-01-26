@@ -6,3 +6,5 @@ from .InternalViews import (
     InterviewerView,
     InterviewerDetails,
 )
+
+from .InterviewerViews import InterviewerAvailabilityView

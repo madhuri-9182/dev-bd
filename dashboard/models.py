@@ -6,4 +6,5 @@ from .Models import (
     Job,
     Candidate,
     Interview,
+    InterviewerAvailability,
 )

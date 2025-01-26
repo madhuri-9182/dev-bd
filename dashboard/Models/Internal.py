@@ -2,6 +2,7 @@ from organizations.models import Organization
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 from phonenumber_field.modelfields import PhoneNumberField
+from core.models import User
 from hiringdogbackend.ModelUtils import SoftDelete, CreateUpdateDateTimeAndArchivedField
 
 
@@ -86,6 +87,9 @@ class InternalInterviewer(CreateUpdateDateTimeAndArchivedField):
 
     organization = models.ManyToManyField(
         Organization, related_name="interviewers", blank=True
+    )
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name="interviewer", blank=True
     )
     name = models.CharField(max_length=255, blank=True)
     email = models.EmailField(unique=True, blank=True)
