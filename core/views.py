@@ -21,6 +21,9 @@ from .serializer import (
     CookieTokenRefreshSerializer,
     ResetPasswordConfirmSerailizer,
 )
+from rest_framework.request import Request
+from drf_spectacular.utils import extend_schema
+
 from externals.google.google_calendar import GoogleCalendar
 
 
@@ -90,6 +93,32 @@ class CookieTokenRefreshView(TokenRefreshView):
 class LogoutView(APIView):
     permission_classes = (IsAuthenticated,)
 
+    @extend_schema(
+        request=None,
+        responses={
+            205: {
+                "type": "object",
+                "properties": {
+                    "status": {"type": "string", "example": "success"},
+                    "message": {"type": "string", "example": "Logout successful"},
+                },
+            },
+            401: {
+                "type": "object",
+                "properties": {
+                    "status": {"type": "string", "example": "fail"},
+                    "message": {"type": "string", "example": "Invalid request"},
+                },
+            },
+            400: {
+                "type": "object",
+                "properties": {
+                    "status": {"type": "string", "example": "fail"},
+                    "message": {"type": "string", "example": "Token errors"},
+                },
+            },
+        },
+    )
     def post(self, request, *args, **kwargs):
         refresh = request.COOKIES.get("refresh_token")
         if not refresh:
@@ -118,6 +147,32 @@ class LogoutView(APIView):
 class LogoutAllView(APIView):
     permission_classes = (IsAuthenticated,)
 
+    @extend_schema(
+        request=None,
+        responses={
+            205: {
+                "type": "object",
+                "properties": {
+                    "status": {"type": "string", "example": "success"},
+                    "message": {"type": "string", "example": "Logout successful"},
+                },
+            },
+            401: {
+                "type": "object",
+                "properties": {
+                    "status": {"type": "string", "example": "fail"},
+                    "message": {"type": "string", "example": "Invalid request"},
+                },
+            },
+            400: {
+                "type": "object",
+                "properties": {
+                    "status": {"type": "string", "example": "fail"},
+                    "message": {"type": "string", "example": "Token errors"},
+                },
+            },
+        },
+    )
     def post(self, request):
         user = request.user
         outstanding_tokens = OutstandingToken.objects.filter(user=user).exclude(
