@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import LimitOffsetPagination
@@ -14,6 +15,7 @@ from ..serializer import (
 )
 
 
+@extend_schema(tags=["Internal"])
 class InternalClientView(APIView, LimitOffsetPagination):
     serializer_class = InternalClientSerializer
     permission_classes = [IsAuthenticated, IsSuperAdmin | IsModerator]
@@ -65,6 +67,7 @@ class InternalClientView(APIView, LimitOffsetPagination):
         return super().finalize_response(request, response, *args, **kwargs)
 
 
+@extend_schema(tags=["Internal"])
 class InternalClientDetailsView(APIView):
     serializer_class = InternalClientSerializer
     permission_classes = [IsAuthenticated, IsSuperAdmin | IsModerator]
@@ -139,6 +142,7 @@ class InternalClientDetailsView(APIView):
         return super().finalize_response(request, response, *args, **kwargs)
 
 
+@extend_schema(tags=["Internal"])
 class InterviewerView(APIView, LimitOffsetPagination):
     serializer_class = InterviewerSerializer
     permission_classes = [IsAuthenticated, IsModerator | IsSuperAdmin]
@@ -190,6 +194,7 @@ class InterviewerView(APIView, LimitOffsetPagination):
         return super().finalize_response(request, response, *args, **kwargs)
 
 
+@extend_schema(tags=["Internal"])
 class InterviewerDetails(APIView):
     serializer_class = InterviewerSerializer
     permission_classes = [IsAuthenticated, IsSuperAdmin | IsModerator]

@@ -1,5 +1,6 @@
 import datetime
 from django.db import transaction
+from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -12,6 +13,7 @@ from core.models import OAuthToken
 from externals.google.google_calendar import GoogleCalendar
 
 
+@extend_schema(tags=["Interviewer"])
 class InterviewerAvailabilityView(APIView, LimitOffsetPagination):
     serializer_class = InterviewerAvailabilitySerializer
     permission_classes = [IsAuthenticated, IsInterviewer]
@@ -84,7 +86,7 @@ class InterviewerAvailabilityView(APIView, LimitOffsetPagination):
                         user=request.user,
                         event_details=event_details,
                     )
-                    interviewer.google_calendar_id = event.pop('id', '')
+                    interviewer.google_calendar_id = event.pop("id", "")
                     interviewer.save()
 
                 except Exception as e:

@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
+from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import LimitOffsetPagination
@@ -13,6 +14,7 @@ from ..models import (
 from ..serializer import ClientUserSerializer, JobSerializer
 
 
+@extend_schema(tags=["Client"])
 class ClientUserView(APIView, LimitOffsetPagination):
     serializer_class = ClientUserSerializer
     permission_classes = [IsAuthenticated]
@@ -108,6 +110,7 @@ class ClientUserView(APIView, LimitOffsetPagination):
         return super().finalize_response(request, response, *args, **kwargs)
 
 
+@extend_schema(tags=["Client"])
 class ClientInvitationActivateView(APIView):
 
     def patch(self, request, uid):
@@ -156,6 +159,7 @@ class ClientInvitationActivateView(APIView):
             )
 
 
+@extend_schema(tags=["Client"])
 class JobView(APIView, LimitOffsetPagination):
     serializer_class = JobSerializer
     permission_classes = [IsAuthenticated]

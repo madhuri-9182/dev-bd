@@ -1,4 +1,5 @@
 from django.http import HttpResponseRedirect
+from drf_spectacular.utils import extend_schema
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
@@ -27,7 +28,16 @@ from drf_spectacular.utils import extend_schema
 from externals.google.google_calendar import GoogleCalendar
 
 
+@extend_schema(tags=["Authentication"])
 class UserSignupView(APIView):
+    """
+    View for handling user signup.
+
+    This view allows new users to sign up by providing the necessary details.
+    Upon successful signup, it returns a success message. If there are any
+    validation errors, it raises an exception.
+    """
+
     serializer_class = UserSerializer
 
     def post(self, request):
@@ -40,7 +50,21 @@ class UserSignupView(APIView):
         )
 
 
+@extend_schema(tags=["Authentication"])
 class UserLoginView(APIView):
+    """
+    View for handling user login.
+
+    This view authenticates a user based on the provided credentials.
+    Upon successful authentication, it returns a success message along with
+    user data and tokens. The refresh token is set as an HTTP-only cookie for
+    enhanced security.
+
+    Responses:
+    200: Login successful
+    400: Validation errors
+    """
+
     serializer_class = UserLoginSerializer
 
     def post(self, request):
@@ -73,6 +97,7 @@ class UserLoginView(APIView):
         return response
 
 
+@extend_schema(tags=["Authentication"])
 class CookieTokenRefreshView(TokenRefreshView):
 
     def finalize_response(self, request, response, *args, **kwargs):
@@ -90,7 +115,22 @@ class CookieTokenRefreshView(TokenRefreshView):
     serializer_class = CookieTokenRefreshSerializer
 
 
+@extend_schema(tags=["Authentication"])
 class LogoutView(APIView):
+    """
+    View for logging out a user by blacklisting their refresh token.
+
+    This view checks for the presence of a refresh token in the request cookies.
+    If found, it attempts to blacklist the token, effectively logging the user out.
+    It responds with a success message upon successful logout, or an appropriate
+    error message and status code if the token is missing or invalid.
+
+    Responses:
+    205: Logout successful
+    400: Token errors
+    401: Invalid request
+    """
+
     permission_classes = (IsAuthenticated,)
 
     @extend_schema(
@@ -144,7 +184,14 @@ class LogoutView(APIView):
         return super().finalize_response(request, response, *args, **kwargs)
 
 
+@extend_schema(tags=["Authentication"])
 class LogoutAllView(APIView):
+    """
+    Logout user from all other sessions
+
+    This API will log the user out of all other sessions.
+    """
+
     permission_classes = (IsAuthenticated,)
 
     @extend_schema(
@@ -174,6 +221,7 @@ class LogoutAllView(APIView):
         },
     )
     def post(self, request):
+
         user = request.user
         outstanding_tokens = OutstandingToken.objects.filter(user=user).exclude(
             id__in=BlacklistedToken.objects.filter(token__user=user).values("token_id")
@@ -189,10 +237,12 @@ class LogoutAllView(APIView):
         )
 
     def finalize_response(self, request, response, *args, **kwargs):
+
         response.delete_cookie("refresh_token")
         return super().finalize_response(request, response, *args, **kwargs)
 
 
+@extend_schema(tags=["Authentication"])
 class PasswordResetView(ResetPasswordRequestToken):
     def finalize_response(self, request, response, *args, **kwargs):
         data = response.data
@@ -210,6 +260,7 @@ class PasswordResetView(ResetPasswordRequestToken):
         return super().finalize_response(request, response, *args, **kwargs)
 
 
+@extend_schema(tags=["Authentication"])
 class PasswordResetConfirmView(ResetPasswordConfirm):
     serializer_class = ResetPasswordConfirmSerailizer
 
@@ -229,6 +280,11 @@ class PasswordResetConfirmView(ResetPasswordConfirm):
         return super().finalize_response(request, response, *args, **kwargs)
 
 
+@extend_schema(
+    description="Initialize Google OAuth flow",
+    responses={200: {"type": "string", "description": "Authorization URL"}},
+    tags=["Authentication"],
+)
 class GoogleAuthInitView(APIView):
     serializer_class = None
     permission_classes = (IsAuthenticated,)
@@ -252,6 +308,36 @@ class GoogleAuthInitView(APIView):
             )
 
 
+@extend_schema(
+    description="Handle callback from Google OAuth flow",
+    responses={
+        200: {
+            "type": "object",
+            "properties": {
+                "status": {"type": "string", "example": "success"},
+                "message": {"type": "string", "example": "Authentication Successful"},
+            },
+        },
+        400: {
+            "type": "object",
+            "properties": {
+                "status": {"type": "string", "example": "fail"},
+                "message": {"type": "string", "example": "Invalid state parameter"},
+            },
+        },
+        500: {
+            "type": "object",
+            "properties": {
+                "status": {"type": "string", "example": "fail"},
+                "message": {
+                    "type": "string",
+                    "example": "Error during authentication callback",
+                },
+            },
+        },
+    },
+    tags=["Authentication"],
+)
 class GoogleAuthCallbackView(APIView):
     serializer_class = None
     permission_classes = (IsAuthenticated,)
@@ -296,6 +382,49 @@ class GoogleAuthCallbackView(APIView):
             )
 
 
+@extend_schema(
+    tags=["Authentication"],
+    responses={
+        200: {
+            "type": "object",
+            "properties": {
+                "status": {"type": "string", "example": "success"},
+                "message": {
+                    "type": "string",
+                    "example": "Successfully retrieve event information",
+                },
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string", "example": "123456789"},
+                            "start": {
+                                "type": "string",
+                                "example": "2025-01-26T17:00:00+05:30",
+                            },
+                            "summary": {
+                                "type": "string",
+                                "example": "Interview Available Time",
+                            },
+                            "status": {"type": "string", "example": "confirmed"},
+                        },
+                    },
+                },
+            },
+        },
+        400: {
+            "type": "object",
+            "properties": {
+                "status": {"type": "string", "example": "fail"},
+                "message": {
+                    "type": "string",
+                    "example": "OAuth token not found for the user",
+                },
+            },
+        },
+    },
+)
 class GoogleCalenderGetEventView(APIView):
     serializer_class = None
     permission_classes = (IsAuthenticated,)
