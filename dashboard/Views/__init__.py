@@ -1,6 +1,4 @@
-from .ClientViews import (
-    ClientUserView,
-)
+from .ClientViews import ClientUserView, ClientInvitationActivateView, JobView
 
 from .InternalViews import (
     InternalClientView,
@@ -8,3 +6,5 @@ from .InternalViews import (
     InterviewerView,
     InterviewerDetails,
 )
+
+from .InterviewerViews import InterviewerAvailabilityView

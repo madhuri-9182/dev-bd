@@ -1,14 +1,17 @@
+from typing import Iterable
 from django.db import models, IntegrityError
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, Group
 from django.core.exceptions import ValidationError
 from phonenumber_field.modelfields import PhoneNumberField
 from organizations.models import Organization
+from hiringdogbackend.ModelUtils import CreateUpdateDateTimeAndArchivedField, SoftDelete
 
 
 class Role(models.TextChoices):
     SUPER_ADMIN = ("super_admin", "Super Admin")
     MODERATOR = ("moderator", "Moderator")
     CLIENT_ADMIN = ("client_admin", "Client Admin")
+    CLIENT_OWNER = ("client_owner", "Client Owner")
     CLIENT_USER = ("client_user", "Client User")
     USER = ("user", "User")
     INTERVIEWER = ("interviewer", "Interviewer")
@@ -56,6 +59,9 @@ class User(AbstractBaseUser):
     is_active = models.BooleanField(default=True)
     is_admin = models.BooleanField(default=False)
     role = models.CharField(max_length=15, choices=Role.choices, default=Role.USER)
+    email_verified = models.BooleanField(default=True)
+    email_verified_date = models.DateTimeField(null=True, blank=True)
+    phone_verified = models.BooleanField(default=True)
 
     objects = UserManager()
 
@@ -83,14 +89,12 @@ class User(AbstractBaseUser):
         indexes = [models.Index(fields=["email", "phone"])]
 
 
-class UserProfile(models.Model):
+class UserProfile(CreateUpdateDateTimeAndArchivedField):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
     organization = models.ForeignKey(
         Organization, on_delete=models.CASCADE, related_name="profiles", null=True
-    )
+    )  # comment this when you run you first makemigration command
     name = models.CharField(max_length=100, help_text="User's Full Name")
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self) -> str:
         return f"{self.name} ({self.user.email})"
@@ -105,4 +109,49 @@ class ClientCustomRole(Group):
     )
     organization = models.ForeignKey(
         Organization, on_delete=models.CASCADE, related_name="clientcustomrole"
+    )  # comment this when you run you first makemigration command
+
+
+class OAuthToken(CreateUpdateDateTimeAndArchivedField):
+    TOKEN_TYPE_CHOICES = (
+        ("CLIENT", "Client"),
+        ("INTERVIEWER", "Interviewer"),
+        ("INTERNAL", "Internal"),
+        ("AGENCY", "Agency"),
     )
+    objects = SoftDelete()
+    object_all = models.Manager()
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name="oauth_token",
+        help_text="The user associated with these tokens.",
+    )
+    token_type = models.CharField(
+        max_length=50, choices=TOKEN_TYPE_CHOICES, blank=True, null=True
+    )
+    access_token = models.TextField(help_text="Access token for API authentication.")
+    refresh_token = models.TextField(
+        help_text="Refresh token to renew the access token.", blank=True, null=True
+    )
+    expires_at = models.DateTimeField(help_text="Access Token expiration timestamp.")
+    scope = models.TextField(
+        help_text="Granted scopes for the token.", blank=True, null=True
+    )
+
+    def is_access_token_valid(self):
+        from django.utils.timezone import now
+
+        return now() < self.expires_at
+
+    def save(self, **kwargs):
+        from django.utils.timezone import now
+        from datetime import timedelta
+
+        if self.updated_at is not None:
+            expiration_duration = timedelta(hours=1)
+            self.expires_at = now() + expiration_duration
+        super().save(**kwargs)
+
+    def __str__(self):
+        return f"OAuthToken for {self.interviewer.name}"
