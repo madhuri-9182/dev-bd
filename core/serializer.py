@@ -69,31 +69,28 @@ class UserLoginSerializer(serializers.ModelSerializer):
     email = serializers.EmailField()
 
     def validate(self, data):
-        request = self.context.get("request")
-
+        request = self.context["request"]
         errors = validate_incoming_data(
             self.initial_data, ["email", "password"], ["csrfmiddlewaretoken"]
         )
 
+        if errors:
+            raise serializers.ValidationError({"errors": errors})
         user = authenticate(request, **data)
-        if not user:
-            errors.append({"credentails": "Invalid credentials"})
+        errors = {}
 
-        clientuser = (
-            getattr(user, "clientuser")
-            if user and hasattr(user, "clientuser")
-            else None
-        )
-        if (
-            clientuser
-            and user.role not in ["client_admin", "client_owner"]
-            and clientuser.status != "ACT"
-        ):
-            errors.append(
-                {
-                    "account": "Your account is not activated. Please check your organization invitation email for activation link."
-                }
-            )
+        if not user:
+            errors.setdefault("credentials", []).append("Invalid credentials")
+
+        if user and hasattr(user, "clientuser"):
+            client_user = user.clientuser
+            if (
+                user.role not in ["client_admin", "client_owner"]
+                and client_user.status != "ACT"
+            ):
+                errors.setdefault("account", []).append(
+                    "Your account is not activated. Please check your organization invitation email for activation link."
+                )
 
         if errors:
             raise serializers.ValidationError({"errors": errors})

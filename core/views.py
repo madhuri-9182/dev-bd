@@ -71,7 +71,16 @@ class UserLoginView(APIView):
         serializer = self.serializer_class(
             data=request.data, context={"request": request}
         )
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            custom_error = serializer.errors.pop("errors", None)
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "Invalid data.",
+                    "errors": serializer.errors if not custom_error else custom_error,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         data = {**serializer.data, **serializer.validated_data.get("tokens")}
 
@@ -163,7 +172,7 @@ class LogoutView(APIView):
         refresh = request.COOKIES.get("refresh_token")
         if not refresh:
             return Response(
-                {"status": "fail", "message": "Invalid request"},
+                {"status": "failed", "message": "Invalid request"},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
         try:
