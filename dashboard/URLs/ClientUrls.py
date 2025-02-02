@@ -1,5 +1,10 @@
 from django.urls import path
-from ..views import ClientUserView, ClientInvitationActivateView, JobView
+from ..views import (
+    ClientUserView,
+    ClientInvitationActivateView,
+    JobView,
+    ResumePraserView,
+)
 
 
 urlpatterns = [
@@ -16,4 +21,5 @@ urlpatterns = [
     ),
     path("jobs/", JobView.as_view(), name="job-list"),
     path("job/<int:job_id>/", JobView.as_view(), name="job-details"),
+    path("parse-resume/", ResumePraserView.as_view(), name="resume-parser"),
 ]

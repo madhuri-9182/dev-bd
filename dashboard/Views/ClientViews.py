@@ -12,6 +12,8 @@ from ..models import (
     Job,
 )
 from ..serializer import ClientUserSerializer, JobSerializer
+from externals.parser.resume_parser import ResumerParser
+from hiringdogbackend.utils import validate_attachment
 
 
 @extend_schema(tags=["Client"])
@@ -288,4 +290,51 @@ class JobView(APIView, LimitOffsetPagination):
                 "message": "Job deleted successfully.",
             },
             status=status.HTTP_204_NO_CONTENT,
+        )
+
+
+@extend_schema(tags=["Client"])
+class ResumePraserView(APIView, LimitOffsetPagination):
+    serializer_class = None
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        resume_files = request.FILES.getlist("resume")
+
+        if not resume_files:
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "Invalid request.",
+                    "error": {
+                        "resume": [
+                            "This field is required. It support list to upload multiple resume files in the format of pdf and docx."
+                        ]
+                    },
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        for file in resume_files:
+            errors = validate_attachment("resume", file, ["pdf", "docx"], 5)
+            if errors:
+                return Response(
+                    {
+                        "status": "failed",
+                        "message": "Invalid File Format",
+                        "error": {"resume": [error["resume"] for error in errors]},
+                    }
+                )
+
+        resume_parser = ResumerParser()
+
+        response = resume_parser.parse_resume(resume_files)
+
+        return Response(
+            {
+                "status": "success",
+                "message": "Resume parsed Successfully.",
+                "data": response,
+            },
+            status=status.HTTP_200_OK,
         )

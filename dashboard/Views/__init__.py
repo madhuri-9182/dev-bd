@@ -1,4 +1,9 @@
-from .ClientViews import ClientUserView, ClientInvitationActivateView, JobView
+from .ClientViews import (
+    ClientUserView,
+    ClientInvitationActivateView,
+    JobView,
+    ResumePraserView,
+)
 
 from .InternalViews import (
     InternalClientView,
