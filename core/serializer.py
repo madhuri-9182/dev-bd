@@ -118,7 +118,7 @@ class CookieTokenRefreshSerializer(TokenRefreshSerializer):
         if data["refresh"]:
             return super().validate(data)
 
-        return InvalidToken({"errors": "No valid token found in cookie"})
+        raise ValidationError({"errors": "No valid token found in cookie"})
 
 
 class ResetPasswordConfirmSerailizer(PasswordTokenSerializer):

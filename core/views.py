@@ -119,6 +119,8 @@ class CookieTokenRefreshView(TokenRefreshView):
                     refresh_token,
                     max_age=cookie_max_age,
                     httponly=True,
+                    samesite="None",
+                    secure=True,
                 )
         return super().finalize_response(request, response, *args, **kwargs)
 

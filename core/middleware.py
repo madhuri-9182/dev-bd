@@ -37,7 +37,7 @@ class AuthenticationMiddlewareJWT:
             return JsonResponse(
                 {
                     "status": "failed",
-                    "message:": "Token is invalid or expired",
+                    "message:": "Either token is invalid or expired or not present in cookie",
                 },
                 status=status.HTTP_403_FORBIDDEN,
             )

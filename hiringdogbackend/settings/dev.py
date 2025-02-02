@@ -4,7 +4,17 @@ DEBUG = True
 
 SECRET_KEY = "django-insecure-pn-#@uf@1!0lm!7p27d5^_)2)yw=6joel7qklh)8l(!p4fe_&_"
 
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+]
+CSRF_COOKIE_HTTPONLY = True
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = False
 
 DATABASES = {
     "default": {
