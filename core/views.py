@@ -120,7 +120,7 @@ class CookieTokenRefreshView(TokenRefreshView):
                     max_age=cookie_max_age,
                     httponly=True,
                     samesite="None",
-                    secure=True,
+                    secure=False,
                 )
         return super().finalize_response(request, response, *args, **kwargs)
 
