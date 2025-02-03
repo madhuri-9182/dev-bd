@@ -8,6 +8,7 @@ from ..models import (
     ClientPointOfContact,
     InternalInterviewer,
     ClientUser,
+    Agreement,
 )
 from hiringdogbackend.utils import (
     validate_incoming_data,
@@ -73,7 +74,7 @@ class InternalClientSerializer(serializers.ModelSerializer):
         )
 
     def to_internal_value(self, data):
-        request = self.context.get("request")
+        
         points_of_contact = data.get("points_of_contact")
         if not points_of_contact:
             raise serializers.ValidationError(
@@ -260,7 +261,7 @@ class InternalClientSerializer(serializers.ModelSerializer):
                 email = contact_data.get("email")
                 name = contact_data.get("name")
                 password = get_random_password()
-                user = User.objects.create_user(
+                User.objects.create_user(
                     contact_data.get("email"),
                     contact_data.get("phone"),
                     password,
@@ -388,3 +389,54 @@ class InterviewerSerializer(serializers.ModelSerializer):
                 login_url=settings.LOGIN_URL,
             )
         return interviewer_obj
+
+
+
+
+class AgreementSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Agreement
+        fields = [
+            "id",
+            "organization",
+            "years_of_experience",
+            "rate",
+        ]
+        
+    def validate(self, data):
+        print("Validation is running...")  # Debugging
+        print("Incoming data:", data)  # Check what data is coming in
+
+        
+        errors = validate_incoming_data(
+            self.initial_data,
+            required_keys=[
+                "organization",
+                "years_of_experience",
+                "rate",
+            ],
+            partial=self.partial,
+            original_data=data,
+           
+        ) or {}
+        
+        print("Validation errors before checks:", errors)  # Debugging
+        
+        
+        if 'rate' in data and data['rate'] <= 0:
+            errors["rate"] = ["Rate must be a positive value."]
+        
+        valid_experience_choices = dict(Agreement.YEARS_OF_EXPERIENCE_CHOICES).keys()
+        if 'years_of_experience' in data and data['years_of_experience'] not in valid_experience_choices:
+            errors["years_of_experience"] = ["Invalid experience range selected."]
+        
+        if 'organization' not in data or data['organization'] is None:
+           errors["organization"] = ["Organization is required."]
+           
+        print("Validation errors after checks:", errors)  # Debugging
+        
+        if errors:
+            raise serializers.ValidationError(errors)
+        
+        return data
+

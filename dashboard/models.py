@@ -3,6 +3,7 @@ from .Models import (
     InternalClient,
     ClientPointOfContact,
     InternalInterviewer,
+    Agreement,
     Job,
     Candidate,
     Interview,

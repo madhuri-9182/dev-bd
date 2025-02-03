@@ -122,3 +122,26 @@ class InternalInterviewer(CreateUpdateDateTimeAndArchivedField):
 
     def __str__(self):
         return f"{self.name} - {self.organization}"
+
+
+class Agreement(CreateUpdateDateTimeAndArchivedField):
+    objects = SoftDelete()
+    object_all = models.Manager()
+
+    YEARS_OF_EXPERIENCE_CHOICES = (
+        ("0 - 4 years", "0 - 4 Years"),
+        ("4 - 6 years", "4 - 6 Years"),
+        ("6 - 8 years", "6 - 8 Years"),
+        ("8 - 10 years", "8 - 10 Years"),
+        ("10+ years", "10+ Years"),
+    )
+    
+    organization = models.OneToOneField(
+        Organization, related_name="agreements", blank=True,on_delete=models.CASCADE)
+
+    years_of_experience = models.CharField(max_length=50, choices=YEARS_OF_EXPERIENCE_CHOICES)
+    rate = models.DecimalField(max_digits=10, decimal_places=2, blank=True)
+   
+
+    def __str__(self):
+        return f"{self.client.name} - {self.rate}"

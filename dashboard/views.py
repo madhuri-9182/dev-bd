@@ -4,6 +4,8 @@ from dashboard.Views import (
     InternalClientDetailsView,
     InterviewerView,
     InterviewerDetails,
+    AgreementView,
+    AgreementDetailView,
     ClientInvitationActivateView,
     JobView,
     InterviewerAvailabilityView,
