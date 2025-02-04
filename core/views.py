@@ -101,6 +101,8 @@ class UserLoginView(APIView):
                 refresh_token,
                 max_age=cookie_max_age,
                 httponly=True,
+                samesite="None",
+                secure=False,
             )
             del data["refresh"]
         return response
