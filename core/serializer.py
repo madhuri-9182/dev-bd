@@ -24,6 +24,7 @@ def get_tokens_for_user(user):
         "access": str(refresh.access_token),
         "id": user.id,
         "role": user.role,
+        "name": user.profile.name,
     }
 
 
@@ -116,7 +117,20 @@ class CookieTokenRefreshSerializer(TokenRefreshSerializer):
         data["refresh"] = self.context.get("request").COOKIES.get("refresh_token")
 
         if data["refresh"]:
-            return super().validate(data)
+            try:
+                token = RefreshToken(data["refresh"])
+                user_id = token.payload.get("user_id")
+
+                user_obj = User.objects.get(pk=user_id)
+            except User.DoesNotExist:
+                raise ValidationError({"errors": "Invalid User ID"})
+            except Exception:
+                raise ValidationError({"errors": "Invalid Token"})
+            data = super().validate(data)
+            data["email"] = user_obj.email
+            data["role"] = user_obj.role
+            data["name"] = user_obj.profile.name
+            return data
 
         raise ValidationError({"errors": "No valid token found in cookie"})
 

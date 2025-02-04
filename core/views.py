@@ -102,7 +102,7 @@ class UserLoginView(APIView):
                 max_age=cookie_max_age,
                 httponly=True,
                 samesite="None",
-                secure=False,
+                secure=True,
             )
             del data["refresh"]
         return response
@@ -110,6 +110,7 @@ class UserLoginView(APIView):
 
 @extend_schema(tags=["Authentication"])
 class CookieTokenRefreshView(TokenRefreshView):
+    serializer_class = CookieTokenRefreshSerializer
 
     def finalize_response(self, request, response, *args, **kwargs):
         if isinstance(response.data, dict):
@@ -122,11 +123,15 @@ class CookieTokenRefreshView(TokenRefreshView):
                     max_age=cookie_max_age,
                     httponly=True,
                     samesite="None",
-                    secure=False,
+                    secure=True,
                 )
+            if response.status_code == 200:
+                response.data = {
+                    "status": "success",
+                    "message": "Access token refreshed successfully.",
+                    "data": {**response.data},
+                }
         return super().finalize_response(request, response, *args, **kwargs)
-
-    serializer_class = CookieTokenRefreshSerializer
 
 
 @extend_schema(tags=["Authentication"])
