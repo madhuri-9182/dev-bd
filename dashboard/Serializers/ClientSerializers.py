@@ -73,6 +73,7 @@ class ClientUserSerializer(serializers.ModelSerializer):
         email = validated_data.pop("email", None)
         phone_number = validated_data.pop("phone", None)
         user_role = validated_data.pop("role", None)
+        name = validated_data.get("name")
         organization = validated_data.get("organization")
         temp_password = get_random_password()
         current_user = self.context.get("user")
@@ -81,6 +82,9 @@ class ClientUserSerializer(serializers.ModelSerializer):
             user = User.objects.create_user(
                 email=email, phone=phone_number, password=temp_password, role=user_role
             )
+            user.profile.name = name
+            user.profile.organization = organization
+            user.profile.save()
             client_user = ClientUser.objects.create(user=user, **validated_data)
             data = f"user:{current_user.email};invitee-email:{email}"
             uid = urlsafe_base64_encode(force_bytes(data))
@@ -88,7 +92,7 @@ class ClientUserSerializer(serializers.ModelSerializer):
                 email=email,
                 subject=f"You're Invited to Join {organization.name} on Hiring Dog",
                 template="invitation.html",
-                invited_name=validated_data.get("name"),
+                invited_name=name,
                 user_name=current_user.clientuser.name,
                 user_email=current_user.email,
                 org_name=organization.name,
@@ -103,6 +107,7 @@ class ClientUserSerializer(serializers.ModelSerializer):
         email = validated_data.pop("email", None)
         phone_number = validated_data.pop("phone", None)
         role = validated_data.pop("role", None)
+        name = validated_data.get("name")
 
         updated_client_user = super().update(instance, validated_data)
 
@@ -112,6 +117,9 @@ class ClientUserSerializer(serializers.ModelSerializer):
             updated_client_user.user.phone = phone_number
         if role:
             updated_client_user.user.role = role
+        if name:
+            updated_client_user.user.profile.name = name
+            updated_client_user.user.profile.save()
 
         updated_client_user.user.save()
         return updated_client_user
