@@ -75,15 +75,18 @@ class Job(CreateUpdateDateTimeAndArchivedField):
 
 class Candidate(CreateUpdateDateTimeAndArchivedField):
     STATUS_CHOICES = (
+        ("HREC", "Highly Recommended"),
         ("REC", "Recommended"),
         ("NREC", "Not Recommended"),
+        ("SNREC", "Strongly Not Recommended"),
         ("SCH", "Schedule"),
         ("NSCH", "Not Schedule"),
+        ("NJ", "Not Joined"),
     )
     REASON_FOR_DROPPING_CHOICES = (
         ("CNI", "Candidate Not Interested"),
         ("CNA", "Candidate Not Available"),
-        ("CNR", "Candidate Not Respond"),
+        ("CNR", "Candidate Not Responded"),
         ("OTH", "Others"),
     )
     objects = SoftDelete()
@@ -123,8 +126,11 @@ class Candidate(CreateUpdateDateTimeAndArchivedField):
 
 
 class Interview(CreateUpdateDateTimeAndArchivedField):
+    objects = SoftDelete()
+    object_all = models.Manager()
+
     candidate = models.ForeignKey(
-        Candidate, on_delete=models.DO_NOTHING, related_name="interview", blank=True
+        Candidate, on_delete=models.DO_NOTHING, related_name="interviews", blank=True
     )
     interivewer = models.ForeignKey(
         InternalInterviewer,
