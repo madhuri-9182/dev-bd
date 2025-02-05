@@ -89,6 +89,11 @@ class Candidate(CreateUpdateDateTimeAndArchivedField):
         ("CNR", "Candidate Not Responded"),
         ("OTH", "Others"),
     )
+    FINAL_SELECTION_STATUS_CHOICES = (
+        ("RJD", "Rejected"),
+        ("SLD", "Selected"),
+        ("HD", "Hold"),
+    )
     objects = SoftDelete()
     object_all = models.Manager()
     name = models.CharField(max_length=100, blank=True)
@@ -123,6 +128,9 @@ class Candidate(CreateUpdateDateTimeAndArchivedField):
     )
     score = models.PositiveSmallIntegerField(default=0)
     total_score = models.PositiveSmallIntegerField(default=0)
+    final_selection_status = models.CharField(
+        max_length=20, choices=FINAL_SELECTION_STATUS_CHOICES, null=True, blank=True
+    )
 
 
 class Interview(CreateUpdateDateTimeAndArchivedField):
