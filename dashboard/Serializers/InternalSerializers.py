@@ -196,6 +196,9 @@ class InternalClientSerializer(serializers.ModelSerializer):
                 client_user_objs.append(
                     ClientUser(organization=organization, user=user, name=name_)
                 )
+                user.profile.name = name_
+                user.profile.organization = organization
+                user.profile.save()
 
                 point_of_contact["temporary_password"] = password
 
@@ -274,6 +277,8 @@ class InternalClientSerializer(serializers.ModelSerializer):
                     password=password,
                     login_url=settings.LOGIN_URL,
                 )
+                user.profile.name = name
+                user.profile.save()
                 ClientPointOfContact.objects.create(client=instance, **contact_data)
 
         return instance
@@ -370,6 +375,7 @@ class InterviewerSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         email = validated_data.get("email")
         phone = validated_data.get("phone_number")
+        name = validated_data.get("name")
         password = get_random_password()
         with transaction.atomic():
             user = User.objects.create_user(
@@ -378,13 +384,17 @@ class InterviewerSerializer(serializers.ModelSerializer):
                 password,
                 role=Role.INTERVIEWER,
             )
-            interviewer_obj = InternalInterviewer.objects.create(user=user, **validated_data)
+            interviewer_obj = InternalInterviewer.objects.create(
+                user=user, **validated_data
+            )
             send_mail.delay(
                 email=email,
-                user_name=validated_data.get("name"),
+                user_name=name,
                 template=ONBOARD_EMAIL_TEMPLATE,
                 password=password,
                 subject=WELCOME_MAIL_SUBJECT,
                 login_url=settings.LOGIN_URL,
             )
+            user.profile.name = name
+            user.profile.save()
         return interviewer_obj
