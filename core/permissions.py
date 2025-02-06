@@ -18,6 +18,11 @@ class IsClientAdmin(BasePermission):
         return request.user.role == Role.CLIENT_ADMIN
 
 
+class IsClientOwner(BasePermission):
+    def has_permission(self, request, view):
+        return request.user.role == Role.CLIENT_OWNER
+
+
 class IsClientUser(BasePermission):
     def has_permission(self, request, view):
         return request.user.role == Role.CLIENT_USER

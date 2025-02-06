@@ -75,17 +75,27 @@ class Job(CreateUpdateDateTimeAndArchivedField):
 
 class Candidate(CreateUpdateDateTimeAndArchivedField):
     STATUS_CHOICES = (
+        ("HREC", "Highly Recommended"),
         ("REC", "Recommended"),
         ("NREC", "Not Recommended"),
+        ("SNREC", "Strongly Not Recommended"),
         ("SCH", "Schedule"),
         ("NSCH", "Not Schedule"),
+        ("NJ", "Not Joined"),
     )
     REASON_FOR_DROPPING_CHOICES = (
         ("CNI", "Candidate Not Interested"),
         ("CNA", "Candidate Not Available"),
-        ("CNR", "Candidate Not Respond"),
+        ("CNR", "Candidate Not Responded"),
         ("OTH", "Others"),
     )
+    FINAL_SELECTION_STATUS_CHOICES = (
+        ("RJD", "Rejected"),
+        ("SLD", "Selected"),
+        ("HD", "Hold"),
+    )
+    SOURCE_CHOICES = (("INT", "Internal"), ("AGN", "Agency"), ("CLT", "Client"))
+    GENDER_CHOICES = (("M", "Male"), ("F", "Female"), ("TG", "Transgender"))
     objects = SoftDelete()
     object_all = models.Manager()
     name = models.CharField(max_length=100, blank=True)
@@ -101,10 +111,16 @@ class Candidate(CreateUpdateDateTimeAndArchivedField):
     phone = PhoneNumberField(region="IN", blank=True)
     email = models.EmailField(max_length=255, blank=True)
     company = models.CharField(max_length=100, blank=True)
-    designation = models.CharField(max_length=100, blank=True)
-    source = models.CharField(
-        max_length=100, blank=True, help_text="From Which side this candidate is ?"
+    designation = models.ForeignKey(
+        Job, on_delete=models.SET_NULL, related_name="candidate", null=True
     )
+    source = models.CharField(
+        max_length=3,
+        blank=True,
+        choices=SOURCE_CHOICES,
+        help_text="From Which side this candidate is ?",
+    )
+    gender = models.CharField(max_length=2, choices=GENDER_CHOICES, blank=True)
     cv = models.FileField(upload_to="candidate_cvs")
     remark = models.TextField(max_length=255, blank=True, null=True)
     specialization = models.CharField(max_length=100, blank=True)
@@ -116,15 +132,21 @@ class Candidate(CreateUpdateDateTimeAndArchivedField):
         help_text="candidate interview status",
     )
     reason_for_dropping = models.CharField(
-        max_length=100, choices=REASON_FOR_DROPPING_CHOICES, blank=True
+        max_length=100, choices=REASON_FOR_DROPPING_CHOICES, blank=True, null=True
     )
     score = models.PositiveSmallIntegerField(default=0)
     total_score = models.PositiveSmallIntegerField(default=0)
+    final_selection_status = models.CharField(
+        max_length=20, choices=FINAL_SELECTION_STATUS_CHOICES, null=True, blank=True
+    )
 
 
 class Interview(CreateUpdateDateTimeAndArchivedField):
+    objects = SoftDelete()
+    object_all = models.Manager()
+
     candidate = models.ForeignKey(
-        Candidate, on_delete=models.DO_NOTHING, related_name="interview", blank=True
+        Candidate, on_delete=models.DO_NOTHING, related_name="interviews", blank=True
     )
     interivewer = models.ForeignKey(
         InternalInterviewer,

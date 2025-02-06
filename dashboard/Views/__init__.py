@@ -3,6 +3,7 @@ from .ClientViews import (
     ClientInvitationActivateView,
     JobView,
     ResumePraserView,
+    CandidateView,
 )
 
 from .InternalViews import (

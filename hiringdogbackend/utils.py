@@ -21,7 +21,7 @@ def validate_incoming_data(
     errors: List[Dict[str, str]] = []
     if not partial:
         for key in required_keys:
-            if key not in data or (form and original_data.get(key) == ""):
+            if key not in data or (form and original_data.get(key) in ("", None)):
                 errors.append({key: "This is a required key."})
 
     for key in data:
@@ -95,18 +95,18 @@ def validate_attachment(
     file,
     allowed_extensions: List[str],
     max_size_mb: int,
-) -> List[Dict[str, str]]:
-    errors = []
+) -> Dict[str, List[str]]:
+    errors = {}
 
     if file.size > max_size_mb * 1024 * 1024:
-        errors.append(
-            {field_name: f"File size must be less than or equal to {max_size_mb}MB"}
+        errors.setdefault(field_name, []).append(
+            f"File size must be less than or equal to {max_size_mb}MB"
         )
 
     file_extension = file.name.split(".")[-1].lower()
     if file_extension not in allowed_extensions:
-        errors.append(
-            {field_name: f"File type must be one of {', '.join(allowed_extensions)}"}
+        errors.setdefault(field_name, []).append(
+            f"File type must be one of {', '.join(allowed_extensions)}"
         )
 
     return errors

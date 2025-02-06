@@ -5,7 +5,7 @@ from django.db import transaction
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from core.models import User, Role
-from ..models import ClientUser, Job
+from ..models import ClientUser, Job, Candidate
 from phonenumber_field.serializerfields import PhoneNumberField
 from hiringdogbackend.utils import (
     validate_incoming_data,
@@ -173,6 +173,7 @@ class JobSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         org = self.context["org"]
+
         required_keys = [
             "name",
             "job_id",
@@ -192,6 +193,7 @@ class JobSerializer(serializers.ModelSerializer):
             self.initial_data,
             required_keys,
             allowed_keys,
+            original_data=data,
             form=True,
             partial=self.partial,
         )
@@ -230,12 +232,14 @@ class JobSerializer(serializers.ModelSerializer):
                 )
 
         if data.get("job_description_file"):
-            errors += validate_attachment(
+            error = validate_attachment(
                 "job_description_file",
                 data["job_description_file"],
                 ["doc", "docx", "pdf"],
                 max_size_mb=5,
             )
+            if error:
+                errors.append(error)
 
         if data.get("other_details") is not None:
             schema = {
@@ -268,3 +272,121 @@ class JobSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data["client_id"] = validated_data.pop("recruiter_id")
         return super().create(validated_data)
+
+
+class CandidateDesignationDetailSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Job
+        fields = ("id", "name")
+
+
+class CandidateSerializer(serializers.ModelSerializer):
+    designation = CandidateDesignationDetailSerializer(read_only=True)
+    gender = serializers.ChoiceField(
+        choices=Candidate.GENDER_CHOICES,
+        error_messages={
+            "invalid_choice": f"This is an invalid choice. Valid choices are {', '.join([f'{key}({value})' for key, value in Candidate.GENDER_CHOICES])}"
+        },
+        required=False,
+    )
+    source = serializers.ChoiceField(
+        choices=Candidate.SOURCE_CHOICES,
+        error_messages={
+            "invalid_choice": f"This is an invalid choice. Valid choices are {', '.join([f'{key}({value})' for key, value in Candidate.SOURCE_CHOICES])}"
+        },
+        required=False,
+    )
+    status = serializers.ChoiceField(
+        choices=Candidate.STATUS_CHOICES,
+        error_messages={
+            "invalid_choice": f"This is an invalid choice. Valid choices are {', '.join([f'{key}({value})' for key, value in Candidate.STATUS_CHOICES])}"
+        },
+        required=False,
+    )
+    final_selection_status = serializers.ChoiceField(
+        choices=Candidate.FINAL_SELECTION_STATUS_CHOICES,
+        error_messages={
+            "invalid_choice": f"This is an invalid choice. Valid choices are {', '.join([f'{key}({value})' for key, value in Candidate.FINAL_SELECTION_STATUS_CHOICES])}"
+        },
+        required=False,
+    )
+    reason_for_dropping = serializers.ChoiceField(
+        choices=Candidate.REASON_FOR_DROPPING_CHOICES,
+        error_messages={
+            "invalid_choice": f"This is an invalid choice. Valid choices are {', '.join([f'{key}({value})' for key, value in Candidate.REASON_FOR_DROPPING_CHOICES])}"
+        },
+        required=False,
+    )
+    job_id = serializers.IntegerField(required=False, write_only=True)
+
+    class Meta:
+        model = Candidate
+        fields = (
+            "id",
+            "name",
+            "designation",
+            "source",
+            "year",
+            "month",
+            "cv",
+            "status",
+            "gender",
+            "score",
+            "total_score",
+            "final_selection_status",
+            "email",
+            "phone",
+            "company",
+            "specialization",
+            "remark",
+            "reason_for_dropping",
+            "job_id",
+        )
+        read_only_fields = ["designation"]
+
+    def validate(self, data):
+        request = self.context.get("request")
+        required_keys = [
+            "name",
+            "year",
+            "month",
+            "phone",
+            "email",
+            "company",
+            "job_id",
+            "source",
+            "cv",
+            "specialization",
+            "gender",
+        ]
+        allowed_keys = [
+            "status",
+            "final_selection_status",
+            "reason_for_dropping",
+            "remark",
+        ]
+
+        errors = validate_incoming_data(
+            self.initial_data,
+            required_keys,
+            allowed_keys,
+            original_data=data,
+            form=True,
+        )
+
+        if errors:
+            raise serializers.ValidationError({"errors": errors})
+
+        errors = {}
+        if not Job.objects.filter(
+            pk=data.get("job_id"),
+            client__organization=request.user.clientuser.organization,
+        ).exists():
+            errors.setdefault("job_id", []).append("Invalid job_id")
+
+        if data.get("cv"):
+            errors.update(validate_attachment("cv", data.get("cv"), ["pdf", "docx"], 5))
+        if errors:
+            raise serializers.ValidationError({"errors": errors})
+
+        return data
