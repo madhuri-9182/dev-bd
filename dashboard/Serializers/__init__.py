@@ -1,4 +1,4 @@
-from .ClientSerializers import ClientUserSerializer, JobSerializer
+from .ClientSerializers import ClientUserSerializer, JobSerializer, CandidateSerializer
 from .InternalSerializers import (
     ClientPointOfContactSerializer,
     InternalClientSerializer,

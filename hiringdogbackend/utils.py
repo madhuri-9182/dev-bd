@@ -21,7 +21,7 @@ def validate_incoming_data(
     errors: List[Dict[str, str]] = []
     if not partial:
         for key in required_keys:
-            if key not in data or (form and original_data.get(key) == ""):
+            if key not in data or (form and original_data.get(key) in ("", None)):
                 errors.append({key: "This is a required key."})
 
     for key in data:

@@ -94,6 +94,8 @@ class Candidate(CreateUpdateDateTimeAndArchivedField):
         ("SLD", "Selected"),
         ("HD", "Hold"),
     )
+    SOURCE_CHOICES = (("INT", "Internal"), ("AGN", "Agency"), ("CLT", "Client"))
+    GENDER_CHOICES = (("M", "Male"), ("F", "Female"), ("TG", "Transgender"))
     objects = SoftDelete()
     object_all = models.Manager()
     name = models.CharField(max_length=100, blank=True)
@@ -111,8 +113,12 @@ class Candidate(CreateUpdateDateTimeAndArchivedField):
     company = models.CharField(max_length=100, blank=True)
     designation = models.CharField(max_length=100, blank=True)
     source = models.CharField(
-        max_length=100, blank=True, help_text="From Which side this candidate is ?"
+        max_length=3,
+        blank=True,
+        choices=SOURCE_CHOICES,
+        help_text="From Which side this candidate is ?",
     )
+    gender = models.CharField(max_length=2, choices=GENDER_CHOICES, blank=True)
     cv = models.FileField(upload_to="candidate_cvs")
     remark = models.TextField(max_length=255, blank=True, null=True)
     specialization = models.CharField(max_length=100, blank=True)
@@ -124,7 +130,7 @@ class Candidate(CreateUpdateDateTimeAndArchivedField):
         help_text="candidate interview status",
     )
     reason_for_dropping = models.CharField(
-        max_length=100, choices=REASON_FOR_DROPPING_CHOICES, blank=True
+        max_length=100, choices=REASON_FOR_DROPPING_CHOICES, blank=True, null=True
     )
     score = models.PositiveSmallIntegerField(default=0)
     total_score = models.PositiveSmallIntegerField(default=0)

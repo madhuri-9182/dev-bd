@@ -7,12 +7,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from ..models import (
-    ClientUser,
-    Job,
-)
-from ..serializer import ClientUserSerializer, JobSerializer
+from ..models import ClientUser, Job, Candidate
+from ..serializer import ClientUserSerializer, JobSerializer, CandidateSerializer
 from externals.parser.resume_parser import ResumerParser
+from core.permissions import IsClientAdmin, IsClientOwner, IsClientUser
 from hiringdogbackend.utils import validate_attachment
 
 
@@ -337,4 +335,66 @@ class ResumePraserView(APIView, LimitOffsetPagination):
                 "data": response,
             },
             status=status.HTTP_200_OK,
+        )
+
+
+@extend_schema(tags=["Client"])
+class CandidateView(APIView, LimitOffsetPagination):
+    serializer_class = CandidateSerializer
+    permission_classes = [IsAuthenticated, IsClientAdmin | IsClientUser | IsClientOwner]
+
+    def get(self, request, **kwargs):
+        candidate_id = kwargs.get("candidate_id")
+        candidates = Candidate.objects.filter(
+            organization=request.user.clientuser.organization
+        )
+
+        if candidate_id:
+            candidate = candidates.filter(pk=candidate_id).first()
+            if not candidate:
+                return Response(
+                    {"status": "failed", "message": "Candidate not found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            serializer = self.serializer_class(candidate)
+            return Response(
+                {
+                    "status": "success",
+                    "message": "Candidate retrieved successfully.",
+                    "data": serializer.data,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        paginated_candidates = self.paginate_queryset(candidates, request)
+        serializer = self.serializer_class(paginated_candidates, many=True)
+        paginated_response = self.get_paginated_response(serializer.data)
+        response_data = {
+            "status": "success",
+            "message": "Candidates retrieved successfully.",
+            **paginated_response.data,
+        }
+        return Response(response_data, status=status.HTTP_200_OK)
+
+    def post(self, request, **kwargs):
+        serializer = self.serializer_class(data=request.data)
+        if serializer.is_valid():
+            serializer.save(organization=request.user.clientuser.organization)
+            return Response(
+                {
+                    "status": "success",
+                    "message": "Candidate stored successfully",
+                    "data": serializer.data,
+                },
+                status=status.HTTP_201_CREATED,
+            )
+
+        custom_error = serializer.errors.pop("errors", None)
+        return Response(
+            {
+                "status": "failed",
+                "message": "Invalid data.",
+                "errors": serializer.errors if not custom_error else custom_error,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
         )

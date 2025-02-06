@@ -5,7 +5,7 @@ from django.db import transaction
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from core.models import User, Role
-from ..models import ClientUser, Job
+from ..models import ClientUser, Job, Candidate
 from phonenumber_field.serializerfields import PhoneNumberField
 from hiringdogbackend.utils import (
     validate_incoming_data,
@@ -260,3 +260,95 @@ class JobSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data["client_id"] = validated_data.pop("recruiter_id")
         return super().create(validated_data)
+
+
+class CandidateSerializer(serializers.ModelSerializer):
+    gender = serializers.ChoiceField(
+        choices=Candidate.GENDER_CHOICES,
+        error_messages={
+            "invalid_choice": f"This is an invalid choice. Valid choices are {', '.join([f'{key}({value})' for key, value in Candidate.GENDER_CHOICES])}"
+        },
+        required=False,
+    )
+    source = serializers.ChoiceField(
+        choices=Candidate.SOURCE_CHOICES,
+        error_messages={
+            "invalid_choice": f"This is an invalid choice. Valid choices are {', '.join([f'{key}({value})' for key, value in Candidate.SOURCE_CHOICES])}"
+        },
+        required=False,
+    )
+    status = serializers.ChoiceField(
+        choices=Candidate.STATUS_CHOICES,
+        error_messages={
+            "invalid_choice": f"This is an invalid choice. Valid choices are {', '.join([f'{key}({value})' for key, value in Candidate.STATUS_CHOICES])}"
+        },
+        required=False,
+    )
+    final_selection_status = serializers.ChoiceField(
+        choices=Candidate.FINAL_SELECTION_STATUS_CHOICES,
+        error_messages={
+            "invalid_choice": f"This is an invalid choice. Valid choices are {', '.join([f'{key}({value})' for key, value in Candidate.FINAL_SELECTION_STATUS_CHOICES])}"
+        },
+        required=False,
+    )
+    reason_for_dropping = serializers.ChoiceField(
+        choices=Candidate.REASON_FOR_DROPPING_CHOICES,
+        error_messages={
+            "invalid_choice": f"This is an invalid choice. Valid choices are {', '.join([f'{key}({value})' for key, value in Candidate.REASON_FOR_DROPPING_CHOICES])}"
+        },
+        required=False,
+    )
+
+    class Meta:
+        model = Candidate
+        fields = (
+            "id",
+            "name",
+            "designation",
+            "source",
+            "year",
+            "month",
+            "cv",
+            "status",
+            "gender",
+            "score",
+            "total_score",
+            "final_selection_status",
+            "email",
+            "phone",
+            "company",
+            "specialization",
+            "remark",
+            "reason_for_dropping",
+        )
+
+    def validate(self, data):
+        required_keys = [
+            "name",
+            "year",
+            "month",
+            "phone",
+            "email",
+            "company",
+            "designation",
+            "source",
+            "cv",
+            "specialization",
+            "gender",
+        ]
+        allowed_keys = [
+            "status",
+            "final_selection_status",
+            "reason_for_dropping",
+            "remark",
+        ]
+        errors = validate_incoming_data(
+            self.initial_data,
+            required_keys,
+            allowed_keys,
+            original_data=data,
+            form=True,
+        )
+        if errors:
+            raise serializers.ValidationError({"errors": errors})
+        return data
