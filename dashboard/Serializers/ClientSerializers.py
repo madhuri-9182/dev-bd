@@ -165,6 +165,7 @@ class JobSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         org = self.context["org"]
+
         required_keys = [
             "name",
             "job_id",
@@ -184,6 +185,7 @@ class JobSerializer(serializers.ModelSerializer):
             self.initial_data,
             required_keys,
             allowed_keys,
+            original_data=data,
             form=True,
             partial=self.partial,
         )
@@ -222,12 +224,14 @@ class JobSerializer(serializers.ModelSerializer):
                 )
 
         if data.get("job_description_file"):
-            errors += validate_attachment(
+            error = validate_attachment(
                 "job_description_file",
                 data["job_description_file"],
                 ["doc", "docx", "pdf"],
                 max_size_mb=5,
             )
+            if error:
+                errors.append(error)
 
         if data.get("other_details") is not None:
             schema = {
@@ -262,7 +266,14 @@ class JobSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 
+class CandidateDesignationDetailSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Job
+        fields = ("id", "name")
+
+
 class CandidateSerializer(serializers.ModelSerializer):
+    designation = CandidateDesignationDetailSerializer(read_only=True)
     gender = serializers.ChoiceField(
         choices=Candidate.GENDER_CHOICES,
         error_messages={
@@ -298,6 +309,7 @@ class CandidateSerializer(serializers.ModelSerializer):
         },
         required=False,
     )
+    job_id = serializers.IntegerField(required=False, write_only=True)
 
     class Meta:
         model = Candidate
@@ -320,9 +332,12 @@ class CandidateSerializer(serializers.ModelSerializer):
             "specialization",
             "remark",
             "reason_for_dropping",
+            "job_id",
         )
+        read_only_fields = ["designation"]
 
     def validate(self, data):
+        request = self.context.get("request")
         required_keys = [
             "name",
             "year",
@@ -330,7 +345,7 @@ class CandidateSerializer(serializers.ModelSerializer):
             "phone",
             "email",
             "company",
-            "designation",
+            "job_id",
             "source",
             "cv",
             "specialization",
@@ -342,6 +357,7 @@ class CandidateSerializer(serializers.ModelSerializer):
             "reason_for_dropping",
             "remark",
         ]
+
         errors = validate_incoming_data(
             self.initial_data,
             required_keys,
@@ -349,6 +365,20 @@ class CandidateSerializer(serializers.ModelSerializer):
             original_data=data,
             form=True,
         )
+
         if errors:
             raise serializers.ValidationError({"errors": errors})
+
+        errors = {}
+        if not Job.objects.filter(
+            pk=data.get("job_id"),
+            client__organization=request.user.clientuser.organization,
+        ).exists():
+            errors.setdefault("job_id", []).append("Invalid job_id")
+
+        if data.get("cv"):
+            errors.update(validate_attachment("cv", data.get("cv"), ["pdf", "docx"], 5))
+        if errors:
+            raise serializers.ValidationError({"errors": errors})
+
         return data

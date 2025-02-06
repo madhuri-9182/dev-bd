@@ -320,7 +320,7 @@ class ResumePraserView(APIView, LimitOffsetPagination):
                     {
                         "status": "failed",
                         "message": "Invalid File Format",
-                        "error": {"resume": [error["resume"] for error in errors]},
+                        "error": errors,
                     }
                 )
 
@@ -347,7 +347,7 @@ class CandidateView(APIView, LimitOffsetPagination):
         candidate_id = kwargs.get("candidate_id")
         candidates = Candidate.objects.filter(
             organization=request.user.clientuser.organization
-        )
+        ).select_related("designation")
 
         if candidate_id:
             candidate = candidates.filter(pk=candidate_id).first()
@@ -377,9 +377,14 @@ class CandidateView(APIView, LimitOffsetPagination):
         return Response(response_data, status=status.HTTP_200_OK)
 
     def post(self, request, **kwargs):
-        serializer = self.serializer_class(data=request.data)
+        serializer = self.serializer_class(
+            data=request.data, context={"request": request}
+        )
         if serializer.is_valid():
-            serializer.save(organization=request.user.clientuser.organization)
+            serializer.save(
+                organization=request.user.clientuser.organization,
+                designation_id=serializer.validated_data.pop("job_id"),
+            )
             return Response(
                 {
                     "status": "success",

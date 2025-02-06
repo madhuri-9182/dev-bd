@@ -111,7 +111,9 @@ class Candidate(CreateUpdateDateTimeAndArchivedField):
     phone = PhoneNumberField(region="IN", blank=True)
     email = models.EmailField(max_length=255, blank=True)
     company = models.CharField(max_length=100, blank=True)
-    designation = models.CharField(max_length=100, blank=True)
+    designation = models.ForeignKey(
+        Job, on_delete=models.SET_NULL, related_name="candidate", null=True
+    )
     source = models.CharField(
         max_length=3,
         blank=True,
