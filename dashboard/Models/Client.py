@@ -12,6 +12,7 @@ class ClientUser(CreateUpdateDateTimeAndArchivedField):
         ("INACT", "Inactive"),
         ("PEND", "Pending"),
     )
+    ACCESSIBILITY_CHOICES = (("AJ", "All jobs"), ("AGJ", "Assigned jobs"))
 
     objects = SoftDelete()
     object_all = models.Manager()
@@ -42,6 +43,9 @@ class ClientUser(CreateUpdateDateTimeAndArchivedField):
         help_text="verification status",
         default="PEND",
     )
+    accessibility = models.CharField(
+        max_length=5, choices=ACCESSIBILITY_CHOICES, blank=True
+    )
 
 
 class Job(CreateUpdateDateTimeAndArchivedField):
@@ -52,7 +56,7 @@ class Job(CreateUpdateDateTimeAndArchivedField):
     )
     objects = SoftDelete()
     object_all = models.Manager()
-    clients = models.ManyToManyField(ClientUser, related_name="recruiters", blank=True)
+    clients = models.ManyToManyField(ClientUser, related_name="jobs", blank=True)
     name = models.CharField(max_length=100, blank=True)
     job_id = models.CharField(max_length=100, blank=True, null=True)
     hiring_manager = models.ForeignKey(

@@ -3,6 +3,9 @@ from rest_framework.exceptions import PermissionDenied
 from .models import Role
 
 
+SAFE_METHOD = ["OPTIONS", "HEAD"]
+
+
 class IsSuperAdmin(BasePermission):
     def has_permission(self, request, view):
         return request.user.role == Role.SUPER_ADMIN
@@ -36,3 +39,15 @@ class IsInterviewer(BasePermission):
 class IsAgency(BasePermission):
     def has_permission(self, request, view):
         return request.user.role == Role.AGENCY
+
+
+class HasRole(BasePermission):
+    def has_permission(self, request, view):
+        roles_mapping = getattr(view, "roles_mapping", {})
+
+        roles = roles_mapping.get(request.method, [])
+
+        if "__all__" in roles or request.method in SAFE_METHOD:
+            return True
+
+        return any(request.user.role == role for role in roles)

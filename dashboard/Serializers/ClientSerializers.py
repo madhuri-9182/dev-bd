@@ -32,6 +32,16 @@ class ClientUserSerializer(serializers.ModelSerializer):
         choices=Role.choices, write_only=True, required=False
     )
     phone = PhoneNumberField(write_only=True, required=False)
+    job_assigned = serializers.ListField(
+        child=serializers.IntegerField(), min_length=1, required=False
+    )
+    accessibility = serializers.ChoiceField(
+        choices=ClientUser.ACCESSIBILITY_CHOICES,
+        error_messages={
+            "invalid_choice": f"This is an invalid choice. Valid choices are {', '.join([f'{key}({value})' for key, value in ClientUser.ACCESSIBILITY_CHOICES])}"
+        },
+        required=False,
+    )
 
     class Meta:
         model = ClientUser
@@ -43,7 +53,9 @@ class ClientUserSerializer(serializers.ModelSerializer):
             "phone",
             "role",
             "designation",
+            "job_assigned",
             "created_at",
+            "accessibility",
         )
         read_only_fields = ["created_at"]
 
@@ -61,7 +73,15 @@ class ClientUserSerializer(serializers.ModelSerializer):
     def validate(self, data):
         errors = validate_incoming_data(
             self.initial_data,
-            ["name", "email", "role", "designation", "phone"],
+            [
+                "name",
+                "email",
+                "role",
+                "designation",
+                "phone",
+                "accessibility",
+            ],
+            allowed_keys=["job_assigned"],
             partial=self.partial,
         )
 
@@ -76,6 +96,7 @@ class ClientUserSerializer(serializers.ModelSerializer):
         user_role = validated_data.pop("role", None)
         name = validated_data.get("name")
         organization = validated_data.get("organization")
+        job_assigned = validated_data.pop("job_assigned", None)
         temp_password = get_random_password()
         current_user = self.context.get("user")
 
@@ -86,7 +107,12 @@ class ClientUserSerializer(serializers.ModelSerializer):
             user.profile.name = name
             user.profile.organization = organization
             user.profile.save()
+
             client_user = ClientUser.objects.create(user=user, **validated_data)
+            if job_assigned:
+                job_qs = Job.objects.filter(pk__in=job_assigned)
+                client_user.jobs.add(*job_qs)
+
             data = f"user:{current_user.email};invitee-email:{email}"
             uid = urlsafe_base64_encode(force_bytes(data))
             send_mail.delay(
@@ -109,8 +135,13 @@ class ClientUserSerializer(serializers.ModelSerializer):
         phone_number = validated_data.pop("phone", None)
         role = validated_data.pop("role", None)
         name = validated_data.get("name")
+        job_assigned = validated_data.pop("job_assigned", None)
 
         updated_client_user = super().update(instance, validated_data)
+
+        if job_assigned:
+            jobs_qs = Job.objects.filter(pk__in=job_assigned)
+            updated_client_user.jobs.set(jobs_qs)
 
         if email:
             updated_client_user.user.email = email

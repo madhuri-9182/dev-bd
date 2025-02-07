@@ -10,21 +10,41 @@ from rest_framework.views import APIView
 from ..models import ClientUser, Job, Candidate
 from ..serializer import ClientUserSerializer, JobSerializer, CandidateSerializer
 from externals.parser.resume_parser import ResumerParser
-from core.permissions import IsClientAdmin, IsClientOwner, IsClientUser
+from core.permissions import IsClientAdmin, IsClientOwner, IsClientUser, HasRole
+from core.models import Role
 from hiringdogbackend.utils import validate_attachment
 
 
 @extend_schema(tags=["Client"])
 class ClientUserView(APIView, LimitOffsetPagination):
     serializer_class = ClientUserSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasRole]
+    roles_mapping = {
+        "GET": [Role.CLIENT_ADMIN, Role.CLIENT_OWNER, Role.CLIENT_USER, Role.AGENCY],
+        "POST": [Role.CLIENT_ADMIN, Role.CLIENT_OWNER],
+        "PATCH": [Role.CLIENT_ADMIN, Role.CLIENT_OWNER],
+        "DELETE": [Role.CLIENT_ADMIN, Role.CLIENT_OWNER],
+    }
 
     def get(self, request, **kwargs):
-        client_user_qs = ClientUser.objects.filter(
-            organization=request.user.clientuser.organization
+        organization = request.user.clientuser.organization
+        client_users = ClientUser.objects.filter(
+            organization=organization
         ).select_related("user")
-        paginated_queryset = self.paginate_queryset(client_user_qs, request)
-        serializer = self.serializer_class(paginated_queryset, many=True)
+
+        if request.user.role == "client_user":
+            client_user = client_users.filter(user=request.user).first()
+            serializer = self.serializer_class(client_user)
+            return Response(
+                {
+                    "status": "success",
+                    "message": "Client User retrieve successfully",
+                    "data": serializer.data,
+                }
+            )
+
+        paginated_client_users = self.paginate_queryset(client_users, request)
+        serializer = self.serializer_class(paginated_client_users, many=True)
         paginated_data = self.get_paginated_response(serializer.data)
         return Response(
             {
@@ -162,7 +182,13 @@ class ClientInvitationActivateView(APIView):
 @extend_schema(tags=["Client"])
 class JobView(APIView, LimitOffsetPagination):
     serializer_class = JobSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasRole]
+    roles_mapping = {
+        "GET": [Role.CLIENT_ADMIN, Role.CLIENT_OWNER, Role.CLIENT_USER],
+        "POST": [Role.CLIENT_ADMIN, Role.CLIENT_OWNER],
+        "PATCH": [Role.CLIENT_ADMIN, Role.CLIENT_OWNER, Role.CLIENT_USER],
+        "DELETE": [Role.CLIENT_ADMIN, Role.CLIENT_OWNER, Role.CLIENT_USER],
+    }
 
     def post(self, request):
         serializer = self.serializer_class(
@@ -236,6 +262,12 @@ class JobView(APIView, LimitOffsetPagination):
         jobs = Job.objects.filter(
             hiring_manager__organization_id=request.user.clientuser.organization_id
         ).prefetch_related("clients")
+
+        if (
+            request.user.role == "client_user"
+            and request.user.clientuser.accessibility == "AGJ"
+        ):
+            jobs = jobs.filter(clients=request.user.clientuser)
 
         if job_ids:
             jobs = jobs.filter(pk__in=job_ids)
