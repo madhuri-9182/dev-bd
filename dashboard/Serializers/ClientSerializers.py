@@ -52,7 +52,7 @@ class ClientUserSerializer(serializers.ModelSerializer):
         phone = data.get("phone")
         role = data.get("role")
         errors = check_for_email_and_phone_uniqueness(email, phone, User)
-        if role and role not in ("client_user", "client_admin"):
+        if role and role not in ("client_user", "client_admin", "agency"):
             errors.append({"role": "Invalid role type."})
         if errors:
             raise serializers.ValidationError({"errors": errors})
