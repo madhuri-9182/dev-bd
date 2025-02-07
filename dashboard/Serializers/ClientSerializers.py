@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from rest_framework import serializers
 from django.conf import settings
@@ -51,7 +52,7 @@ class ClientUserSerializer(serializers.ModelSerializer):
         phone = data.get("phone")
         role = data.get("role")
         errors = check_for_email_and_phone_uniqueness(email, phone, User)
-        if role and role not in Role.values:
+        if role and role not in ("client_user", "client_admin"):
             errors.append({"role": "Invalid role type."})
         if errors:
             raise serializers.ValidationError({"errors": errors})
@@ -132,21 +133,21 @@ class JobClientSerializer(serializers.ModelSerializer):
 
 
 class JobSerializer(serializers.ModelSerializer):
-    client = JobClientSerializer(read_only=True)
+    clients = JobClientSerializer(read_only=True, many=True)
     hiring_manager = JobClientSerializer(read_only=True)
-    recruiter_id = serializers.IntegerField(write_only=True, required=False)
+    recruiter_ids = serializers.CharField(write_only=True, required=False)
     hiring_manager_id = serializers.IntegerField(write_only=True, required=False)
-    interview_time = serializers.TimeField(input_formats=["%H:%M:%S"])
+    interview_time = serializers.TimeField(input_formats=["%H:%M:%S"], required=False)
 
     class Meta:
         model = Job
         fields = (
             "id",
-            "client",
+            "clients",
             "name",
             "job_id",
             "hiring_manager",
-            "recruiter_id",
+            "recruiter_ids",
             "hiring_manager_id",
             "total_positions",
             "job_description_file",
@@ -164,11 +165,10 @@ class JobSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {
                     "errors": {
-                        "reason_for_archived": "Invalid reason_for_archived value."
+                        "reason_for_archived": ["Invalid reason_for_archived value."]
                     }
                 }
             )
-
         return super().run_validation(data)
 
     def validate(self, data):
@@ -178,7 +178,7 @@ class JobSerializer(serializers.ModelSerializer):
             "name",
             "job_id",
             "hiring_manager_id",
-            "recruiter_id",
+            "recruiter_ids",
             "total_positions",
             "job_description_file",
             "mandatory_skills",
@@ -197,38 +197,49 @@ class JobSerializer(serializers.ModelSerializer):
             form=True,
             partial=self.partial,
         )
-
         if errors:
             raise serializers.ValidationError({"errors": errors})
 
         hiring_manager_id = data.get("hiring_manager_id")
-        recruiter_id = data.get("recruiter_id")
+        recruiter_ids = data.get("recruiter_ids")
 
         client_user_ids = set(
             ClientUser.objects.filter(organization=org).values_list("id", flat=True)
         )
-        if not self.partial and recruiter_id not in client_user_ids:
-            errors.append({"recruiter_id": "Invalid recruiter_id"})
-        if not self.partial and hiring_manager_id not in client_user_ids:
-            errors.append({"hiring_manager_id": "Invalid hiring_manager_id"})
-        if not self.partial and hiring_manager_id == recruiter_id:
-            errors.append(
-                {
-                    "conflict_error": "hiring_manager_id and recruiter_id cannot be the same."
-                }
+        if recruiter_ids:
+            try:
+                recruiter_ids = set(json.loads(recruiter_ids))
+                if not recruiter_ids.issubset(client_user_ids):
+                    errors.setdefault("recruiter_ids", []).append(
+                        f"Invalid recruiter_ids(clientuser_ids): {recruiter_ids - client_user_ids}"
+                    )
+            except (json.JSONDecodeError, ValueError, TypeError):
+                errors.setdefault("recruiter_ids", []).append(
+                    "Invalid data format. It should be a list of integers."
+                )
+
+        if hiring_manager_id and hiring_manager_id not in client_user_ids:
+            errors.setdefault("hiring_manager_id", []).append(
+                "Invalid hiring_manager_id"
+            )
+        if (
+            hiring_manager_id
+            and isinstance(recruiter_ids, list)
+            and hiring_manager_id in recruiter_ids
+        ):
+            errors.setdefault("conflict_error", []).append(
+                "hiring_manager_id and recruiter_id cannot be the same."
             )
 
-        if not self.partial and not (0 <= data.get("total_positions") < 100):
-            errors.append({"total_positions": "Invalid total_positions"})
+        if data.get("total_positions") and not (0 <= data.get("total_positions") < 100):
+            errors.setdefault("total_positions", []).append("Invalid total_positions")
 
         if data.get("interview_time"):
             try:
                 datetime.strptime(str(data["interview_time"]), "%H:%M:%S")
             except (ValueError, TypeError):
-                errors.append(
-                    {
-                        "interview_time": "Invalid interview time. Format should be %H:%M:%S"
-                    }
+                errors.setdefault("interview_time", []).append(
+                    "Invalid interview time. Format should be %H:%M:%S"
                 )
 
         if data.get("job_description_file"):
@@ -239,7 +250,7 @@ class JobSerializer(serializers.ModelSerializer):
                 max_size_mb=5,
             )
             if error:
-                errors.append(error)
+                errors.update(error)
 
         if data.get("other_details") is not None:
             schema = {
@@ -263,15 +274,26 @@ class JobSerializer(serializers.ModelSerializer):
                     "required": ["details", "time", "guidelines"],
                 },
             }
-            errors += validate_json(data["other_details"], "other_details", schema)
+            errors.update(validate_json(data["other_details"], "other_details", schema))
 
         if errors:
             raise serializers.ValidationError({"errors": errors})
+        data["recruiter_ids"] = recruiter_ids
         return data
 
     def create(self, validated_data):
-        validated_data["client_id"] = validated_data.pop("recruiter_id")
-        return super().create(validated_data)
+        recruiter_ids = validated_data.pop("recruiter_ids")
+        job = super().create(validated_data)
+        for recruiter_id in recruiter_ids:
+            job.clients.add(recruiter_id)
+        return job
+
+    def update(self, instance, validated_data):
+        recruiter_ids = validated_data.pop("recruiter_ids", None)
+        job = super().update(instance, validated_data)
+        if recruiter_ids is not None:
+            job.clients.set(recruiter_ids)
+        return job
 
 
 class CandidateDesignationDetailSerializer(serializers.ModelSerializer):
@@ -377,7 +399,6 @@ class CandidateSerializer(serializers.ModelSerializer):
         if errors:
             raise serializers.ValidationError({"errors": errors})
 
-        errors = {}
         if not Job.objects.filter(
             pk=data.get("job_id"),
             client__organization=request.user.clientuser.organization,

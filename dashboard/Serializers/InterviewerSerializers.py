@@ -138,21 +138,21 @@ class InterviewerAvailabilitySerializer(serializers.ModelSerializer):
             end_time__gt=data.get("start_time"),
         )
         if overlapping_slots.exists():
-            errors.append(
-                {"availability": "Interviewer already available at this date and time."}
+            errors.setdefault("availability", []).append(
+                "Interviewer already available at this date and time."
             )
 
         if data["date"] < datetime.datetime.now().date():
-            errors.append({"date": "Invalid date. Date can't in past"})
+            errors.setdefault("date", []).append("Invalid date. Date can't in past")
 
         current_time = datetime.datetime.now().time()
         if data["end_time"] <= data["start_time"]:
-            errors.append({"end_time": "end_time must be after start_time"})
+            errors.setdefault("end_time", []).append(
+                "end_time must be after start_time"
+            )
         if data["start_time"] <= current_time or data["end_time"] <= current_time:
-            errors.append(
-                {
-                    "start_time & date_time": "start_time and end_time must be in the future for today"
-                }
+            errors.setdefault("start_time & date_time", []).append(
+                "start_time and end_time must be in the future for today"
             )
 
         if errors:

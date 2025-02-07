@@ -16,17 +16,17 @@ def validate_incoming_data(
     partial: bool = False,
     original_data: Dict[str, any] = {},
     form: bool = False,
-) -> List[Dict[str, str]]:
+) -> Dict[str, List[str]]:
 
-    errors: List[Dict[str, str]] = []
+    errors: Dict[str, List[str]] = {}
     if not partial:
         for key in required_keys:
             if key not in data or (form and original_data.get(key) in ("", None)):
-                errors.append({key: "This is a required key."})
+                errors.setdefault(key, []).append("This is a required key.")
 
     for key in data:
         if key not in required_keys + allowed_keys:
-            errors.append({key: "Unexpected key"})
+            errors.setdefault("unexpected_keys", []).append(key)
 
     return errors
 
@@ -114,11 +114,11 @@ def validate_attachment(
 
 def validate_json(
     json_data: Dict[str, Any], field_name: str, schema: Dict[str, Any]
-) -> List[Dict[str, str]]:
-    errors: List[Dict[str, str]] = []
+) -> Dict[str, List[str]]:
+    errors: Dict[str, List[str]] = {}
 
     try:
         validate(instance=json_data, schema=schema)
     except ValidationError as e:
-        errors.append({field_name: f"Invalid JSON: {str(e)}"})
+        errors.setdefault(field_name, []).append(f"Invalid JSON: {str(e)}")
     return errors

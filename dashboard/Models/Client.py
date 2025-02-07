@@ -52,9 +52,7 @@ class Job(CreateUpdateDateTimeAndArchivedField):
     )
     objects = SoftDelete()
     object_all = models.Manager()
-    client = models.ForeignKey(
-        ClientUser, on_delete=models.CASCADE, related_name="recruiter", blank=True
-    )
+    clients = models.ManyToManyField(ClientUser, related_name="recruiters", blank=True)
     name = models.CharField(max_length=100, blank=True)
     job_id = models.CharField(max_length=100, blank=True, null=True)
     hiring_manager = models.ForeignKey(

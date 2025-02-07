@@ -190,9 +190,78 @@ class JobView(APIView, LimitOffsetPagination):
 
     def get(self, request, **kwargs):
         job_id = kwargs.get("job_id")
+        job_ids = request.query_params.get("job_ids")
+        try:
+            job_ids = [int(i) for i in job_ids.split(",")] if job_ids else []
+        except ValueError:
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "Invalid job_ids in query params. It should be comma seperated integer values.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        recruiter_ids = request.query_params.get("recruiter_ids")
+        try:
+            recruiter_ids = (
+                [int(i) for i in recruiter_ids.split(",")] if recruiter_ids else []
+            )
+        except ValueError:
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "Invalid recruiter_ids in query params. It should be comma seperated integer values.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        hiring_manager_ids = request.query_params.get("hiring_manager_ids")
+        try:
+            hiring_manager_ids = (
+                [int(i) for i in hiring_manager_ids.split(",")]
+                if hiring_manager_ids
+                else []
+            )
+        except ValueError:
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "Invalid hiring_manager_ids in query params. It should be comma seperated integer values.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        post_job_date = request.query_params.get("post_job_date")
+
         jobs = Job.objects.filter(
-            client__organization_id=request.user.clientuser.organization_id
-        )
+            hiring_manager__organization_id=request.user.clientuser.organization_id
+        ).prefetch_related("clients")
+
+        if job_ids:
+            jobs = jobs.filter(pk__in=job_ids)
+
+        if recruiter_ids:
+            jobs = jobs.filter(clients__in=recruiter_ids)
+
+        if hiring_manager_ids:
+            jobs = jobs.filter(hiring_manager__in=hiring_manager_ids)
+
+        if post_job_date:
+            try:
+                post_job_date = (
+                    datetime.strptime(post_job_date, "%d/%m/%Y")
+                    .date()
+                    .strftime("%Y-%m-%d")
+                )
+                jobs = jobs.filter(created_at__date=post_job_date)
+            except ValueError:
+                return Response(
+                    {
+                        "status": "failed",
+                        "message": "Invalid post_job_date in query params. It should be in DD/MM/YYYY format.",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         if job_id:
             jobs = jobs.filter(pk=job_id)
@@ -205,7 +274,7 @@ class JobView(APIView, LimitOffsetPagination):
             {
                 "status": "success",
                 "message": "Jobs retrieved successfully.",
-                "data": response_data.data,
+                **response_data.data,
             },
             status=status.HTTP_200_OK,
         )

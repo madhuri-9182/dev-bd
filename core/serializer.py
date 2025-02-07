@@ -78,7 +78,6 @@ class UserLoginSerializer(serializers.ModelSerializer):
         if errors:
             raise serializers.ValidationError({"errors": errors})
         user = authenticate(request, **data)
-        errors = {}
 
         if not user:
             errors.setdefault("credentials", []).append("Invalid credentials")
