@@ -87,7 +87,6 @@ class ClientUserSerializer(serializers.ModelSerializer):
                 "name",
                 "email",
                 "role",
-                "designation",
                 "phone",
                 "accessibility",
             ],
