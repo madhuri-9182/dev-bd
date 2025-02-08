@@ -24,6 +24,12 @@ class ClientUserDetailsSerializer(serializers.ModelSerializer):
         fields = ("id", "email", "role")
 
 
+class ClientJobAssignedDetailsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Job
+        fields = ("id", "name")
+
+
 class ClientUserSerializer(serializers.ModelSerializer):
     created_at = serializers.DateTimeField(format="%d/%m/%Y", read_only=True)
     user = ClientUserDetailsSerializer(read_only=True)
@@ -33,7 +39,10 @@ class ClientUserSerializer(serializers.ModelSerializer):
     )
     phone = PhoneNumberField(write_only=True, required=False)
     job_assigned = serializers.ListField(
-        child=serializers.IntegerField(), min_length=1, required=False
+        child=serializers.IntegerField(), min_length=1, required=False, write_only=True
+    )
+    assigned_jobs = ClientJobAssignedDetailsSerializer(
+        read_only=True, many=True, source="jobs"
     )
     accessibility = serializers.ChoiceField(
         choices=ClientUser.ACCESSIBILITY_CHOICES,
@@ -54,6 +63,7 @@ class ClientUserSerializer(serializers.ModelSerializer):
             "role",
             "designation",
             "job_assigned",
+            "assigned_jobs",
             "created_at",
             "accessibility",
         )
@@ -61,9 +71,9 @@ class ClientUserSerializer(serializers.ModelSerializer):
 
     def run_validation(self, data=...):
         email = data.get("email")
-        phone = data.get("phone")
+        phone_number = data.get("phone")
         role = data.get("role")
-        errors = check_for_email_and_phone_uniqueness(email, phone, User)
+        errors = check_for_email_and_phone_uniqueness(email, phone_number, User)
         if role and role not in ("client_user", "client_admin", "agency"):
             errors.append({"role": "Invalid role type."})
         if errors:

@@ -32,24 +32,25 @@ class ClientUserView(APIView, LimitOffsetPagination):
             organization=organization
         ).select_related("user")
 
-        if request.user.role == "client_user":
+        if request.user.role == Role.CLIENT_USER:
             client_user = client_users.filter(user=request.user).first()
             serializer = self.serializer_class(client_user)
             return Response(
                 {
                     "status": "success",
-                    "message": "Client User retrieve successfully",
+                    "message": "Client User retrieved successfully",
                     "data": serializer.data,
                 }
             )
 
+        client_users = client_users.prefetch_related("jobs")
         paginated_client_users = self.paginate_queryset(client_users, request)
         serializer = self.serializer_class(paginated_client_users, many=True)
         paginated_data = self.get_paginated_response(serializer.data)
         return Response(
             {
                 "status": "success",
-                "message": "Client user retrieve successfully.",
+                "message": "Client users retrieved successfully.",
                 "data": paginated_data.data,
             },
             status=status.HTTP_200_OK,
@@ -86,7 +87,7 @@ class ClientUserView(APIView, LimitOffsetPagination):
             return Response(
                 {
                     "status": "failed",
-                    "message": "Invalid client_user_id in url.",
+                    "message": "Invalid client_user_id in URL.",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -123,9 +124,7 @@ class ClientUserView(APIView, LimitOffsetPagination):
         if response.data.get("errors"):
             response.data["status"] = "failed"
             response.data["message"] = response.data.get("message", "Invalid data")
-            # putting the below line becuase of response ordering
-            errors = response.data["errors"]
-            del response.data["errors"]
+            errors = response.data.pop("errors")
             response.data["errors"] = errors
         return super().finalize_response(request, response, *args, **kwargs)
 
@@ -296,7 +295,24 @@ class JobView(APIView, LimitOffsetPagination):
                 )
 
         if job_id:
-            jobs = jobs.filter(pk=job_id)
+            job = jobs.filter(pk=job_id).first()
+            if not job:
+                return Response(
+                    {
+                        "status": "failed",
+                        "message": "Job not found.",
+                    },
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            serializer = self.serializer_class(job)
+            return Response(
+                {
+                    "status": "success",
+                    "message": "Job retrieved successfully.",
+                    "data": serializer.data,
+                },
+                status=status.HTTP_200_OK,
+            )
 
         paginated_jobs = self.paginate_queryset(jobs, request)
         serializer = self.serializer_class(paginated_jobs, many=True)
