@@ -106,7 +106,7 @@ class ClientUserSerializer(serializers.ModelSerializer):
         user_role = validated_data.pop("role", None)
         name = validated_data.get("name")
         organization = validated_data.get("organization")
-        job_assigned = validated_data.pop("job_assigned", None)
+        jobs_assigned = validated_data.pop("jobs_assigned", None)
         temp_password = get_random_password()
         current_user = self.context.get("user")
 
@@ -119,8 +119,8 @@ class ClientUserSerializer(serializers.ModelSerializer):
             user.profile.save()
 
             client_user = ClientUser.objects.create(user=user, **validated_data)
-            if job_assigned:
-                job_qs = Job.objects.filter(pk__in=job_assigned)
+            if jobs_assigned:
+                job_qs = Job.objects.filter(pk__in=jobs_assigned)
                 client_user.jobs.add(*job_qs)
 
             data = f"user:{current_user.email};invitee-email:{email}"
@@ -145,12 +145,12 @@ class ClientUserSerializer(serializers.ModelSerializer):
         phone_number = validated_data.pop("phone", None)
         role = validated_data.pop("role", None)
         name = validated_data.get("name")
-        job_assigned = validated_data.pop("job_assigned", None)
+        jobs_assigned = validated_data.pop("jobs_assigned", None)
 
         updated_client_user = super().update(instance, validated_data)
 
-        if job_assigned:
-            jobs_qs = Job.objects.filter(pk__in=job_assigned)
+        if jobs_assigned:
+            jobs_qs = Job.objects.filter(pk__in=jobs_assigned)
             updated_client_user.jobs.set(jobs_qs)
 
         if email:
