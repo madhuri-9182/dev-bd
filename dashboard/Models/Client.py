@@ -98,6 +98,18 @@ class Candidate(CreateUpdateDateTimeAndArchivedField):
     )
     SOURCE_CHOICES = (("INT", "Internal"), ("AGN", "Agency"), ("CLT", "Client"))
     GENDER_CHOICES = (("M", "Male"), ("F", "Female"), ("TG", "Transgender"))
+    SPECIALIZATION_CHOICES = (
+        ("frontend", "Frontend"),
+        ("backend", "Backend"),
+        ("fullstack", "Fullstack"),
+        ("aiml", "AI/ML"),
+        ("devops", "DevOps"),
+        ("data_engineer", "Data Engineering"),
+        ("testing", "Testing/QA"),
+        ("android", "Android"),
+        ("ios", "iOS"),
+        ("mobile", "Mobile (Android + iOS)"),
+    )
     objects = SoftDelete()
     object_all = models.Manager()
     name = models.CharField(max_length=100, blank=True)
@@ -125,7 +137,9 @@ class Candidate(CreateUpdateDateTimeAndArchivedField):
     gender = models.CharField(max_length=2, choices=GENDER_CHOICES, blank=True)
     cv = models.FileField(upload_to="candidate_cvs")
     remark = models.TextField(max_length=255, blank=True, null=True)
-    specialization = models.CharField(max_length=100, blank=True)
+    specialization = models.CharField(
+        max_length=100, blank=True, choices=SPECIALIZATION_CHOICES
+    )
     status = models.CharField(
         max_length=15,
         choices=STATUS_CHOICES,

@@ -24,7 +24,7 @@ class ClientUserDetailsSerializer(serializers.ModelSerializer):
         fields = ("id", "email", "role")
 
 
-class ClientJobAssignedDetailsSerializer(serializers.ModelSerializer):
+class JobSpecificDetailsSerializer(serializers.ModelSerializer):
     class Meta:
         model = Job
         fields = ("id", "name")
@@ -38,10 +38,10 @@ class ClientUserSerializer(serializers.ModelSerializer):
         choices=Role.choices, write_only=True, required=False
     )
     phone = PhoneNumberField(write_only=True, required=False)
-    job_assigned = serializers.ListField(
+    jobs_assigned = serializers.ListField(
         child=serializers.IntegerField(), min_length=1, required=False, write_only=True
     )
-    assigned_jobs = ClientJobAssignedDetailsSerializer(
+    assigned_jobs = JobSpecificDetailsSerializer(
         read_only=True, many=True, source="jobs"
     )
     accessibility = serializers.ChoiceField(
@@ -62,7 +62,7 @@ class ClientUserSerializer(serializers.ModelSerializer):
             "phone",
             "role",
             "designation",
-            "job_assigned",
+            "jobs_assigned",
             "assigned_jobs",
             "created_at",
             "accessibility",
@@ -91,7 +91,7 @@ class ClientUserSerializer(serializers.ModelSerializer):
                 "phone",
                 "accessibility",
             ],
-            allowed_keys=["job_assigned"],
+            allowed_keys=["jobs_assigned"],
             partial=self.partial,
         )
 
@@ -337,14 +337,8 @@ class JobSerializer(serializers.ModelSerializer):
         return job
 
 
-class CandidateDesignationDetailSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Job
-        fields = ("id", "name")
-
-
 class CandidateSerializer(serializers.ModelSerializer):
-    designation = CandidateDesignationDetailSerializer(read_only=True)
+    designation = JobSpecificDetailsSerializer(read_only=True)
     gender = serializers.ChoiceField(
         choices=Candidate.GENDER_CHOICES,
         error_messages={
@@ -381,6 +375,13 @@ class CandidateSerializer(serializers.ModelSerializer):
         required=False,
     )
     job_id = serializers.IntegerField(required=False, write_only=True)
+    specialization = serializers.ChoiceField(
+        choices=Candidate.SPECIALIZATION_CHOICES,
+        error_messages={
+            "invalid_choice": f"This is an invalid choice. Valid choices are {', '.join([f'{key}({value})' for key, value in Candidate.SPECIALIZATION_CHOICES])}"
+        },
+        required=False,
+    )
 
     class Meta:
         model = Candidate
