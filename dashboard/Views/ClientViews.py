@@ -92,7 +92,9 @@ class ClientUserView(APIView, LimitOffsetPagination):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        client_user_obj = ClientUser.objects.filter(pk=client_user_id).first()
+        client_user_obj = ClientUser.objects.filter(
+            organization=request.user.clientuser.organization, pk=client_user_id
+        ).first()
         if not client_user_obj:
             return Response(
                 {"status": "failed", "message": "Client user not found."},
