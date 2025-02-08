@@ -21,7 +21,7 @@ from ..tasks import send_mail
 class ClientUserDetailsSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ("id", "email", "role")
+        fields = ("id", "email", "phone", "role")
 
 
 class JobSpecificDetailsSerializer(serializers.ModelSerializer):
