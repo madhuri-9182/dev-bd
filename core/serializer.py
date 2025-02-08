@@ -80,10 +80,18 @@ class UserLoginSerializer(serializers.ModelSerializer):
         user = authenticate(request, **data)
 
         if not user:
-            errors.setdefault("credentials", []).append("Invalid credentials")
+            errors.setdefault("credentials", []).append(
+                "Invalid email or password. Please check your credentials and try again."
+            )
 
         if user and hasattr(user, "clientuser"):
             client_user = user.clientuser
+
+            if not user.is_active:
+                errors.setdefault("account", []).append(
+                    f"Your account is being deactivated. Kindly contact {user.clientuser.organization.name} Admin"
+                )
+
             if (
                 user.role not in ["client_admin", "client_owner"]
                 and client_user.status != "ACT"

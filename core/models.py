@@ -59,9 +59,9 @@ class User(AbstractBaseUser):
     is_active = models.BooleanField(default=True)
     is_admin = models.BooleanField(default=False)
     role = models.CharField(max_length=15, choices=Role.choices, default=Role.USER)
-    email_verified = models.BooleanField(default=True)
+    email_verified = models.BooleanField(default=False)
     email_verified_date = models.DateTimeField(null=True, blank=True)
-    phone_verified = models.BooleanField(default=True)
+    phone_verified = models.BooleanField(default=False)
 
     objects = UserManager()
 

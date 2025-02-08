@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from ..models import ClientUser, Job, Candidate
 from ..serializer import ClientUserSerializer, JobSerializer, CandidateSerializer
+from ..permissions import CanDeleteUpdateUser
 from externals.parser.resume_parser import ResumerParser
 from core.permissions import IsClientAdmin, IsClientOwner, IsClientUser, HasRole
 from core.models import Role
@@ -18,7 +19,7 @@ from hiringdogbackend.utils import validate_attachment
 @extend_schema(tags=["Client"])
 class ClientUserView(APIView, LimitOffsetPagination):
     serializer_class = ClientUserSerializer
-    permission_classes = [IsAuthenticated, HasRole]
+    permission_classes = [IsAuthenticated, HasRole, CanDeleteUpdateUser]
     roles_mapping = {
         "GET": [Role.CLIENT_ADMIN, Role.CLIENT_OWNER, Role.CLIENT_USER, Role.AGENCY],
         "POST": [Role.CLIENT_ADMIN, Role.CLIENT_OWNER],
@@ -95,12 +96,14 @@ class ClientUserView(APIView, LimitOffsetPagination):
         client_user_obj = ClientUser.objects.filter(
             organization=request.user.clientuser.organization, pk=client_user_id
         ).first()
+
         if not client_user_obj:
             return Response(
                 {"status": "failed", "message": "Client user not found."},
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        self.check_object_permissions(request, client_user_obj)
         if partial:
             serializer = self.serializer_class(
                 client_user_obj, data=request.data, partial=partial
@@ -110,6 +113,8 @@ class ClientUserView(APIView, LimitOffsetPagination):
             message = "Client user updated successfully."
         else:
             client_user_obj.archived = True
+            client_user_obj.user.is_active = False
+            client_user_obj.user.save()
             client_user_obj.save()
             message = "Client user successfully deleted."
 
