@@ -429,10 +429,15 @@ class CandidateSerializer(serializers.ModelSerializer):
             "remark",
         ]
 
+        if self.partial:
+            allowed_keys = ["specialization", "remark", "source"]
+            required_keys = allowed_keys
+
         errors = validate_incoming_data(
             self.initial_data,
             required_keys,
             allowed_keys,
+            partial=self.partial,
             original_data=data,
             form=True,
         )
@@ -440,10 +445,13 @@ class CandidateSerializer(serializers.ModelSerializer):
         if errors:
             raise serializers.ValidationError({"errors": errors})
 
-        if not Job.objects.filter(
-            pk=data.get("job_id"),
-            client__organization=request.user.clientuser.organization,
-        ).exists():
+        if (
+            data.get("job_id")
+            and not Job.objects.filter(
+                pk=data.get("job_id"),
+                hiring_manager__organization=request.user.clientuser.organization,
+            ).exists()
+        ):
             errors.setdefault("job_id", []).append("Invalid job_id")
 
         if data.get("cv"):

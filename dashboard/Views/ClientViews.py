@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
+from django.db.models import Q
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -9,9 +10,15 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from ..models import ClientUser, Job, Candidate
 from ..serializer import ClientUserSerializer, JobSerializer, CandidateSerializer
-from ..permissions import CanDeleteUpdateUser
+from ..permissions import CanDeleteUpdateUser, CanDeleteUpdateCandidateData
 from externals.parser.resume_parser import ResumerParser
-from core.permissions import IsClientAdmin, IsClientOwner, IsClientUser, HasRole
+from core.permissions import (
+    IsClientAdmin,
+    IsClientOwner,
+    IsClientUser,
+    IsAgency,
+    HasRole,
+)
 from core.models import Role
 from hiringdogbackend.utils import validate_attachment
 
@@ -465,13 +472,49 @@ class ResumePraserView(APIView, LimitOffsetPagination):
 @extend_schema(tags=["Client"])
 class CandidateView(APIView, LimitOffsetPagination):
     serializer_class = CandidateSerializer
-    permission_classes = [IsAuthenticated, IsClientAdmin | IsClientUser | IsClientOwner]
+    permission_classes = [
+        IsAuthenticated,
+        IsClientAdmin | IsClientUser | IsClientOwner | IsAgency,
+        CanDeleteUpdateCandidateData,
+    ]
 
     def get(self, request, **kwargs):
         candidate_id = kwargs.get("candidate_id")
+        job_id = request.query_params.get("job_id")
+        status_ = request.query_params.get("status")
+        search_term = request.query_params.get("q")
+
+        if status_ and status_ not in dict(Candidate.STATUS_CHOICES).keys():
+            return Response(
+                {"status": "failed", "message": "Invalid Status."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         candidates = Candidate.objects.filter(
-            organization=request.user.clientuser.organization
+            organization=request.user.clientuser.organization,
         ).select_related("designation")
+
+        if request.user.role in [Role.CLIENT_USER, Role.AGENCY]:
+            candidates = candidates.filter(designation__clients=request.user.clientuser)
+
+        total_candidates = candidates.count()
+        scheduled = candidates.filter(status="SCH").count()
+        inprocess = candidates.filter(status="NSCH").count()
+        recommended = candidates.filter(Q(status="REC") | Q(status="HREC")).count()
+        rejected = candidates.filter(Q(status="SNREC") | Q(status="NREC")).count()
+
+        if job_id and job_id.isdigit():
+            candidates = candidates.filter(designation__id=job_id)
+
+        if status_:
+            candidates = candidates.filter(status=status_)
+
+        if search_term:
+            candidates = candidates.filter(
+                Q(name__icontains=search_term)
+                | Q(email=search_term)
+                | Q(phone=search_term)
+            )
 
         if candidate_id:
             candidate = candidates.filter(pk=candidate_id).first()
@@ -496,6 +539,11 @@ class CandidateView(APIView, LimitOffsetPagination):
         response_data = {
             "status": "success",
             "message": "Candidates retrieved successfully.",
+            "total_candidates": total_candidates,
+            "scheduled": scheduled,
+            "inprocess": inprocess,
+            "recommended": recommended,
+            "rejected": rejected,
             **paginated_response.data,
         }
         return Response(response_data, status=status.HTTP_200_OK)
@@ -527,3 +575,81 @@ class CandidateView(APIView, LimitOffsetPagination):
             },
             status=status.HTTP_400_BAD_REQUEST,
         )
+
+    def patch(self, request, **kwargs):
+        candidate_id = kwargs.get("candidate_id")
+        candidate_instance = self.get_candidate_instance(request, candidate_id)
+        if isinstance(candidate_instance, Response):
+            return candidate_instance
+        serializer = self.serializer_class(
+            candidate_instance, request.data, partial=True, context={"request": request}
+        )
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {
+                    "status": "success",
+                    "message": "Successfully updated candidate profile",
+                    "data": serializer.data,
+                },
+                status=status.HTTP_200_OK,
+            )
+        custom_errors = serializer.errors.pop("errors", None)
+        return Response(
+            {
+                "status": "failed",
+                "message": "Failed to update candidate profile",
+                "errors": custom_errors if custom_errors else serializer.errors,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    def delete(self, request, **kwargs):
+        candidate_id = kwargs.get("candidate_id")
+        reason_for_dropping = request.data.get("reason")
+        if (
+            reason_for_dropping
+            not in dict(Candidate.REASON_FOR_DROPPING_CHOICES).keys()
+        ):
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "Invalid reason for dropping. Please choose from the following options: {}".format(
+                        ", ".join(
+                            [
+                                "{} ({})".format(key, value)
+                                for key, value in dict(
+                                    Candidate.REASON_FOR_DROPPING_CHOICES
+                                ).items()
+                            ]
+                        )
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        candidate_instance = self.get_candidate_instance(request, candidate_id)
+        if isinstance(candidate_instance, Response):
+            return candidate_instance
+
+        if reason_for_dropping:
+            candidate_instance.reason_for_dropping = reason_for_dropping
+
+        candidate_instance.archived = True
+        candidate_instance.save()
+        return Response(
+            {"status": "success", "message": "Candidate dropped successfully"},
+            status=status.HTTP_204_NO_CONTENT,
+        )
+
+    def get_candidate_instance(self, request, candidate_id):
+        try:
+            candidate_instance = Candidate.objects.get(
+                organization=request.user.clientuser.organization, pk=candidate_id
+            )
+            self.check_object_permissions(request, candidate_instance)
+        except Candidate.DoesNotExist:
+            return Response(
+                {"status": "failed", "message": "Candidate not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return candidate_instance

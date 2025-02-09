@@ -135,7 +135,7 @@ class Candidate(CreateUpdateDateTimeAndArchivedField):
         help_text="From Which side this candidate is ?",
     )
     gender = models.CharField(max_length=2, choices=GENDER_CHOICES, blank=True)
-    cv = models.FileField(upload_to="candidate_cvs")
+    cv = models.FileField(upload_to="candidate_cvs", blank=True)
     remark = models.TextField(max_length=255, blank=True, null=True)
     specialization = models.CharField(
         max_length=100, blank=True, choices=SPECIALIZATION_CHOICES
