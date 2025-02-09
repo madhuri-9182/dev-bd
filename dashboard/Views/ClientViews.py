@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from ..models import ClientUser, Job, Candidate
 from ..serializer import ClientUserSerializer, JobSerializer, CandidateSerializer
-from ..permissions import CanDeleteUpdateUser, CanDeleteUpdateCandidateData
+from ..permissions import CanDeleteUpdateUser, UserRoleDeleteUpdateClientData
 from externals.parser.resume_parser import ResumerParser
 from core.permissions import (
     IsClientAdmin,
@@ -195,7 +195,7 @@ class ClientInvitationActivateView(APIView):
 @extend_schema(tags=["Client"])
 class JobView(APIView, LimitOffsetPagination):
     serializer_class = JobSerializer
-    permission_classes = [IsAuthenticated, HasRole]
+    permission_classes = [IsAuthenticated, HasRole, UserRoleDeleteUpdateClientData]
     roles_mapping = {
         "GET": [Role.CLIENT_ADMIN, Role.CLIENT_OWNER, Role.CLIENT_USER],
         "POST": [Role.CLIENT_ADMIN, Role.CLIENT_OWNER],
@@ -352,7 +352,11 @@ class JobView(APIView, LimitOffsetPagination):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         try:
-            job = Job.objects.get(pk=job_id)
+            job = Job.objects.get(
+                hiring_manager__organization_id=request.user.clientuser.organization_id,
+                pk=job_id,
+            )
+            self.check_object_permissions(request, job)
         except Job.DoesNotExist:
             return Response(
                 {
@@ -400,7 +404,11 @@ class JobView(APIView, LimitOffsetPagination):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         try:
-            job = Job.objects.get(pk=job_id)
+            job = Job.objects.get(
+                hiring_manager__organization_id=request.user.clientuser.organization_id,
+                pk=job_id,
+            )
+            self.check_object_permissions(request, job)
         except Job.DoesNotExist:
             return Response(
                 {
@@ -425,7 +433,10 @@ class JobView(APIView, LimitOffsetPagination):
 @extend_schema(tags=["Client"])
 class ResumePraserView(APIView, LimitOffsetPagination):
     serializer_class = None
-    permission_classes = [IsAuthenticated]
+    permission_classes = [
+        IsAuthenticated,
+        IsClientAdmin | IsClientUser | IsClientOwner | IsAgency,
+    ]
 
     def post(self, request):
         resume_files = request.FILES.getlist("resume")
@@ -475,7 +486,7 @@ class CandidateView(APIView, LimitOffsetPagination):
     permission_classes = [
         IsAuthenticated,
         IsClientAdmin | IsClientUser | IsClientOwner | IsAgency,
-        CanDeleteUpdateCandidateData,
+        UserRoleDeleteUpdateClientData,
     ]
 
     def get(self, request, **kwargs):
