@@ -77,12 +77,16 @@ class InternalInterviewer(CreateUpdateDateTimeAndArchivedField):
     )
 
     STRENGTH_CHOICES = (
-        ("backend", "Backend"),
         ("frontend", "Frontend"),
-        ("devops", "DevOps"),
-        ("testing", "Strength"),
+        ("backend", "Backend"),
+        ("fullstack", "Fullstack"),
         ("aiml", "AI/ML"),
-        ("data_engineer", "Data Engineer"),
+        ("devops", "DevOps"),
+        ("data_engineer", "Data Engineering"),
+        ("testing", "Testing/QA"),
+        ("android", "Android"),
+        ("ios", "iOS"),
+        ("mobile", "Mobile (Android + iOS)"),
     )
 
     organization = models.ManyToManyField(
