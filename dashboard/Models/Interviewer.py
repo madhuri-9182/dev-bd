@@ -20,9 +20,6 @@ class InterviewerAvailability(CreateUpdateDateTimeAndArchivedField):
     end_time = models.TimeField(
         help_text="The end time of the slot availability.", blank=True
     )
-    is_booked = models.BooleanField(
-        default=False, help_text="Indicates whether the slot has been booked or not."
-    )
     booked_by = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -51,12 +48,6 @@ class InterviewerAvailability(CreateUpdateDateTimeAndArchivedField):
         """
         return self.start_time < now()
 
-    def mark_as_booked(self, user):
-        """
-        Mark the slot as booked and associate it with a user.
-        """
-        if self.is_booked:
-            raise ValueError("This slot is already booked.")
-        self.is_booked = True
-        self.booked_by = user
-        self.save()
+    @property
+    def is_booked(self):
+        return self.booked_by is not None
