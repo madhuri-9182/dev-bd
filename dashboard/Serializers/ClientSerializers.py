@@ -316,6 +316,12 @@ class JobSerializer(serializers.ModelSerializer):
             }
             errors.update(validate_json(data["other_details"], "other_details", schema))
 
+        if data.get("mandatory_skills") is not None:
+            schema = {"type": "array", "items": {"type": "string"}, "minItems": 1}
+            errors.update(
+                validate_json(data["mandatory_skills"], "mandatory_skills", schema)
+            )
+
         if errors:
             raise serializers.ValidationError({"errors": errors})
         data["recruiter_ids"] = recruiter_ids
