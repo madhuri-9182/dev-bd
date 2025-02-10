@@ -32,6 +32,7 @@ class InterviewerAvailability(CreateUpdateDateTimeAndArchivedField):
         blank=True, null=True, help_text="Additional notes for the slot booking."
     )
     google_calendar_id = models.CharField(max_length=255, blank=True)
+    recurrence_rule = models.CharField(max_length=255, null=True, blank=True)
 
     class Meta:
         ordering = ["date", "start_time", "end_time"]
@@ -42,6 +43,7 @@ class InterviewerAvailability(CreateUpdateDateTimeAndArchivedField):
     def __str__(self):
         return f"Slot for {self.interviewer} at {self.start_time}"
 
+    @property
     def is_in_past(self):
         """
         Check if the slot time is in the past.
@@ -51,3 +53,7 @@ class InterviewerAvailability(CreateUpdateDateTimeAndArchivedField):
     @property
     def is_booked(self):
         return self.booked_by is not None
+
+    @property
+    def is_recurrence(self):
+        return self.recurrence_rule is not None
