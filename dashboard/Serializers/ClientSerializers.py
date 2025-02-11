@@ -6,7 +6,7 @@ from django.db import transaction
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from core.models import User, Role
-from ..models import ClientUser, Job, Candidate
+from ..models import ClientUser, Job, Candidate, InternalInterviewer
 from phonenumber_field.serializerfields import PhoneNumberField
 from hiringdogbackend.utils import (
     validate_incoming_data,
@@ -178,6 +178,13 @@ class JobSerializer(serializers.ModelSerializer):
     recruiter_ids = serializers.CharField(write_only=True, required=False)
     hiring_manager_id = serializers.IntegerField(write_only=True, required=False)
     interview_time = serializers.TimeField(input_formats=["%H:%M:%S"], required=False)
+    name = serializers.ChoiceField(
+        choices=InternalInterviewer.ROLE_CHOICES,
+        error_messages={
+            "invalid_choice": f"This is an invalid choice. Valid choices are {', '.join([f'{key}({value})' for key, value in InternalInterviewer.ROLE_CHOICES])}"
+        },
+        required=False,
+    )
 
     class Meta:
         model = Job
