@@ -672,6 +672,7 @@ class CandidateView(APIView, LimitOffsetPagination):
         return candidate_instance
 
 
+@extend_schema(tags=["Client"])
 class PotentialInterviewerAvailabilityForCandidateView(APIView):
     serializer_class = None
     permission_classes = [
