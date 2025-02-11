@@ -115,8 +115,8 @@ class InternalInterviewer(CreateUpdateDateTimeAndArchivedField):
         ],
     )
     interview_experience_months = models.PositiveSmallIntegerField(default=0)
-    assigned_roles = models.JSONField(
-        default=list, blank=True
+    assigned_roles = models.CharField(
+        max_length=15, choices=ROLE_CHOICES, blank=True
     )  # e.g., ["SDE III", "EM"]
     skills = models.JSONField(default=list, blank=True)  # e.g., ["Java", "Python"]
     strength = models.CharField(
