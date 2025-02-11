@@ -5,6 +5,7 @@ from ..views import (
     JobView,
     ResumePraserView,
     CandidateView,
+    PotentialInterviewerAvailabilityForCandidateView,
 )
 
 
@@ -24,5 +25,10 @@ urlpatterns = [
     path("candidate/<int:candidate_id>/", CandidateView.as_view(), name="candidate"),
     path("jobs/", JobView.as_view(), name="job-list"),
     path("job/<int:job_id>/", JobView.as_view(), name="job-details"),
+    path(
+        "interviewer-availability/",
+        PotentialInterviewerAvailabilityForCandidateView.as_view(),
+        name="interviewer-availablity",
+    ),
     path("parse-resume/", ResumePraserView.as_view(), name="resume-parser"),
 ]
