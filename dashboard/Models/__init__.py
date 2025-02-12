@@ -1,3 +1,4 @@
-from .Client import ClientUser, Job, Candidate, Interview
+from .Client import ClientUser, Job, Candidate
 from .Internal import ClientPointOfContact, InternalClient, InternalInterviewer
-from .Interviewer import InterviewerAvailability
+from .Interviewer import InterviewerAvailability, InterviewerRequest
+from .Interviews import Interview
