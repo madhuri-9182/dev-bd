@@ -7,4 +7,5 @@ from .Serializers import (
     CandidateSerializer,
     JobSerializer,
     InterviewerAvailabilitySerializer,
+    InterviewerRequestSerializer,
 )

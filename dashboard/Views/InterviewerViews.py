@@ -1,14 +1,24 @@
 import datetime
 from django.db import transaction
+from django.conf import settings
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import LimitOffsetPagination
-from ..serializer import InterviewerAvailabilitySerializer
-from ..models import InterviewerAvailability
-from core.permissions import IsInterviewer
+from ..serializer import InterviewerAvailabilitySerializer, InterviewerRequestSerializer
+from ..models import InterviewerAvailability, Candidate
+from ..tasks import send_email_to_multiple_recipients
+from core.permissions import (
+    IsInterviewer,
+    IsClientAdmin,
+    IsClientUser,
+    IsClientOwner,
+    IsAgency,
+)
 from core.models import OAuthToken
 from externals.google.google_calendar import GoogleCalendar
 
@@ -143,4 +153,62 @@ class InterviewerAvailabilityView(APIView, LimitOffsetPagination):
         return Response(
             return_response,
             status=status.HTTP_200_OK,
+        )
+
+
+@extend_schema(tags=["Interviewer"])
+class InterviewerReqeustView(APIView):
+    serializer_class = InterviewerRequestSerializer
+    permission_classes = [
+        IsAuthenticated,
+        IsClientUser | IsClientAdmin | IsClientOwner | IsAgency,
+    ]
+
+    def post(self, request):
+        serializer = self.serializer_class(
+            data=request.data, context={"request": request}
+        )
+        if serializer.is_valid():
+            candidate_id = serializer.validated_data["candidate_id"]
+            interviewer_ids = serializer.validated_data["interviewer_ids"]
+            candidate = Candidate.objects.filter(pk=candidate_id).first()
+            contexts = []
+
+            for interviewer_obj in InterviewerAvailability.objects.filter(
+                pk__in=interviewer_ids, booked_by__isnull=True
+            ).select_related("interviewer"):
+                data = f"interviewer_id:{interviewer_obj.interviewer.id};candidate_id:{candidate_id}:"
+                uid = urlsafe_base64_encode(force_bytes(data))
+                context = {
+                    "name": interviewer_obj.interviewer.name,
+                    "email": interviewer_obj.interviewer.email,
+                    "interview_date": serializer.validated_data["date"],
+                    "interview_time": serializer.validated_data["time"],
+                    "position": candidate.designation.get_name_display(),
+                    "site_domain": settings.SITE_DOMAIN,
+                    "link": "/confirmation/{}/".format(uid),
+                }
+                contexts.append(context)
+
+            send_email_to_multiple_recipients.delay(
+                contexts,
+                "Interview Opportunity Available - Confirm Your Availability",
+                "interviewer_interview_notification.html",
+            )
+            return Response(
+                {
+                    "status": "success",
+                    "message": "Interviewers notified successfully progress.",
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        custom_error = serializer.errors.pop("errors", None)
+        return Response(
+            {
+                "status": "failed",
+                "message": "Invalid data.",
+                "errors": serializer.errors if not custom_error else custom_error,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
         )
