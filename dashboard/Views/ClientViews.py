@@ -716,7 +716,10 @@ class PotentialInterviewerAvailabilityForCandidateView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             formatted__start_time = datetime.strptime(time, "%H:%M").time()
-            if formatted__start_time < datetime.now().time():
+            if (
+                formatted_date == datetime.today().date()
+                and formatted__start_time < datetime.now().time()
+            ):
                 return Response(
                     {"status": "failed", "message": "Invalid time"},
                     status=status.HTTP_400_BAD_REQUEST,

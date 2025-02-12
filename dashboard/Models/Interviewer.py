@@ -2,6 +2,7 @@ from django.db import models
 from django.utils.timezone import now
 from core.models import User
 from .Internal import InternalInterviewer
+from .Interviews import Interview
 from hiringdogbackend.ModelUtils import CreateUpdateDateTimeAndArchivedField
 
 
@@ -31,6 +32,7 @@ class InterviewerAvailability(CreateUpdateDateTimeAndArchivedField):
     notes = models.TextField(
         blank=True, null=True, help_text="Additional notes for the slot booking."
     )
+    is_scheduled = models.BooleanField(default=False)
     google_calendar_id = models.CharField(max_length=255, blank=True)
     recurrence_rule = models.CharField(max_length=255, null=True, blank=True)
 
@@ -57,3 +59,28 @@ class InterviewerAvailability(CreateUpdateDateTimeAndArchivedField):
     @property
     def is_recurrence(self):
         return self.recurrence_rule is not None
+
+
+class InterviewerRequest(CreateUpdateDateTimeAndArchivedField):
+    STATUS_CHOICES = (
+        ("pending", "Pending"),
+        ("accepted", "Accepted"),
+        ("rejected", "Rejected"),
+    )
+
+    interviewer = models.ForeignKey(
+        InternalInterviewer,
+        on_delete=models.CASCADE,
+        related_name="interview_requests",
+    )
+    interview = models.ForeignKey(
+        Interview, on_delete=models.CASCADE, related_name="interviewer_requests"
+    )
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="pending")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("interviewer", "interview")
+
+    def __str__(self):
+        return f"{self.interviewer} - {self.status}"

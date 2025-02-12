@@ -1,6 +1,6 @@
 import datetime
 from rest_framework import serializers
-from ..models import InterviewerAvailability
+from ..models import InterviewerAvailability, Candidate
 from hiringdogbackend.utils import validate_incoming_data
 
 
@@ -150,7 +150,9 @@ class InterviewerAvailabilitySerializer(serializers.ModelSerializer):
             errors.setdefault("end_time", []).append(
                 "end_time must be after start_time"
             )
-        if data["start_time"] <= current_time or data["end_time"] <= current_time:
+        if data["date"] == datetime.datetime.now().date() and (
+            data["start_time"] <= current_time or data["end_time"] <= current_time
+        ):
             errors.setdefault("start_time & date_time", []).append(
                 "start_time and end_time must be in the future for today"
             )
@@ -165,3 +167,39 @@ class InterviewerAvailabilitySerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data.pop("recurrence", None)
         return super().create(validated_data)
+
+
+class InterviewerRequestSerializer(serializers.Serializer):
+    candidate_id = serializers.IntegerField(min_value=0)
+    interviewer_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1), min_length=1
+    )
+    date = serializers.DateField(input_formats=["%d/%m/%Y"])
+    time = serializers.TimeField(input_formats=["%H:%M"])
+
+    def validate(self, data):
+        request = self.context.get("request")
+        errors = {}
+
+        candidate = Candidate.objects.filter(
+            organization=request.user.clientuser.organization,
+            pk=data.get("candidate_id"),
+        ).first()
+        if not candidate:
+            errors.setdefault("candidate_id", []).append("Invalid candidate_id")
+
+        valid_interviewer_ids = set(
+            InterviewerAvailability.objects.filter(
+                pk__in=data.get("interviewer_ids")
+            ).values_list("id", flat=True)
+        )
+        for index, interviewer_id in enumerate(data.get("interviewer_ids", [])):
+            if interviewer_id not in valid_interviewer_ids:
+                errors.setdefault("interviewer_ids", []).append(
+                    {index: ["interviewer_id is invalid"]}
+                )
+
+        if errors:
+            raise serializers.ValidationError({"errors": errors})
+
+        return data

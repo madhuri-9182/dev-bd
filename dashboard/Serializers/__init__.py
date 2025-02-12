@@ -4,4 +4,7 @@ from .InternalSerializers import (
     InternalClientSerializer,
     InterviewerSerializer,
 )
-from .InterviewerSerializers import InterviewerAvailabilitySerializer
+from .InterviewerSerializers import (
+    InterviewerAvailabilitySerializer,
+    InterviewerRequestSerializer,
+)
