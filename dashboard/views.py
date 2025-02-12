@@ -9,4 +9,5 @@ from dashboard.Views import (
     CandidateView,
     JobView,
     InterviewerAvailabilityView,
+    PotentialInterviewerAvailabilityForCandidateView,
 )

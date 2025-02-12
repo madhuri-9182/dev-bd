@@ -1,14 +1,20 @@
 from datetime import datetime, timedelta
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
-from django.db.models import Q
+from django.db.models import Q, F, ExpressionWrapper, DurationField
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from ..models import ClientUser, Job, Candidate
+from ..models import (
+    ClientUser,
+    Job,
+    Candidate,
+    InternalInterviewer,
+    InterviewerAvailability,
+)
 from ..serializer import ClientUserSerializer, JobSerializer, CandidateSerializer
 from ..permissions import CanDeleteUpdateUser, UserRoleDeleteUpdateClientData
 from externals.parser.resume_parser import ResumerParser
@@ -664,3 +670,152 @@ class CandidateView(APIView, LimitOffsetPagination):
                 status=status.HTTP_404_NOT_FOUND,
             )
         return candidate_instance
+
+
+@extend_schema(tags=["Client"])
+class PotentialInterviewerAvailabilityForCandidateView(APIView):
+    serializer_class = None
+    permission_classes = [
+        IsAuthenticated,
+        IsClientAdmin | IsClientOwner | IsClientUser | IsAgency,
+    ]
+
+    def get(self, request):
+        date = request.query_params.get("date")
+        time = request.query_params.get("time")
+        specialization = request.query_params.get("specialization")
+        experience = request.query_params.get("experience_year")
+        company = request.query_params.get("company")
+        designation_id = request.query_params.get("designation_id")
+
+        required_fields = {
+            "date": date,
+            "time": time,
+            "designation_id": designation_id,
+            "experience_year": experience,
+            "specialization": specialization,
+            "company": company,
+        }
+        missing_fields = [
+            field for field, value in required_fields.items() if not value
+        ]
+        if missing_fields:
+            return Response(
+                {
+                    "status": "failed",
+                    "message": f"{', '.join(missing_fields)} are required in query params.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            formatted_date = datetime.strptime(date, "%d/%m/%Y").date()
+            if formatted_date < datetime.today().date():
+                return Response(
+                    {"status": "failed", "message": "Invalid date"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            formatted__start_time = datetime.strptime(time, "%H:%M").time()
+            if formatted__start_time < datetime.now().time():
+                return Response(
+                    {"status": "failed", "message": "Invalid time"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            end_time_lower = (
+                datetime.strptime(time, "%H:%M") + timedelta(hours=1)
+            ).time()
+            end_time_upper = (
+                datetime.strptime(time, "%H:%M") + timedelta(hours=2)
+            ).time()
+        except ValueError:
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "Invalid date or time format. Use DD/MM/YYYY and HH:MM",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            experience = int(experience) if experience is not None else 0
+        except ValueError:
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "Invalid experience format. It should be a valid integer",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if specialization not in dict(Candidate.SPECIALIZATION_CHOICES).keys():
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "Invalid specialization. Please choose from the following options: {}".format(
+                        ", ".join(
+                            "{} ({})".format(key, value)
+                            for key, value in dict(
+                                Candidate.SPECIALIZATION_CHOICES
+                            ).items()
+                        )
+                    ),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            job = Job.objects.get(
+                pk=designation_id,
+                hiring_manager__organization=request.user.clientuser.organization,
+            )
+        except Job.DoesNotExist:
+            return Response(
+                {"status": "failed", "message": "Job not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        skills = job.mandatory_skills or []
+        if not skills:
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "No mandatory skills found for this job.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        query = Q()
+        for skill in skills:
+            query |= Q(interviewer__skills__icontains=f'"{skill}"')
+
+        interviewer_availability = (
+            InterviewerAvailability.objects.select_related("interviewer")
+            .filter(
+                date=formatted_date,
+                start_time__gte=formatted__start_time,
+                end_time__gte=end_time_lower,
+                end_time__lte=end_time_upper,
+                interviewer__assigned_roles=job.name,
+                interviewer__strength=specialization,
+                interviewer__total_experience_years__gte=experience + 2,
+                booked_by__isnull=True,
+            )
+            .filter(query)
+            .exclude(interviewer__current_company__iexact=company)
+            .values("id", "date", "start_time", "end_time")
+        )
+
+        if not interviewer_availability:
+            return Response(
+                {"status": "failed", "message": "No available slots on that date."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return Response(
+            {
+                "status": "success",
+                "message": "Available slots retrieved successfully.",
+                "data": list(interviewer_availability),
+            },
+            status=status.HTTP_200_OK,
+        )

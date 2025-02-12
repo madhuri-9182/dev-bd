@@ -341,6 +341,7 @@ class InterviewerSerializer(serializers.ModelSerializer):
                 "name",
                 "email",
                 "phone_number",
+                "current_company",
                 "previous_company",
                 "current_designation",
                 "total_experience_years",

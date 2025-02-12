@@ -19,7 +19,7 @@ class RecurrenceSerializer(serializers.Serializer):
             "invalid_choice": "This is an invalid choice. Valid choices are WEEKLY, DAILY, MONTHLY, YEARLY, HOURLY, MINUTELY, SECONDLY."
         },
     )
-    intervals = serializers.IntegerField(min_value=1, max_value=90)
+    intervals = serializers.IntegerField(min_value=1, max_value=90, required=False)
     count = serializers.IntegerField(min_value=1, max_value=250, required=False)
     until = serializers.DateTimeField(
         input_formats=["%Y-%m-%dT%H:%M:%S"], format="%d/%m/%Y %H:%M", required=False

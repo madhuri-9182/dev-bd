@@ -166,7 +166,7 @@ class Interview(CreateUpdateDateTimeAndArchivedField):
     candidate = models.ForeignKey(
         Candidate, on_delete=models.DO_NOTHING, related_name="interviews", blank=True
     )
-    interivewer = models.ForeignKey(
+    interviewer = models.ForeignKey(
         InternalInterviewer,
         on_delete=models.DO_NOTHING,
         related_name="interviews",
@@ -179,8 +179,13 @@ class Interview(CreateUpdateDateTimeAndArchivedField):
         help_text="Interview status",
     )
     date = models.DateTimeField(help_text="Scheduled interview date and time")
-    reschedule = models.BooleanField(
-        default=False, help_text="Indicates if the interview has been rescheduled"
+    previous_interview = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="rescheduled_interviews",
+        help_text="Reference to the previous interview instance if rescheduled.",
     )
     recording = models.FileField(
         upload_to="interview_recordings",

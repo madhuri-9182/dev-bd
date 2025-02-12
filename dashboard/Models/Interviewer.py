@@ -20,9 +20,6 @@ class InterviewerAvailability(CreateUpdateDateTimeAndArchivedField):
     end_time = models.TimeField(
         help_text="The end time of the slot availability.", blank=True
     )
-    is_booked = models.BooleanField(
-        default=False, help_text="Indicates whether the slot has been booked or not."
-    )
     booked_by = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -35,6 +32,7 @@ class InterviewerAvailability(CreateUpdateDateTimeAndArchivedField):
         blank=True, null=True, help_text="Additional notes for the slot booking."
     )
     google_calendar_id = models.CharField(max_length=255, blank=True)
+    recurrence_rule = models.CharField(max_length=255, null=True, blank=True)
 
     class Meta:
         ordering = ["date", "start_time", "end_time"]
@@ -45,18 +43,17 @@ class InterviewerAvailability(CreateUpdateDateTimeAndArchivedField):
     def __str__(self):
         return f"Slot for {self.interviewer} at {self.start_time}"
 
+    @property
     def is_in_past(self):
         """
         Check if the slot time is in the past.
         """
         return self.start_time < now()
 
-    def mark_as_booked(self, user):
-        """
-        Mark the slot as booked and associate it with a user.
-        """
-        if self.is_booked:
-            raise ValueError("This slot is already booked.")
-        self.is_booked = True
-        self.booked_by = user
-        self.save()
+    @property
+    def is_booked(self):
+        return self.booked_by is not None
+
+    @property
+    def is_recurrence(self):
+        return self.recurrence_rule is not None
