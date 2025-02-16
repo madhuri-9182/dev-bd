@@ -11,4 +11,5 @@ from dashboard.Views import (
     InterviewerAvailabilityView,
     PotentialInterviewerAvailabilityForCandidateView,
     InterviewerReqeustView,
+    InterviewerRequestResponseView,
 )

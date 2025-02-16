@@ -29,6 +29,12 @@ def send_email_to_multiple_recipients(self, contexts, subject, template, **kwarg
     with get_connection() as connection:
         for context in contexts:
             email_address = context.get("email")
+            if context.get("subject"):
+                subject = context["subject"]
+
+            if context.get("template"):
+                template = context["template"]
+
             if not email_address:
                 continue
 

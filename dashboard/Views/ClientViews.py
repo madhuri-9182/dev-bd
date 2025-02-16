@@ -724,12 +724,7 @@ class PotentialInterviewerAvailabilityForCandidateView(APIView):
                     {"status": "failed", "message": "Invalid time"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            end_time_lower = (
-                datetime.strptime(time, "%H:%M") + timedelta(hours=1)
-            ).time()
-            end_time_upper = (
-                datetime.strptime(time, "%H:%M") + timedelta(hours=2)
-            ).time()
+            end_time = (datetime.strptime(time, "%H:%M") + timedelta(hours=1)).time()
         except ValueError:
             return Response(
                 {
@@ -795,9 +790,8 @@ class PotentialInterviewerAvailabilityForCandidateView(APIView):
             InterviewerAvailability.objects.select_related("interviewer")
             .filter(
                 date=formatted_date,
-                start_time__gte=formatted__start_time,
-                end_time__gte=end_time_lower,
-                end_time__lte=end_time_upper,
+                start_time__lte=formatted__start_time,
+                end_time__gte=end_time,
                 interviewer__assigned_roles=job.name,
                 interviewer__strength=specialization,
                 interviewer__total_experience_years__gte=experience + 2,

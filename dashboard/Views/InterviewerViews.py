@@ -1,8 +1,8 @@
 import datetime
 from django.db import transaction
 from django.conf import settings
-from django.utils.encoding import force_bytes
-from django.utils.http import urlsafe_base64_encode
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.response import Response
@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import LimitOffsetPagination
 from ..serializer import InterviewerAvailabilitySerializer, InterviewerRequestSerializer
-from ..models import InterviewerAvailability, Candidate
+from ..models import InterviewerAvailability, Candidate, InternalInterviewer, Interview
 from ..tasks import send_email_to_multiple_recipients
 from core.permissions import (
     IsInterviewer,
@@ -177,8 +177,15 @@ class InterviewerReqeustView(APIView):
             for interviewer_obj in InterviewerAvailability.objects.filter(
                 pk__in=interviewer_ids, booked_by__isnull=True
             ).select_related("interviewer"):
-                data = f"interviewer_id:{interviewer_obj.interviewer.id};candidate_id:{candidate_id}:"
-                uid = urlsafe_base64_encode(force_bytes(data))
+                schedule_datetime = datetime.datetime.combine(
+                    serializer.validated_data.get("date"),
+                    serializer.validated_data.get("time"),
+                )
+                data = f"interviewer_avialability_id:{interviewer_obj.id};candidate_id:{candidate_id};schedule_time:{schedule_datetime};expired_time:{datetime.datetime.now()+datetime.timedelta(hours=1)}"
+                accept_data = data + ";action:accept"
+                reject_data = data + ";action:reject"
+                accept_uid = urlsafe_base64_encode(force_bytes(accept_data))
+                reject_uid = urlsafe_base64_encode(force_bytes(reject_data))
                 context = {
                     "name": interviewer_obj.interviewer.name,
                     "email": interviewer_obj.interviewer.email,
@@ -186,7 +193,8 @@ class InterviewerReqeustView(APIView):
                     "interview_time": serializer.validated_data["time"],
                     "position": candidate.designation.get_name_display(),
                     "site_domain": settings.SITE_DOMAIN,
-                    "link": "/confirmation/{}/".format(uid),
+                    "accept_link": "/confirmation/{}/".format(accept_uid),
+                    "reject_link": "/confirmation/{}/".format(reject_uid),
                 }
                 contexts.append(context)
 
@@ -212,3 +220,146 @@ class InterviewerReqeustView(APIView):
             },
             status=status.HTTP_400_BAD_REQUEST,
         )
+
+
+@extend_schema(tags=["Interviewer"])
+class InterviewerRequestResponseView(APIView):
+    serializer_class = None
+
+    def post(self, request, request_id):
+        try:
+
+            try:
+                decode_data = force_str(urlsafe_base64_decode(request_id))
+                data_parts = decode_data.split(";")
+                if len(data_parts) != 5:
+                    raise ValueError("Invalid data format")
+
+                (
+                    interviewer_availability_id,
+                    candidate_id,
+                    schedule_time,
+                    expired_time,
+                    action,
+                ) = [item.split(":", 1)[1] for item in data_parts]
+            except Exception:
+                return Response(
+                    {"status": "failed", "message": "Invalid Request ID format."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            expired_time = datetime.datetime.strptime(
+                expired_time, "%Y-%m-%d %H:%M:%S.%f"
+            )
+            if datetime.datetime.now() > expired_time:
+                return Response(
+                    {"status": "failed", "message": "Request expired"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            interviewer_availability = InterviewerAvailability.objects.filter(
+                pk=interviewer_availability_id
+            ).first()
+            candidate = Candidate.objects.filter(pk=candidate_id).first()
+
+            if not interviewer_availability or not candidate:
+                return Response(
+                    {
+                        "status": "failed",
+                        "message": "Invalid Interviewer or Candidate.",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if candidate.status not in ["SCH", "NSCH"]:
+                return Response(
+                    {"status": "failed", "message": "Invalid request"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if candidate.status == "SCH":
+                return Response(
+                    {
+                        "status": "failed",
+                        "message": "Candidate already has a scheduled interview.",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            schedule_time = datetime.datetime.strptime(
+                schedule_time, "%Y-%m-%d %H:%M:%S"
+            )
+
+            if action == "accept":
+                with transaction.atomic():
+                    Interview.objects.create(
+                        candidate=candidate,
+                        interviewer=interviewer_availability.interviewer,
+                        status="SCH",
+                        scheduled_time=schedule_time,
+                        total_score=100,
+                    )
+                    interviewer_availability.booked_by = (
+                        interviewer_availability.interviewer.user
+                    )
+                    interviewer_availability.is_scheduled = True
+                    interviewer_availability.save()
+
+                    interview_date = schedule_time.date().strftime("%d/%m/%Y")
+                    interview_time = schedule_time.time().strftime("%H:%M:%S")
+
+                    contexts = [
+                        {
+                            "name": candidate.name,
+                            "position": candidate.designation.name,
+                            "company_name": candidate.organization.name,
+                            "interview_date": interview_date,
+                            "interview_time": interview_time,
+                            "interviewer": interviewer_availability.interviewer.name,
+                            "email": candidate.email,
+                            "template": "interview_confirmation_candidate_notification.html",
+                            "subject": f"Interview Scheduled - {candidate.designation.name}",
+                        },
+                        {
+                            "name": interviewer_availability.interviewer.name,
+                            "position": candidate.designation.name,
+                            "interview_date": interview_date,
+                            "interview_time": interview_time,
+                            "candidate": candidate.name,
+                            "email": interviewer_availability.interviewer.email,
+                            "template": "interview_confirmation_interviewer_notification.html",
+                            "subject": f"Interview Assigned - {candidate.name}",
+                        },
+                        {
+                            "name": candidate.organization.name,
+                            "position": candidate.designation.name,
+                            "interview_date": interview_date,
+                            "interview_time": interview_time,
+                            "candidate": candidate.name,
+                            "email": candidate.designation.hiring_manager.user.email,
+                            "template": "interview_confirmation_client_notification.html",
+                            "subject": f"Interview Scheduled - {candidate.name}",
+                        },
+                    ]
+
+                    send_email_to_multiple_recipients.delay(
+                        contexts,
+                        "",
+                        "",
+                    )
+
+                    return Response(
+                        {"status": "success", "message": "Interview Confirmed"},
+                        status=status.HTTP_200_OK,
+                    )
+
+            return Response(
+                {"status": "success", "message": "Interview Rejected"},
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            return Response(
+                {"status": "failed", "message": f"Error: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
