@@ -1,4 +1,7 @@
+import datetime
 from django.http import HttpResponseRedirect
+from django.utils.encoding import force_str
+from django.utils.http import urlsafe_base64_decode
 from drf_spectacular.utils import extend_schema
 from rest_framework.response import Response
 from rest_framework import status
@@ -15,7 +18,7 @@ from django_rest_passwordreset.views import (
     ResetPasswordRequestToken,
     ResetPasswordConfirm,
 )
-from .models import OAuthToken
+from .models import OAuthToken, User
 from .serializer import (
     UserSerializer,
     UserLoginSerializer,
@@ -475,3 +478,40 @@ class GoogleCalenderGetEventView(APIView):
                 {"status": "failed", "message": f"error occured. {e}"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+
+class VerifyEmailView(APIView):
+    serializer_class = None
+
+    def post(self, request, verification_uid):
+        try:
+            user_id, expired_timestamp = force_str(
+                urlsafe_base64_decode(verification_uid)
+            ).split(":")
+        except (ValueError, TypeError):
+            return Response(
+                {"status": "failed", "message": "Invalid verification_uid format."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if datetime.datetime.now().timestamp() > float(expired_timestamp):
+            return Response(
+                {"status": "failed", "message": "Link expired."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        updated = User.objects.filter(pk=user_id).update(
+            email_verified=True,
+            email_verified_date=datetime.date.today(),
+            phone_verified=True,  # keep it for temporary will change it later
+        )
+
+        if updated:
+            return Response(
+                {"status": "success", "message": "User verified successfully."},
+                status=status.HTTP_200_OK,
+            )
+
+        return Response(
+            {"status": "failed", "message": "User not found."},
+            status=status.HTTP_404_NOT_FOUND,
+        )

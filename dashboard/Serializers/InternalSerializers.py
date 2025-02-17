@@ -1,7 +1,10 @@
+import datetime
 from rest_framework import serializers
 from organizations.utils import create_organization
 from django.conf import settings
 from django.db import transaction
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
 from core.models import User, Role
 from ..models import (
     InternalClient,
@@ -53,7 +56,9 @@ class ClientPointOfContactSerializer(serializers.ModelSerializer):
 
 
 class InternalClientSerializer(serializers.ModelSerializer):
-    created_at = serializers.DateTimeField(format="%d/%m/%Y", read_only=True)
+    onboarded_at = serializers.DateTimeField(
+        source="created_at", format="%d/%m/%Y", read_only=True
+    )
     points_of_contact = ClientPointOfContactSerializer(many=True)
 
     class Meta:
@@ -69,38 +74,31 @@ class InternalClientSerializer(serializers.ModelSerializer):
             "assigned_to",
             "address",
             "points_of_contact",
-            "created_at",
+            "onboarded_at",
         )
 
     def to_internal_value(self, data):
         request = self.context.get("request")
         points_of_contact = data.get("points_of_contact")
+        errors = {}
         if not points_of_contact:
-            raise serializers.ValidationError(
-                {
-                    "errors": {
-                        "points_of_contact": "This field is required and must contain list of objects."
-                    }
-                }
+            errors.setdefault("points_of_contact", []).append(
+                "This field is required and must contain list of objects."
             )
 
         if not isinstance(points_of_contact, list):
-            raise serializers.ValidationError(
-                {
-                    "errors": {
-                        "points_of_contact": "This field must be a list of objects."
-                    }
-                }
+            errors.setdefault("points_of_contact", []).append(
+                "This field must be a list of objects."
             )
-        if len(points_of_contact) > 3:
-            raise serializers.ValidationError(
-                {
-                    "errors": {
-                        "points_of_contact": "A maximum of 3 points of contact are allowed."
-                    }
-                }
+
+        if points_of_contact and len(points_of_contact) > 3:
+            errors.setdefault("points_of_contact", []).append(
+                "A maximum of 3 points of contact are allowed."
             )
-        errors = {}
+
+        if errors:
+            raise serializers.ValidationError(errors)
+
         contact_ids = []
         for i, contact in enumerate(points_of_contact):
             if contact.get("id"):
@@ -112,9 +110,7 @@ class InternalClientSerializer(serializers.ModelSerializer):
                 errors[f"{i + 1}"] = serializer.errors["errors"]
 
         if errors:
-            raise serializers.ValidationError(
-                {"errors": {"points_of_contact": {**errors}}}
-            )
+            raise serializers.ValidationError(errors)
 
         self.context["contact_ids"] = contact_ids
 
@@ -145,10 +141,10 @@ class InternalClientSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"errors": errors})
 
         if data.get("gstin") and not is_valid_gstin(data.get("gstin")):
-            errors.append({"gstin": "Invalid GSTIN."})
+            errors.setdefault("gstin", []).append("Invalid gstin.")
 
         if data.get("pan") and not is_valid_pan(data.get("pan")):
-            errors.append({"pan": "Invalid PAN."})
+            errors.setdefault("pan", []).append("Invalid PAN.")
 
         if errors:
             raise serializers.ValidationError({"errors": errors})
@@ -233,10 +229,10 @@ class InternalClientSerializer(serializers.ModelSerializer):
         return client
 
     def update(self, instance, validated_data):
-        points_of_contact_data = validated_data.pop("points_of_contact")
+        point_of_contact_data = validated_data.pop("points_of_contact")
 
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
+        for key, value in validated_data.items():
+            setattr(instance, key, value)
         instance.save()
 
         existing_contacts = ClientPointOfContact.objects.filter(client=instance)
@@ -249,23 +245,36 @@ class InternalClientSerializer(serializers.ModelSerializer):
             contact.archived = True
             contact.save()
 
-        for index, contact_data in enumerate(points_of_contact_data):
+        for index, point_of_contact in enumerate(point_of_contact_data):
             contact_id = contact_ids[index] if index < len(contact_ids) else None
+
+            """ --> keep it for future reference.
+                if not contact_id and len(existing_contacts_dict) >= 3:
+                    raise serializers.ValidationError(
+                        {
+                            "errors": {
+                                "points_of_contact": [
+                                    "Maximum 3 points of contact are allowed"
+                                ]
+                            }
+                        }
+                    )
+            """
 
             if contact_id in existing_contacts_dict:
                 contact = existing_contacts_dict[contact_id]
-                contact_data.pop("email", None)
-                contact_data.pop("phone", None)
-                for key, value in contact_data.items():
+                point_of_contact.pop("email", None)
+                point_of_contact.pop("phone", None)
+                for key, value in point_of_contact.items():
                     setattr(contact, key, value)
                 contact.save()
             else:
-                email = contact_data.get("email")
-                name = contact_data.get("name")
+                email = point_of_contact.get("email")
+                name = point_of_contact.get("name")
                 password = get_random_password()
                 user = User.objects.create_user(
-                    contact_data.get("email"),
-                    contact_data.get("phone"),
+                    email,
+                    point_of_contact.get("phone"),
                     password,
                     role=Role.CLIENT_ADMIN,
                 )
@@ -279,12 +288,26 @@ class InternalClientSerializer(serializers.ModelSerializer):
                 )
                 user.profile.name = name
                 user.profile.save()
-                ClientPointOfContact.objects.create(client=instance, **contact_data)
+                ClientPointOfContact.objects.create(client=instance, **point_of_contact)
 
         return instance
 
 
 class InterviewerSerializer(serializers.ModelSerializer):
+    assigned_roles = serializers.ChoiceField(
+        choices=InternalInterviewer.ROLE_CHOICES,
+        error_messages={
+            "invalid_choice": f"This is an invalid choice. Valid choices are {', '.join([f'{key}({value})' for key, value in InternalInterviewer.ROLE_CHOICES])}"
+        },
+        required=False,
+    )
+    strength = serializers.ChoiceField(
+        choices=InternalInterviewer.STRENGTH_CHOICES,
+        error_messages={
+            "invalid_choice": f"This is an invalid choice. Valid choices are {', '.join([f'{key}({value})' for key, value in InternalInterviewer.STRENGTH_CHOICES])}"
+        },
+        required=False,
+    )
 
     class Meta:
         model = InternalInterviewer
@@ -312,23 +335,9 @@ class InterviewerSerializer(serializers.ModelSerializer):
             data.pop("email", None)
             data.pop("phone_number", None)
 
-        errors = []
         email = data.get("email")
         phone = data.get("phone_number")
-        strength = data.get("strength")
         errors = check_for_email_and_phone_uniqueness(email, phone, User)
-        if strength and strength not in [
-            "frontend",
-            "backend",
-            "devops",
-            "aiml",
-            "data_engineer",
-        ]:
-            errors.append(
-                {
-                    "strength": "Invalid strength type. Valid types are frontend, backend, devops, aiml and data_engineer."
-                }
-            )
         if errors:
             raise serializers.ValidationError({"errors": errors})
         return super().run_validation(data)
@@ -361,13 +370,13 @@ class InterviewerSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"errors": errors})
         for key in ["total_experience_years", "interview_experience_years"]:
             if key in data and not 1 <= data[key] <= 50:
-                errors.append({key: "Invalid Experience"})
+                errors.setdefault(key, []).append("Invalid Experience")
         for key in ["total_experience_months", "interview_experience_months"]:
             if key in data and not 0 <= data[key] <= 12:
-                errors.append({key: "Invalid Experience"})
+                errors.setdefault(key, []).append("Invalid Experience")
         if "total_experience_years" < "interview_experience_years":
-            errors.append(
-                {"years": "Total experience must be greater than interview experience."}
+            errors.setdefault("years", []).append(
+                "Total experience must be greater than interview experience."
             )
         if errors:
             raise serializers.ValidationError({"errors": errors})
@@ -388,6 +397,12 @@ class InterviewerSerializer(serializers.ModelSerializer):
             interviewer_obj = InternalInterviewer.objects.create(
                 user=user, **validated_data
             )
+            verification_data = (
+                f"{user.id}:{int(datetime.datetime.now().timestamp() + 86400)}"
+            )
+            verification_data_uid = urlsafe_base64_encode(
+                force_bytes(verification_data)
+            )
             send_mail.delay(
                 email=email,
                 user_name=name,
@@ -395,6 +410,8 @@ class InterviewerSerializer(serializers.ModelSerializer):
                 password=password,
                 subject=WELCOME_MAIL_SUBJECT,
                 login_url=settings.LOGIN_URL,
+                site_domain=settings.SITE_DOMAIN,
+                verification_link=f"/verification/{verification_data_uid}/",
             )
             user.profile.name = name
             user.profile.save()

@@ -10,11 +10,17 @@ from .views import (
     GoogleAuthInitView,
     GoogleAuthCallbackView,
     GoogleCalenderGetEventView,
+    VerifyEmailView,
 )
 
 urlpatterns = [
     path("refresh/", CookieTokenRefreshView.as_view(), name="token_refresh"),
     path("login/", UserLoginView.as_view(), name="user_login"),
+    path(
+        "email-verify/<str:verification_uid>/",
+        VerifyEmailView.as_view(),
+        name="user_email_verification",
+    ),
     path("signup/", UserSignupView.as_view(), name="user_signup"),
     path("logout/", LogoutView.as_view(), name="logout"),
     path("logout-all/", LogoutAllView.as_view(), name="logout-all"),

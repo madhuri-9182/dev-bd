@@ -67,15 +67,15 @@ def get_boolean(data: dict, key: str) -> bool:
 
 def check_for_email_and_phone_uniqueness(
     email: str, phone: str, user
-) -> List[Dict[str, str]]:
-    errors = []
+) -> Dict[str, List[str]]:
+    errors = {}
     if email:
         try:
             EmailValidator()(email)
         except ValidationError:
-            errors.append({"email": "Invalid email"})
+            errors.setdefault("email", []).append("Invalid email")
         if user.objects.filter(email=email).exists():
-            errors.append({"email": "This email is already used."})
+            errors.setdefault("email", []).append("This email is already used.")
 
     if phone:
         if (
@@ -83,9 +83,9 @@ def check_for_email_and_phone_uniqueness(
             or len(phone) != 13
             or not phone.startswith("+91")
         ):
-            errors.append({"phone": "Invalid phone number"})
+            errors.setdefault("phone", []).append("Invalid phone number")
         elif user.objects.filter(phone=phone).exists():
-            errors.append({"phone": "This phone is already used."})
+            errors.setdefault("phone", []).append("This phone is already used.")
 
     return errors
 
