@@ -9,4 +9,5 @@ from .Serializers import (
     InterviewerAvailabilitySerializer,
     InterviewerRequestSerializer,
     EngagementTemplateSerializer,
+    EngagementSerializer,
 )

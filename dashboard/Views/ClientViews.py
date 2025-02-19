@@ -15,12 +15,14 @@ from ..models import (
     EngagementTemplates,
     InternalInterviewer,
     InterviewerAvailability,
+    Engagement,
 )
 from ..serializer import (
     ClientUserSerializer,
     JobSerializer,
     CandidateSerializer,
     EngagementTemplateSerializer,
+    EngagementSerializer,
 )
 from ..permissions import CanDeleteUpdateUser, UserRoleDeleteUpdateClientData
 from externals.parser.resume_parser import ResumerParser
@@ -845,7 +847,9 @@ class EngagementTemplateView(APIView, LimitOffsetPagination):
         )
 
     def post(self, request, **kwargs):
-        serializer = self.serializer_class(data=request.data, context={"attachment":request.FILES.get('attachment')})
+        serializer = self.serializer_class(
+            data=request.data, context={"attachment": request.FILES.get("attachment")}
+        )
         if serializer.is_valid():
             serializer.save(organization=request.user.clientuser.organization)
             return Response(
@@ -913,4 +917,51 @@ class EngagementTemplateView(APIView, LimitOffsetPagination):
         return Response(
             {"status": "success", "message": "Successfully deleted template"},
             status=status.HTTP_204_NO_CONTENT,
+        )
+
+
+@extend_schema(tags=["Client"])
+class EngagementView(APIView, LimitOffsetPagination):
+    serializer_class = EngagementSerializer
+    permission_classes = [IsAuthenticated, IsClientAdmin | IsClientOwner | IsClientUser]
+
+    def post(self, request):
+        serializer = self.serializer_class(
+            data=request.data, context={"request": request}
+        )
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {
+                    "status": "success",
+                    "message": "Successfully created engagement",
+                    "data": serializer.data,
+                },
+                status=status.HTTP_201_CREATED,
+            )
+        custom_errors = serializer.errors.pop("errors", None)
+        return Response(
+            {
+                "status": "failed",
+                "message": "Invalid data",
+                "errors": custom_errors if custom_errors else serializer.errors,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    def get(self, request):
+        organization = request.user.clientuser.organization
+        engagements = Engagement.objects.select_related(
+            "client", "job", "candidate"
+        ).filter(client__organization=organization)
+        paginated_engagements = self.paginate_queryset(engagements, request)
+        serializer = self.serializer_class(paginated_engagements, many=True)
+        paginated_response = self.get_paginated_response(serializer.data)
+        return Response(
+            {
+                "status": "success",
+                "message": "Successfully retrieved engagements",
+                **paginated_response.data,
+            },
+            status=status.HTTP_200_OK,
         )

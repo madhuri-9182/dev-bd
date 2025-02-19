@@ -6,6 +6,7 @@ from .ClientViews import (
     CandidateView,
     PotentialInterviewerAvailabilityForCandidateView,
     EngagementTemplateView,
+    EngagementView,
 )
 
 from .InternalViews import (

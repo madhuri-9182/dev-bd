@@ -527,3 +527,169 @@ class EngagementTemplateSerializer(serializers.ModelSerializer):
         if errors:
             raise serializers.ValidationError({"errors": errors})
         return data
+
+
+class EngagementCandidateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Candidate
+        fields = ("name", "phone", "email", "company", "cv")
+
+
+class EngagementJobSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Job
+        fields = ("id", "name")
+
+
+class EngagementClientUserSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField(source="user.email", read_only=True)
+
+    class Meta:
+        model = ClientUser
+        fields = ("id", "name", "email")
+        read_only_fields = ("email",)
+
+
+class EngagementSerializer(serializers.ModelSerializer):
+    candidate = EngagementCandidateSerializer(read_only=True)
+    job = EngagementJobSerializer(read_only=True)
+    client = EngagementClientUserSerializer(read_only=True)
+    job_id = serializers.IntegerField(required=False, write_only=True)
+    client_user_id = serializers.IntegerField(required=False, write_only=True)
+    candidate_id = serializers.IntegerField(required=False, write_only=True)
+    offer_date = serializers.DateField(input_formats=["%d/%m/%Y"], format="%d/%m/%Y")
+
+    status = serializers.ChoiceField(
+        choices=Engagement.STATUS_CHOICE,
+        error_messages={
+            "invalid_choice": f"This is an invalid choice. Valid choices are {', '.join([f'{key}({value})' for key, value in Engagement.STATUS_CHOICE])}"
+        },
+        required=False,
+    )
+    notice_period = serializers.ChoiceField(
+        choices=Engagement.NOTICE_PERIOD_CHOICE,
+        error_messages={
+            "invalid_choice": f"This is an invalid choice. Valid choices are {', '.join([f'{key}({value})' for key, value in Engagement.NOTICE_PERIOD_CHOICE])}"
+        },
+        required=False,
+    )
+
+    class Meta:
+        model = Engagement
+        fields = (
+            "id",
+            "candidate_name",
+            "candidate_email",
+            "candidate_phone",
+            "job_id",
+            "client_user_id",
+            "candidate_id",
+            "job",
+            "client",
+            "candidate",
+            "status",
+            "notice_period",
+            "offered",
+            "offer_date",
+            "offer_accepted",
+            "other_offer",
+            "candidate_cv",
+        )
+        extra_kwargs = {
+            "job_id": {"write_only": True},
+            "client_user_id": {"write_only": True},
+            "candidate_id": {"write_only": True},
+        }
+
+    def validate(self, data):
+        request = self.context["request"]
+        errors = {}
+
+        required_keys = [
+            "job_id",
+            "client_user_id",
+            "notice_period",
+            "offered",
+            "offer_date",
+            "offer_accepted",
+            "other_offer",
+        ]
+        allowed_keys = ["status"]
+
+        if (
+            data.get("candidate_name")
+            or data.get("candidate_email")
+            or data.get("candidate_phone")
+        ):
+            required_keys.extend(
+                ["candidate_name", "candidate_email", "candidate_phone", "candidate_cv"]
+            )
+        elif data.get("candidate_id"):
+            required_keys.append("candidate_id")
+        else:
+            errors.setdefault("missing_candidate_details", []).append(
+                "Either candidate_id or candidate_email, candidate_name, candidate_phone, candidate_cv is required"
+            )
+
+        errors.update(
+            validate_incoming_data(
+                self.initial_data,
+                required_keys=required_keys,
+                allowed_keys=allowed_keys,
+                partial=self.partial,
+                original_data=data,
+                form=True,
+            )
+        )
+
+        job_id = data.pop("job_id", None)
+        if job_id:
+            job = Job.objects.filter(
+                hiring_manager__organization=request.user.clientuser.organization,
+                pk=job_id,
+            ).first()
+            if not job:
+                errors.setdefault("job_id", []).append("Invalid job_id")
+            else:
+                data["job"] = job
+
+        client_user_id = data.pop("client_user_id", None)
+        if client_user_id:
+            client_user = ClientUser.objects.filter(
+                organization=request.user.clientuser.organization, pk=client_user_id
+            ).first()
+            if not client_user:
+                errors.setdefault("client_user_id", []).append("Invalid client_user_id")
+            data["client"] = client_user
+
+        candidate_id = data.pop("candidate_id", None)
+        if candidate_id:
+            candidate = Candidate.objects.filter(
+                organization=request.user.clientuser.organization, pk=candidate_id
+            ).first()
+            if not candidate:
+                errors.setdefault("candidate_id", []).append("Invalid candidate_id")
+            data["candidate"] = candidate
+
+        candidate_cv = data.get("candidate_cv")
+        if candidate_cv:
+            errors.update(
+                validate_attachment(
+                    "candidate_cv", candidate_cv, ["pdf", "doc", "docx"], 5
+                )
+            )
+
+        if data.get("offered") and not data.get("offer_date"):
+            errors.setdefault("offer_date", []).append(
+                "Offer date is required if 'offered' is True."
+            )
+
+        if data.get("offer_accepted") and not data.get("offered"):
+            errors.setdefault("offer_accepted", []).append(
+                "Offer cannot be accepted if it was never made."
+            )
+
+        if errors:
+            raise serializers.ValidationError({"errors": errors})
+
+        return data

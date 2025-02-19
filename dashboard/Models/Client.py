@@ -166,8 +166,11 @@ class Candidate(CreateUpdateDateTimeAndArchivedField):
 
 class Engagement(CreateUpdateDateTimeAndArchivedField):
     STATUS_CHOICE = (
-        ("YET_TO_JOIN", "Yet To Join"),
-        ("DOUBTFUL", "Doubtful"),
+        ("YTJ", "Yet to Join"),
+        ("DBT", "Doubtful"),
+        ("JND", "Joined"),
+        ("DCL", "Declined"),
+        ("OHD", "On Hold"),
     )
 
     NOTICE_PERIOD_CHOICE = (
@@ -181,9 +184,21 @@ class Engagement(CreateUpdateDateTimeAndArchivedField):
     )
 
     candidate = models.ForeignKey(
-        Candidate, on_delete=models.CASCADE, related_name="engagements"
+        Candidate,
+        on_delete=models.CASCADE,
+        related_name="engagements",
+        null=True,
+        blank=True,
     )
-    jobs = models.ForeignKey(Job, on_delete=models.CASCADE, related_name="engagements")
+    candidate_name = models.CharField(max_length=50, blank=True, null=True)
+    candidate_email = models.EmailField(
+        max_length=255, blank=True, null=True, unique=True
+    )
+    candidate_phone = PhoneNumberField(region="IN", blank=True, null=True, unique=True)
+    candidate_cv = models.FileField(
+        upload_to="engagement-candidate-cv", blank=True, null=True
+    )
+    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name="engagements")
     client = models.ForeignKey(
         ClientUser, on_delete=models.CASCADE, related_name="engagements"
     )
@@ -205,14 +220,14 @@ class Engagement(CreateUpdateDateTimeAndArchivedField):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["candidate", "jobs"], name="unique_engagement"
+                fields=["candidate", "job"], name="unique_engagement"
             )
         ]
 
 
 class EngagementTemplates(CreateUpdateDateTimeAndArchivedField):
-    object_all = models.Manager()
     objects = SoftDelete()
+    object_all = models.Manager()
     organization = models.ForeignKey(
         Organization,
         on_delete=models.CASCADE,

@@ -8,6 +8,7 @@ from dashboard.Views import (
     ClientInvitationActivateView,
     CandidateView,
     EngagementTemplateView,
+    EngagementView,
     JobView,
     InterviewerAvailabilityView,
     PotentialInterviewerAvailabilityForCandidateView,

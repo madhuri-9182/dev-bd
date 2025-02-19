@@ -3,6 +3,7 @@ from .ClientSerializers import (
     JobSerializer,
     CandidateSerializer,
     EngagementTemplateSerializer,
+    EngagementSerializer,
 )
 from .InternalSerializers import (
     ClientPointOfContactSerializer,
