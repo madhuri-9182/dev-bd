@@ -6,7 +6,15 @@ from django.db import transaction
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from core.models import User, Role
-from ..models import ClientUser, Job, Candidate, InternalInterviewer
+from ..models import (
+    ClientUser,
+    Job,
+    Candidate,
+    InternalInterviewer,
+    Engagement,
+    EngagementOperation,
+    EngagementTemplates,
+)
 from phonenumber_field.serializerfields import PhoneNumberField
 from hiringdogbackend.utils import (
     validate_incoming_data,
@@ -472,4 +480,19 @@ class CandidateSerializer(serializers.ModelSerializer):
         if errors:
             raise serializers.ValidationError({"errors": errors})
 
+        return data
+
+
+class EngagementTemplateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EngagementTemplates
+        fields = ("id", "template_name", "template_html_content")
+
+    def validate(self, data):
+        required_data = ["template_name", "template_html_content"]
+        errors = validate_incoming_data(
+            self.initial_data, required_data, partial=self.partial
+        )
+        if errors:
+            raise serializers.ValidationError({"errors": errors})
         return data

@@ -8,4 +8,5 @@ from .Serializers import (
     JobSerializer,
     InterviewerAvailabilitySerializer,
     InterviewerRequestSerializer,
+    EngagementTemplateSerializer,
 )

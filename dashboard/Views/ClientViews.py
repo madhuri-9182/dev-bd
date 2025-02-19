@@ -12,10 +12,16 @@ from ..models import (
     ClientUser,
     Job,
     Candidate,
+    EngagementTemplates,
     InternalInterviewer,
     InterviewerAvailability,
 )
-from ..serializer import ClientUserSerializer, JobSerializer, CandidateSerializer
+from ..serializer import (
+    ClientUserSerializer,
+    JobSerializer,
+    CandidateSerializer,
+    EngagementTemplateSerializer,
+)
 from ..permissions import CanDeleteUpdateUser, UserRoleDeleteUpdateClientData
 from externals.parser.resume_parser import ResumerParser
 from core.permissions import (
@@ -815,4 +821,96 @@ class PotentialInterviewerAvailabilityForCandidateView(APIView):
                 "data": list(interviewer_availability),
             },
             status=status.HTTP_200_OK,
+        )
+
+
+@extend_schema(tags=["Client"])
+class EngagementTemplateView(APIView, LimitOffsetPagination):
+    permission_classes = [IsAuthenticated, IsClientOwner | IsClientAdmin | IsClientUser]
+    serializer_class = EngagementTemplateSerializer
+
+    def get(self, request, **kwrags):
+        engagement_template_qs = EngagementTemplates.objects.filter(
+            organization=request.user.clientuser.organization
+        )
+        paginated_queryset = self.paginate_queryset(engagement_template_qs, request)
+        serializer = self.serializer_class(paginated_queryset, many=True)
+        paginated_response = self.get_paginated_response(serializer.data)
+        return Response(
+            {
+                "status": "success",
+                "message": "Successfully retrieved templates",
+                **paginated_response.data,
+            }
+        )
+
+    def post(self, request, **kwargs):
+        serializer = self.serializer_class(data=request.data)
+        if serializer.is_valid():
+            serializer.save(organization=request.user.clientuser.organization)
+            return Response(
+                {
+                    "status": "success",
+                    "message": "Successfully created template",
+                    "data": serializer.data,
+                },
+                status=status.HTTP_201_CREATED,
+            )
+        custom_errors = serializer.errors.pop("errors", None)
+        return Response(
+            {
+                "status": "failed",
+                "message": "Invalid data",
+                "errors": custom_errors if custom_errors else serializer.errors,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    def patch(self, request, pk):
+        try:
+            engagement_template = EngagementTemplates.objects.get(
+                pk=pk, organization=request.user.clientuser.organization
+            )
+        except EngagementTemplates.DoesNotExist:
+            return Response(
+                {"status": "failed", "message": "Template not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        serializer = self.serializer_class(
+            engagement_template, data=request.data, partial=True
+        )
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {
+                    "status": "success",
+                    "message": "Successfully updated template",
+                    "data": serializer.data,
+                },
+                status=status.HTTP_200_OK,
+            )
+        return Response(
+            {
+                "status": "failed",
+                "message": "Invalid data",
+                "errors": serializer.errors,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    def delete(self, request, pk):
+        try:
+            engagement_template = EngagementTemplates.objects.get(
+                pk=pk, organization=request.user.clientuser.organization
+            )
+        except EngagementTemplates.DoesNotExist:
+            return Response(
+                {"status": "failed", "message": "Template not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        engagement_template.archived = True
+        engagement_template.save(update_fields=["archived"])
+        return Response(
+            {"status": "success", "message": "Successfully deleted template"},
+            status=status.HTTP_204_NO_CONTENT,
         )

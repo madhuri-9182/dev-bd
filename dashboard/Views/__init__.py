@@ -5,6 +5,7 @@ from .ClientViews import (
     ResumePraserView,
     CandidateView,
     PotentialInterviewerAvailabilityForCandidateView,
+    EngagementTemplateView,
 )
 
 from .InternalViews import (

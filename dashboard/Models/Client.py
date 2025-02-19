@@ -162,3 +162,87 @@ class Candidate(CreateUpdateDateTimeAndArchivedField):
     final_selection_status = models.CharField(
         max_length=20, choices=FINAL_SELECTION_STATUS_CHOICES, null=True, blank=True
     )
+
+
+class Engagement(CreateUpdateDateTimeAndArchivedField):
+    STATUS_CHOICE = (
+        ("YET_TO_JOIN", "Yet To Join"),
+        ("DOUBTFUL", "Doubtful"),
+    )
+
+    NOTICE_PERIOD_CHOICE = (
+        ("0-7", "0-7 days"),
+        ("8-15", "8-15 days"),
+        ("16-30", "16-30 days"),
+        ("31-45", "31-45 days"),
+        ("46-60", "46-60 days"),
+        ("61-75", "61-75 days"),
+        ("76-90", "76-90 days"),
+    )
+
+    candidate = models.ForeignKey(
+        Candidate, on_delete=models.CASCADE, related_name="engagements"
+    )
+    jobs = models.ForeignKey(Job, on_delete=models.CASCADE, related_name="engagements")
+    client = models.ForeignKey(
+        ClientUser, on_delete=models.CASCADE, related_name="engagements"
+    )
+
+    status = models.CharField(
+        max_length=11, choices=STATUS_CHOICE, default="YET_TO_JOIN"
+    )
+    notice_period = models.CharField(
+        max_length=10, choices=NOTICE_PERIOD_CHOICE, default="16-30"
+    )
+    offered = models.BooleanField(default=False)
+    offer_date = models.DateField(null=True, blank=True)
+    offer_accepted = models.BooleanField(default=False)
+    other_offer = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.candidate.name} - {self.status}"
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["candidate", "jobs"], name="unique_engagement"
+            )
+        ]
+
+
+class EngagementTemplates(CreateUpdateDateTimeAndArchivedField):
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="engagementtemplates",
+        blank=True,
+    )
+    template_name = models.CharField(max_length=255, blank=True)
+    template_html_content = models.TextField(blank=True)
+
+
+class EngagementOperation(models.Model):
+    DELIVERY_STATUS_CHOICES = (
+        ("PED", "Pending"),
+        ("SUC", "Success"),
+        ("FLD", "Failed"),
+    )
+    engagement = models.ForeignKey(
+        Engagement, on_delete=models.CASCADE, related_name="engagementoperations"
+    )
+    template = models.ForeignKey(
+        EngagementTemplates,
+        on_delete=models.CASCADE,
+        related_name="engagementoperations",
+    )
+    operation_date = models.DateTimeField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    delivery_status = models.CharField(
+        max_length=15, choices=DELIVERY_STATUS_CHOICES, default="PED"
+    )
+    attachment = models.FileField(
+        upload_to="engagement_attachments/", blank=True, null=True
+    )
+
+    def __str__(self):
+        return f"{self.engagement.candidate.name} - {self.template.template_name} - {self.delivery_status}"

@@ -6,6 +6,7 @@ from ..views import (
     ResumePraserView,
     CandidateView,
     PotentialInterviewerAvailabilityForCandidateView,
+    EngagementTemplateView,
 )
 
 
@@ -31,4 +32,14 @@ urlpatterns = [
         name="interviewer-availablity",
     ),
     path("parse-resume/", ResumePraserView.as_view(), name="resume-parser"),
+    path(
+        "engagement-templates/",
+        EngagementTemplateView.as_view(),
+        name="engagement-tempates",
+    ),
+    path(
+        "engagement-template/<int:pk>/",
+        EngagementTemplateView.as_view(),
+        name="engagement-tempates",
+    ),
 ]
