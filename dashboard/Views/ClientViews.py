@@ -845,7 +845,7 @@ class EngagementTemplateView(APIView, LimitOffsetPagination):
         )
 
     def post(self, request, **kwargs):
-        serializer = self.serializer_class(data=request.data)
+        serializer = self.serializer_class(data=request.data, context={"attachment":request.FILES.get('attachment')})
         if serializer.is_valid():
             serializer.save(organization=request.user.clientuser.organization)
             return Response(

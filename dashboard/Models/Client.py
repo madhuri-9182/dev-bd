@@ -211,6 +211,8 @@ class Engagement(CreateUpdateDateTimeAndArchivedField):
 
 
 class EngagementTemplates(CreateUpdateDateTimeAndArchivedField):
+    object_all = models.Manager()
+    objects = SoftDelete()
     organization = models.ForeignKey(
         Organization,
         on_delete=models.CASCADE,
@@ -219,6 +221,9 @@ class EngagementTemplates(CreateUpdateDateTimeAndArchivedField):
     )
     template_name = models.CharField(max_length=255, blank=True)
     template_html_content = models.TextField(blank=True)
+    attachment = models.FileField(
+        upload_to="engagement_attachments/", blank=True, null=True
+    )
 
 
 class EngagementOperation(models.Model):
@@ -235,13 +240,10 @@ class EngagementOperation(models.Model):
         on_delete=models.CASCADE,
         related_name="engagementoperations",
     )
-    operation_date = models.DateTimeField(blank=True)
+    date = models.DateTimeField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     delivery_status = models.CharField(
         max_length=15, choices=DELIVERY_STATUS_CHOICES, default="PED"
-    )
-    attachment = models.FileField(
-        upload_to="engagement_attachments/", blank=True, null=True
     )
 
     def __str__(self):

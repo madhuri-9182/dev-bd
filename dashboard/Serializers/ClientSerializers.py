@@ -486,13 +486,44 @@ class CandidateSerializer(serializers.ModelSerializer):
 class EngagementTemplateSerializer(serializers.ModelSerializer):
     class Meta:
         model = EngagementTemplates
-        fields = ("id", "template_name", "template_html_content")
+        fields = ("id", "template_name", "template_html_content", "attachment")
 
     def validate(self, data):
-        required_data = ["template_name", "template_html_content"]
+        attachment = self.context.get("attachment")
+        required_keys = ["template_name", "template_html_content"]
+        allowed_keys = ["attachment"]
         errors = validate_incoming_data(
-            self.initial_data, required_data, partial=self.partial
+            self.initial_data,
+            required_keys,
+            allowed_keys,
+            partial=self.partial,
+            original_data=data,
+            form=True,
         )
+        if attachment:
+            errors.update(
+                validate_attachment(
+                    "attachment",
+                    data.get("attachment"),
+                    [
+                        "pdf",
+                        "doc",
+                        "docx",
+                        "xls",
+                        "xlsx",
+                        "ppt",
+                        "txt",
+                        "pptx",
+                        "jpeg",
+                        "jpg",
+                        "mp3",
+                        "mp4",
+                        "mkv",
+                        "zip",
+                    ],
+                    25,
+                )
+            )
         if errors:
             raise serializers.ValidationError({"errors": errors})
         return data
