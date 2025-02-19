@@ -18,12 +18,14 @@ from ..models import (
 from ..serializer import ClientUserSerializer, JobSerializer, CandidateSerializer
 from ..permissions import CanDeleteUpdateUser, UserRoleDeleteUpdateClientData
 from externals.parser.resume_parser import ResumerParser
+from externals.parser.resumeparser2 import ResumeParser2
 from core.permissions import (
     IsClientAdmin,
     IsClientOwner,
     IsClientUser,
     IsAgency,
     HasRole,
+    IsSuperAdmin,
 )
 from core.models import Role
 from hiringdogbackend.utils import validate_attachment
@@ -435,13 +437,12 @@ class JobView(APIView, LimitOffsetPagination):
             status=status.HTTP_204_NO_CONTENT,
         )
 
-
 @extend_schema(tags=["Client"])
-class ResumePraserView(APIView, LimitOffsetPagination):
+class ResumeParserView(APIView, LimitOffsetPagination):
     serializer_class = None
     permission_classes = [
         IsAuthenticated,
-        IsClientAdmin | IsClientUser | IsClientOwner | IsAgency,
+        IsClientAdmin | IsClientUser | IsClientOwner | IsAgency | IsSuperAdmin,
     ]
 
     def post(self, request):
@@ -454,7 +455,7 @@ class ResumePraserView(APIView, LimitOffsetPagination):
                     "message": "Invalid request.",
                     "error": {
                         "resume": [
-                            "This field is required. It support list to upload multiple resume files in the format of pdf and docx."
+                            "This field is required. It supports multiple resume files in PDF and DOCX formats."
                         ]
                     },
                 },
@@ -469,21 +470,25 @@ class ResumePraserView(APIView, LimitOffsetPagination):
                         "status": "failed",
                         "message": "Invalid File Format",
                         "error": errors,
-                    }
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
 
-        resume_parser = ResumerParser()
-
-        response = resume_parser.parse_resume(resume_files)
+        resume_parser = ResumeParser2()
+        
+        response = resume_parser.process_multiple_resumes(resume_files)
 
         return Response(
             {
                 "status": "success",
-                "message": "Resume parsed Successfully.",
+                "message": "Resume parsed successfully.",
                 "data": response,
             },
             status=status.HTTP_200_OK,
         )
+
+
+
 
 
 @extend_schema(tags=["Client"])
