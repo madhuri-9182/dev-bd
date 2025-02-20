@@ -2,6 +2,8 @@ from django.core.mail import EmailMultiAlternatives, get_connection
 from django.template.loader import render_to_string
 from celery import shared_task
 from django.conf import settings
+from django.utils.safestring import mark_safe
+from .models import EngagementOperation
 
 
 @shared_task()
@@ -52,3 +54,44 @@ def send_email_to_multiple_recipients(self, contexts, subject, template, **kwarg
 
         if emails:
             connection.send_messages(emails)
+
+
+@shared_task(bind=True, max_retries=4)
+def send_schedule_engagement_email(self, engagement_operation_id):
+    try:
+        engagement_operation_obj = (
+            EngagementOperation.objects.select_related(
+                "template", "engagement", "engagement__candidate"
+            )
+            .only(
+                "template__subject",
+                "template__template_html_content",
+                "engagement__candidate__email",
+                "engagement__candidate_email",
+            )
+            .get(pk=engagement_operation_id)
+        )
+
+        email = EmailMultiAlternatives(
+            subject=engagement_operation_obj.template.subject,
+            body="This is an email.",
+            from_email=settings.EMAIL_HOST_USER,
+            to=[
+                getattr(
+                    engagement_operation_obj.engagement.candidate,
+                    "email",
+                    engagement_operation_obj.engagement.candidate_email,
+                )
+            ],
+        )
+        email.attach_alternative(
+            mark_safe(engagement_operation_obj.template.template_html_content),
+            "text/html",
+        )
+        email.send()
+        engagement_operation_obj.delivery_status = "SUC"
+        engagement_operation_obj.save()
+    except Exception as e:
+        engagement_operation_obj.delivery_status = "FLD"
+        engagement_operation_obj.save()
+        self.retry(exec=e, countdown=60)

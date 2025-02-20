@@ -261,6 +261,7 @@ class EngagementOperation(models.Model):
     delivery_status = models.CharField(
         max_length=15, choices=DELIVERY_STATUS_CHOICES, default="PED"
     )
+    task_id = models.UUIDField(null=True, editable=False, blank=True)
 
     def __str__(self):
         return f"{self.engagement.candidate.name} - {self.template.template_name} - {self.delivery_status}"

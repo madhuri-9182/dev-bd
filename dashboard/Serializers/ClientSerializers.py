@@ -1,6 +1,7 @@
 import json
 from datetime import datetime
 from rest_framework import serializers
+from celery import group
 from django.conf import settings
 from django.db import transaction
 from django.utils.encoding import force_bytes
@@ -23,7 +24,7 @@ from hiringdogbackend.utils import (
     validate_attachment,
     validate_json,
 )
-from ..tasks import send_mail
+from ..tasks import send_mail, send_schedule_engagement_email
 
 
 class ClientUserDetailsSerializer(serializers.ModelSerializer):
@@ -570,51 +571,79 @@ class EngagementOperationSerializer(serializers.ModelSerializer):
             max_template_assign = notice_weeks * 2
 
             templates = data.pop("template_data", [])
-            if len(templates) > max_template_assign:
+            already_associated_operation = EngagementOperation.objects.filter(
+                engagement=engagement
+            ).count()
+
+            if (
+                len(templates) > max_template_assign
+                or already_associated_operation > max_template_assign
+            ):
                 errors.setdefault("template_ids", []).append(
-                    "Max {} templates can be assigned ".format(max_template_assign)
+                    "Max {} templates can be assigned ".format(int(max_template_assign))
                 )
 
-            valid_template_ids = set(
-                EngagementTemplates.objects.filter(
-                    organization=request.user.clientuser.organization,
-                    pk__in=[template["template_id"] for template in templates],
-                ).values_list("id", flat=True)
-            )
-
-            existing_template_ids = set(
-                EngagementOperation.objects.filter(
-                    engagement=engagement, template_id__in=valid_template_ids
-                ).values_list("template_id", flat=True)
-            )
-            if existing_template_ids:
-                errors.setdefault("template_id", []).extend(
-                    [
-                        "Template id already exists for the given engagement: {}".format(
-                            template_id
-                        )
-                        for template_id in existing_template_ids
-                    ]
+            invalid_dates = [
+                template["date"].strftime("%d-%m-%Y %H:%M:%S")
+                for template in templates
+                if datetime.strptime(
+                    template["date"].strftime("%d-%m-%Y %H:%M:%S"),
+                    "%d-%m-%Y %H:%M:%S",
                 )
+                < datetime.strptime(
+                    datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
+                    "%d-%m-%Y %H:%M:%S",
+                )
+            ]
 
-            invalid_template_ids = (
-                set(template["template_id"] for template in templates)
-                - valid_template_ids
-            )
-
-            if invalid_template_ids:
-                errors.setdefault("template_id", []).append(
-                    "Invalid template_id: {}".format(
-                        ", ".join(map(str, invalid_template_ids))
+            if invalid_dates:
+                errors.setdefault("template_data", []).append(
+                    "Invalid dates present: {}. Dates should not be in past".format(
+                        ", ".join(invalid_dates)
                     )
                 )
 
-            data["templates"] = [
-                template
-                for template in templates
-                if template["template_id"] in valid_template_ids
-                and template["template_id"] not in existing_template_ids
-            ]
+            if not errors:
+                valid_template_ids = set(
+                    EngagementTemplates.objects.filter(
+                        organization=request.user.clientuser.organization,
+                        pk__in=[template["template_id"] for template in templates],
+                    ).values_list("id", flat=True)
+                )
+
+                existing_template_ids = set(
+                    EngagementOperation.objects.filter(
+                        engagement=engagement, template_id__in=valid_template_ids
+                    ).values_list("template_id", flat=True)
+                )
+                if existing_template_ids:
+                    errors.setdefault("template_id", []).extend(
+                        [
+                            "Template id already exists for the given engagement: {}".format(
+                                template_id
+                            )
+                            for template_id in existing_template_ids
+                        ]
+                    )
+
+                invalid_template_ids = (
+                    set(template["template_id"] for template in templates)
+                    - valid_template_ids
+                )
+
+                if invalid_template_ids:
+                    errors.setdefault("template_id", []).append(
+                        "Invalid template_id: {}".format(
+                            ", ".join(map(str, invalid_template_ids))
+                        )
+                    )
+
+                data["templates"] = [
+                    template
+                    for template in templates
+                    if template["template_id"] in valid_template_ids
+                    and template["template_id"] not in existing_template_ids
+                ]
 
         if errors:
             raise serializers.ValidationError({"errors": errors})
@@ -635,6 +664,17 @@ class EngagementOperationSerializer(serializers.ModelSerializer):
         ]
 
         operations = EngagementOperation.objects.bulk_create(operations)
+
+        task_group = group(
+            send_schedule_engagement_email.s(operation.id).set(eta=operation.date)
+            for operation in operations
+        )
+        result = task_group.apply_async()
+
+        for operation, task in zip(operations, result.children):
+            operation.task_id = task.id
+            operation.save()
+
         return operations
 
 

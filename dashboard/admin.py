@@ -5,7 +5,13 @@ from django.contrib import admin
 from django.contrib import admin
 from django.db.models.query import QuerySet
 from django.http import HttpRequest
-from .models import InternalClient, ClientPointOfContact, Job, ClientUser
+from .models import (
+    InternalClient,
+    ClientPointOfContact,
+    Job,
+    ClientUser,
+    EngagementTemplates,
+)
 
 
 @admin.register(InternalClient)
@@ -41,3 +47,13 @@ class ClientUserAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         return ClientUser.object_all.all()
+
+
+@admin.register(EngagementTemplates)
+class EnagagementTeamplteAdmin(admin.ModelAdmin):
+    list_display = ("id", "template_name", "organization__name")
+    search_fields = ("organization__name", "template_name")
+    readonly_fields = ["created_at", "updated_at"]
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[Any]:
+        return EngagementTemplates.object_all.select_related("organization")
