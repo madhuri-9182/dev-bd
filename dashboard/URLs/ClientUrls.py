@@ -8,6 +8,7 @@ from ..views import (
     PotentialInterviewerAvailabilityForCandidateView,
     EngagementTemplateView,
     EngagementView,
+    EngagementOperationView,
 )
 
 
@@ -44,4 +45,9 @@ urlpatterns = [
         name="engagement-tempates",
     ),
     path("engagements/", EngagementView.as_view(), name="candidate-engagements"),
+    path(
+        "engagement-operation/",
+        EngagementOperationView.as_view(),
+        name="engagement-operation",
+    ),
 ]

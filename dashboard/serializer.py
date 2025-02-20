@@ -10,4 +10,5 @@ from .Serializers import (
     InterviewerRequestSerializer,
     EngagementTemplateSerializer,
     EngagementSerializer,
+    EngagementOperationSerializer,
 )

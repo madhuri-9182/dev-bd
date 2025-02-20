@@ -4,6 +4,7 @@ from .ClientSerializers import (
     CandidateSerializer,
     EngagementTemplateSerializer,
     EngagementSerializer,
+    EngagementOperationSerializer,
 )
 from .InternalSerializers import (
     ClientPointOfContactSerializer,

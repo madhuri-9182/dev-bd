@@ -215,7 +215,7 @@ class Engagement(CreateUpdateDateTimeAndArchivedField):
     other_offer = models.BooleanField(default=False)
 
     def __str__(self):
-        return f"{self.candidate.name} - {self.status}"
+        return f"{self.candidate_name if self.candidate_name else self.candidate.name} - {self.status}"
 
     class Meta:
         constraints = [
@@ -236,6 +236,7 @@ class EngagementTemplates(CreateUpdateDateTimeAndArchivedField):
     )
     template_name = models.CharField(max_length=255, blank=True)
     template_html_content = models.TextField(blank=True)
+    subject = models.CharField(max_length=255, blank=True)
     attachment = models.FileField(
         upload_to="engagement_attachments/", blank=True, null=True
     )
@@ -263,3 +264,10 @@ class EngagementOperation(models.Model):
 
     def __str__(self):
         return f"{self.engagement.candidate.name} - {self.template.template_name} - {self.delivery_status}"
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["engagement", "template"], name="unique_engagement_operation"
+            )
+        ]

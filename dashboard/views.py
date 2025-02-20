@@ -9,6 +9,7 @@ from dashboard.Views import (
     CandidateView,
     EngagementTemplateView,
     EngagementView,
+    EngagementOperationView,
     JobView,
     InterviewerAvailabilityView,
     PotentialInterviewerAvailabilityForCandidateView,

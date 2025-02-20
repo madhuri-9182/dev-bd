@@ -23,6 +23,7 @@ from ..serializer import (
     CandidateSerializer,
     EngagementTemplateSerializer,
     EngagementSerializer,
+    EngagementOperationSerializer,
 )
 from ..permissions import CanDeleteUpdateUser, UserRoleDeleteUpdateClientData
 from externals.parser.resume_parser import ResumerParser
@@ -951,9 +952,11 @@ class EngagementView(APIView, LimitOffsetPagination):
 
     def get(self, request):
         organization = request.user.clientuser.organization
-        engagements = Engagement.objects.select_related(
-            "client", "job", "candidate"
-        ).filter(client__organization=organization)
+        engagements = (
+            Engagement.objects.select_related("client", "job", "candidate")
+            .prefetch_related("engagementoperations")
+            .filter(client__organization=organization)
+        )
         paginated_engagements = self.paginate_queryset(engagements, request)
         serializer = self.serializer_class(paginated_engagements, many=True)
         paginated_response = self.get_paginated_response(serializer.data)
@@ -965,3 +968,53 @@ class EngagementView(APIView, LimitOffsetPagination):
             },
             status=status.HTTP_200_OK,
         )
+
+
+@extend_schema(tags=["Client"])
+class EngagementOperationView(APIView, LimitOffsetPagination):
+    serializer_class = EngagementOperationSerializer
+    permission_classes = [IsAuthenticated, IsClientAdmin | IsClientOwner | IsClientUser]
+
+    def post(self, request):
+        serializer = self.serializer_class(
+            data=request.data, context={"request": request}
+        )
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {
+                    "status": "success",
+                    "message": "Engagement operation initiated successfully",
+                    "data": serializer.data,
+                },
+                status=status.HTTP_201_CREATED,
+            )
+
+        custom_errors = serializer.errors.pop("errors", None)
+        return Response(
+            {
+                "status": "failed",
+                "message": "Failed to initiate the engagement operation",
+                "errors": custom_errors if custom_errors else serializer.errors,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    """    --> keep it for future reference
+    def get(self, request):
+        organization = request.user.clientuser.organization
+        engagement_operation = EngagementOperation.objects.filter(
+            engagement__client__organization=organization
+        )
+        paginated_engagements = self.paginate_queryset(engagement_operation, request)
+        serializer = self.serializer_class(paginated_engagements, many=True)
+        paginated_response = self.get_paginated_response(serializer.data)
+        return Response(
+            {
+                "status": "success",
+                "message": "Successfully retrieved engagements",
+                **paginated_response.data,
+            },
+            status=status.HTTP_200_OK,
+        )
+    """

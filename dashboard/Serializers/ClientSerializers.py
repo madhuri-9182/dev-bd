@@ -483,14 +483,175 @@ class CandidateSerializer(serializers.ModelSerializer):
         return data
 
 
+class EngagementOperationDataSerializer(serializers.Serializer):
+    template_id = serializers.IntegerField()
+    date = serializers.DateTimeField(
+        input_formats=["%d/%m/%Y %H:%M:%S"], format="%d/%m/%Y %H:%M"
+    )
+
+
+class EngagementOperationTemplateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EngagementTemplates
+        fields = ("id", "template_name")
+
+
+class EngagementOperationSerializer(serializers.ModelSerializer):
+    template_data = EngagementOperationDataSerializer(
+        many=True, write_only=True, required=False
+    )
+    template = EngagementOperationTemplateSerializer(read_only=True)
+    engagement_id = serializers.IntegerField(write_only=True, required=False)
+    date = serializers.DateTimeField(format="%d/%m/%Y %H:%M:%S", read_only=True)
+
+    class Meta:
+        model = EngagementOperation
+        fields = (
+            "template",
+            "date",
+            "delivery_status",
+            "engagement_id",
+            "template_data",
+        )
+        read_only_fields = ["date", "delivery_status"]
+
+    def to_internal_value(self, data):
+        template_data = data.get("template_data", [])
+
+        if ("template_data" in data.keys() and not template_data) or not isinstance(
+            template_data, list
+        ):
+            raise serializers.ValidationError(
+                {
+                    "template_data": [
+                        "This field must be a non-empty list of dictionaries with keys 'template_id' and 'date'.",
+                        "Expected format: [{'template_id': <int>, 'date': '<dd/mm/yyyy hh:mm:ss>'}]",
+                    ]
+                }
+            )
+
+        for entry in template_data:
+            if (
+                not isinstance(entry, dict)
+                or "template_id" not in entry
+                or "date" not in entry
+            ):
+                raise serializers.ValidationError(
+                    {
+                        "template_data": [
+                            "Each item must match the following schema:",
+                            "Expected format: {'template_id': <int>, 'date': '<dd/mm/yyyy hh:mm:ss>'}",
+                        ]
+                    }
+                )
+        return super().to_internal_value(data)
+
+    def validate(self, data):
+        request = self.context["request"]
+        errors = validate_incoming_data(
+            self.initial_data,
+            ["engagement_id", "template_data"],
+            partial=self.partial,
+        )
+
+        engagement_id = data.pop("engagement_id", None)
+        engagement = None
+        if engagement_id:
+            engagement = Engagement.objects.filter(
+                client__organization=request.user.clientuser.organization,
+                pk=engagement_id,
+            ).first()
+            if not engagement:
+                errors.setdefault("engagement_id", []).append("Invalid engagement_id")
+            data["engagement"] = engagement
+
+        if engagement:
+            notice_weeks = int(engagement.notice_period.split("-")[1]) / 7
+            max_template_assign = notice_weeks * 2
+
+            templates = data.pop("template_data", [])
+            if len(templates) > max_template_assign:
+                errors.setdefault("template_ids", []).append(
+                    "Max {} templates can be assigned ".format(max_template_assign)
+                )
+
+            valid_template_ids = set(
+                EngagementTemplates.objects.filter(
+                    organization=request.user.clientuser.organization,
+                    pk__in=[template["template_id"] for template in templates],
+                ).values_list("id", flat=True)
+            )
+
+            existing_template_ids = set(
+                EngagementOperation.objects.filter(
+                    engagement=engagement, template_id__in=valid_template_ids
+                ).values_list("template_id", flat=True)
+            )
+            if existing_template_ids:
+                errors.setdefault("template_id", []).extend(
+                    [
+                        "Template id already exists for the given engagement: {}".format(
+                            template_id
+                        )
+                        for template_id in existing_template_ids
+                    ]
+                )
+
+            invalid_template_ids = (
+                set(template["template_id"] for template in templates)
+                - valid_template_ids
+            )
+
+            if invalid_template_ids:
+                errors.setdefault("template_id", []).append(
+                    "Invalid template_id: {}".format(
+                        ", ".join(map(str, invalid_template_ids))
+                    )
+                )
+
+            data["templates"] = [
+                template
+                for template in templates
+                if template["template_id"] in valid_template_ids
+                and template["template_id"] not in existing_template_ids
+            ]
+
+        if errors:
+            raise serializers.ValidationError({"errors": errors})
+
+        return data
+
+    def create(self, validated_data):
+        engagement = validated_data["engagement"]
+        templates = validated_data.pop("templates", [])
+
+        operations = [
+            EngagementOperation(
+                engagement=engagement,
+                template_id=template["template_id"],
+                date=template["date"],
+            )
+            for template in templates
+        ]
+
+        operations = EngagementOperation.objects.bulk_create(operations)
+        return operations
+
+
 class EngagementTemplateSerializer(serializers.ModelSerializer):
     class Meta:
         model = EngagementTemplates
-        fields = ("id", "template_name", "template_html_content", "attachment")
+        fields = (
+            "id",
+            "template_name",
+            "subject",
+            "template_html_content",
+            "attachment",
+        )
 
     def validate(self, data):
         attachment = self.context.get("attachment")
-        required_keys = ["template_name", "template_html_content"]
+        required_keys = ["template_name", "subject", "template_html_content"]
         allowed_keys = ["attachment"]
         errors = validate_incoming_data(
             self.initial_data,
@@ -558,6 +719,7 @@ class EngagementSerializer(serializers.ModelSerializer):
     client_user_id = serializers.IntegerField(required=False, write_only=True)
     candidate_id = serializers.IntegerField(required=False, write_only=True)
     offer_date = serializers.DateField(input_formats=["%d/%m/%Y"], format="%d/%m/%Y")
+    engagementoperations = EngagementOperationSerializer(read_only=True, many=True)
 
     status = serializers.ChoiceField(
         choices=Engagement.STATUS_CHOICE,
@@ -594,6 +756,7 @@ class EngagementSerializer(serializers.ModelSerializer):
             "offer_accepted",
             "other_offer",
             "candidate_cv",
+            "engagementoperations",
         )
         extra_kwargs = {
             "job_id": {"write_only": True},
