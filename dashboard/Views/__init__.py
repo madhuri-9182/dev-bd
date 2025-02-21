@@ -2,7 +2,7 @@ from .ClientViews import (
     ClientUserView,
     ClientInvitationActivateView,
     JobView,
-    ResumePraserView,
+    ResumeParserView,
     CandidateView,
     PotentialInterviewerAvailabilityForCandidateView,
     EngagementTemplateView,

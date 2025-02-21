@@ -3,7 +3,7 @@ from ..views import (
     ClientUserView,
     ClientInvitationActivateView,
     JobView,
-    ResumePraserView,
+    ResumeParserView,
     CandidateView,
     PotentialInterviewerAvailabilityForCandidateView,
     EngagementTemplateView,
@@ -33,7 +33,7 @@ urlpatterns = [
         PotentialInterviewerAvailabilityForCandidateView.as_view(),
         name="interviewer-availablity",
     ),
-    path("parse-resume/", ResumePraserView.as_view(), name="resume-parser"),
+    path("parse-resume/", ResumeParserView.as_view(), name="resume-parser"),
     path(
         "engagement-templates/",
         EngagementTemplateView.as_view(),

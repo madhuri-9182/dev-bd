@@ -1,6 +1,6 @@
 from dashboard.Views import (
     ClientUserView,
-    ResumePraserView,
+    ResumeParserView,
     InternalClientView,
     InternalClientDetailsView,
     InterviewerView,
