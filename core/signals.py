@@ -45,7 +45,7 @@ def password_reset_token_created(sender, reset_password_token, *args, **kwargs):
     msg = EmailMultiAlternatives(
         "Password Reset for {}".format(site_full_name),
         email_plaintext_message,
-        settings.EMAIL_HOST_USER,
+        settings.CONTACT_EMAIL,
         [reset_password_token.user.email],
     )
     msg.attach_alternative(email_html_message, "text/html")

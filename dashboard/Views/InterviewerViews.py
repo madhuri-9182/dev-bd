@@ -195,6 +195,7 @@ class InterviewerReqeustView(APIView):
                     "site_domain": settings.SITE_DOMAIN,
                     "accept_link": "/confirmation/{}/".format(accept_uid),
                     "reject_link": "/confirmation/{}/".format(reject_uid),
+                    "from_email": settings.INTERVIEW_EMAIL,
                 }
                 contexts.append(context)
 
@@ -319,6 +320,7 @@ class InterviewerRequestResponseView(APIView):
                             "email": candidate.email,
                             "template": "interview_confirmation_candidate_notification.html",
                             "subject": f"Interview Scheduled - {candidate.designation.name}",
+                            "from_email": settings.INTERVIEW_EMAIL,
                         },
                         {
                             "name": interviewer_availability.interviewer.name,
@@ -329,6 +331,7 @@ class InterviewerRequestResponseView(APIView):
                             "email": interviewer_availability.interviewer.email,
                             "template": "interview_confirmation_interviewer_notification.html",
                             "subject": f"Interview Assigned - {candidate.name}",
+                            "from_email": settings.INTERVIEW_EMAIL,
                         },
                         {
                             "name": candidate.organization.name,
@@ -339,6 +342,7 @@ class InterviewerRequestResponseView(APIView):
                             "email": candidate.designation.hiring_manager.user.email,
                             "template": "interview_confirmation_client_notification.html",
                             "subject": f"Interview Scheduled - {candidate.name}",
+                            "from_email": settings.INTERVIEW_EMAIL,
                         },
                     ]
 
