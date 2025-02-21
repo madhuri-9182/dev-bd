@@ -18,7 +18,7 @@ from ..models import (
 from ..serializer import ClientUserSerializer, JobSerializer, CandidateSerializer
 from ..permissions import CanDeleteUpdateUser, UserRoleDeleteUpdateClientData
 from externals.parser.resume_parser import ResumerParser
-from externals.parser.resumeparser2 import ResumeParser2
+from externals.parser.resumeparser2 import process_resume
 from core.permissions import (
     IsClientAdmin,
     IsClientOwner,
@@ -29,6 +29,9 @@ from core.permissions import (
 )
 from core.models import Role
 from hiringdogbackend.utils import validate_attachment
+import tempfile
+import os
+from django.core.files.storage import default_storage
 
 
 @extend_schema(tags=["Client"])
@@ -460,8 +463,8 @@ class ResumeParserView(APIView, LimitOffsetPagination):
                     },
                 },
                 status=status.HTTP_400_BAD_REQUEST,
-            )
-
+            )  
+          
         for file in resume_files:
             errors = validate_attachment("resume", file, ["pdf", "docx"], 5)
             if errors:
@@ -473,23 +476,36 @@ class ResumeParserView(APIView, LimitOffsetPagination):
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+       
+        temp_dir = tempfile.mkdtemp()  # Create a persistent temp directory
+        parsed_resumes = []  
 
-        resume_parser = ResumeParser2()
-        
-        response = resume_parser.process_multiple_resumes(resume_files)
+        try:
+            for file in resume_files:
+                temp_path = os.path.join(temp_dir, file.name)
+                with open(temp_path, "wb") as temp_file:
+                    for chunk in file.chunks():
+                        temp_file.write(chunk)
+              
 
-        return Response(
-            {
-                "status": "success",
-                "message": "Resume parsed successfully.",
-                "data": response,
-            },
-            status=status.HTTP_200_OK,
-        )
-
-
-
-
+                # Pass file paths to processing function
+                parsed_data = process_resume(temp_path)
+                if parsed_data:
+                    parsed_resumes.append(parsed_data)
+                    
+            return Response(
+                {
+                    "status": "success",
+                    "message": "Resume parsed successfully.",
+                    "data": parsed_resumes,
+                },
+                status=status.HTTP_200_OK,
+            )
+        finally:
+            for file in os.listdir(temp_dir):
+                os.remove(os.path.join(temp_dir, file))
+            os.rmdir(temp_dir)
+            
 
 @extend_schema(tags=["Client"])
 class CandidateView(APIView, LimitOffsetPagination):

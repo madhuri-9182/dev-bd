@@ -1,6 +1,7 @@
 from .base import *
+import sys
 
-DEBUG = sys.argv[1] == "runserver"
+DEBUG = len(sys.argv) > 1 and sys.argv[1] == "runserver"
 
 SECRET_KEY = "django-insecure-pn-#@uf@1!0lm!7p27d5^_)2)yw=6joel7qklh)8l(!p4fe_&_"
 
