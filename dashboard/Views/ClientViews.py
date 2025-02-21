@@ -440,6 +440,7 @@ class JobView(APIView, LimitOffsetPagination):
             status=status.HTTP_204_NO_CONTENT,
         )
 
+
 @extend_schema(tags=["Client"])
 class ResumeParserView(APIView, LimitOffsetPagination):
     serializer_class = None
@@ -463,8 +464,8 @@ class ResumeParserView(APIView, LimitOffsetPagination):
                     },
                 },
                 status=status.HTTP_400_BAD_REQUEST,
-            )  
-          
+            )
+
         for file in resume_files:
             errors = validate_attachment("resume", file, ["pdf", "docx"], 5)
             if errors:
@@ -476,9 +477,9 @@ class ResumeParserView(APIView, LimitOffsetPagination):
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-       
+
         temp_dir = tempfile.mkdtemp()  # Create a persistent temp directory
-        parsed_resumes = []  
+        parsed_resumes = []
 
         try:
             for file in resume_files:
@@ -486,13 +487,12 @@ class ResumeParserView(APIView, LimitOffsetPagination):
                 with open(temp_path, "wb") as temp_file:
                     for chunk in file.chunks():
                         temp_file.write(chunk)
-              
 
                 # Pass file paths to processing function
                 parsed_data = process_resume(temp_path)
                 if parsed_data:
                     parsed_resumes.append(parsed_data)
-                    
+
             return Response(
                 {
                     "status": "success",
@@ -505,7 +505,7 @@ class ResumeParserView(APIView, LimitOffsetPagination):
             for file in os.listdir(temp_dir):
                 os.remove(os.path.join(temp_dir, file))
             os.rmdir(temp_dir)
-            
+
 
 @extend_schema(tags=["Client"])
 class CandidateView(APIView, LimitOffsetPagination):

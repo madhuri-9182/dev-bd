@@ -1,19 +1,19 @@
 import google.generativeai as genai
 from pdfminer.high_level import extract_text
+from django.conf import settings
 from docx import Document
 from datetime import datetime
 import json
 import os
 import re
-import tempfile
-from dotenv import load_dotenv
+
 
 # Load environment variables
-load_dotenv()
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+genai.configure(api_key=settings.GOOGLE_API_KEY)
 
 # Supported file extensions
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".doc"}
+
 
 def process_resume(file_path):
     """
@@ -23,6 +23,7 @@ def process_resume(file_path):
     - Resume parsing using Gemini API
     - Data validation and formatting
     """
+
     def allowed_file(filename):
         """Check if the file has an allowed extension."""
         return os.path.splitext(filename)[1].lower() in ALLOWED_EXTENSIONS
@@ -51,7 +52,10 @@ def process_resume(file_path):
         """Converts a .doc file to .docx using unoconv."""
         try:
             import subprocess
-            subprocess.run(["unoconv", "-f", "docx", "-o", docx_path, doc_path], check=True)
+
+            subprocess.run(
+                ["unoconv", "-f", "docx", "-o", docx_path, doc_path], check=True
+            )
         except Exception as e:
             print(f"Error converting DOC to DOCX: {e}")
 
@@ -85,7 +89,7 @@ def process_resume(file_path):
             "- Current company is the most recent/last mentioned job\n"
         )
         prompt += f"Resume to parse:\n{text}"
-        model = genai.GenerativeModel('gemini-pro')
+        model = genai.GenerativeModel("gemini-pro")
         try:
             response = model.generate_content(prompt)
             raw_response = response.text.strip()
@@ -93,8 +97,8 @@ def process_resume(file_path):
             print(f"Error generating Gemini response: {e}")
             return {}
         # Clean response
-        json_start = raw_response.find('{')
-        json_end = raw_response.rfind('}') + 1
+        json_start = raw_response.find("{")
+        json_end = raw_response.rfind("}") + 1
         if json_start != -1 and json_end != 0:
             raw_response = raw_response[json_start:json_end]
         # Validate JSON
@@ -112,18 +116,17 @@ def process_resume(file_path):
             return {"year": 0, "month": 0}
         try:
             # Clean up the date string (remove commas and extra spaces)
-            cleaned_date = re.sub(r'[^\w\s]', '', graduation_date).strip()
+            cleaned_date = re.sub(r"[^\w\s]", "", graduation_date).strip()
             grad_date = datetime.strptime(cleaned_date, "%B %Y")
             current_date = datetime.now()
             if grad_date > current_date:
                 return {"year": 0, "month": 0}
-            total_months = (current_date.year - grad_date.year) * 12 + (current_date.month - grad_date.month)
+            total_months = (current_date.year - grad_date.year) * 12 + (
+                current_date.month - grad_date.month
+            )
             if total_months < 0:
                 total_months += 12
-            return {
-                "year": total_months // 12,
-                "month": total_months % 12
-            }
+            return {"year": total_months // 12, "month": total_months % 12}
         except Exception as e:
             print(f"Experience calculation error: {e}")
             return {"year": 0, "month": 0}
@@ -132,8 +135,8 @@ def process_resume(file_path):
         """Standardizes phone number format."""
         if not number or number == "Not Found":
             return "Not Found"
-        cleaned = re.sub(r'(?!^\+)\D', '', number)
-        if cleaned.startswith('+'):
+        cleaned = re.sub(r"(?!^\+)\D", "", number)
+        if cleaned.startswith("+"):
             return cleaned
         return f"+{cleaned}" if cleaned else "Not Found"
 
@@ -166,7 +169,7 @@ def process_resume(file_path):
         "phone_number": validate_phone_number(parsed_data.get("phoneNumber")),
         "years_of_experience": years_of_experience,
         "current_company": parsed_data.get("currentCompanyName", "Not Found"),
-        "current_designation": parsed_data.get("currentDesignation", "Not Found")
+        "current_designation": parsed_data.get("currentDesignation", "Not Found"),
     }
 
     return processed_data
@@ -176,11 +179,11 @@ def process_resume(file_path):
 #     # Create a temporary directory for uploaded files
 #     with tempfile.TemporaryDirectory() as temp_dir:
 #         print(f"Temporary directory created: {temp_dir}")
-        
+
 #         # Prompt user to enter file paths
 #         file_paths_input = input("Enter file paths (comma-separated): ").strip()
 #         file_paths = [path.strip() for path in file_paths_input.split(",") if path.strip()]
-        
+
 #         if not file_paths:
 #             print("No files provided.")
 #         else:
@@ -194,7 +197,7 @@ def process_resume(file_path):
 #                     temp_file_paths.append(temp_file_path)
 #                 else:
 #                     print(f"File does not exist: {file_path}")
-            
+
 #             if temp_file_paths:
 #                 # Process each file and collect results
 #                 all_parsed_data = []
@@ -208,10 +211,3 @@ def process_resume(file_path):
 #                 print(json.dumps(all_parsed_data, indent=4))
 #             else:
 #                 print("No valid files to process.")
-
-
-
-
-
-
-

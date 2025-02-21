@@ -18,3 +18,6 @@ DATABASES = {
         "NAME": BASE_DIR / "db.sqlite3",
     }
 }
+
+
+GOOGLE_API_KEY = "AIzaSyBIi5-B03yNolwRaQeWzy4n-XFpSUdzJBo"
