@@ -203,9 +203,7 @@ class Engagement(CreateUpdateDateTimeAndArchivedField):
         ClientUser, on_delete=models.CASCADE, related_name="engagements"
     )
 
-    status = models.CharField(
-        max_length=11, choices=STATUS_CHOICE, default="YET_TO_JOIN"
-    )
+    status = models.CharField(max_length=11, choices=STATUS_CHOICE, default="YTJ")
     notice_period = models.CharField(
         max_length=10, choices=NOTICE_PERIOD_CHOICE, default="16-30"
     )
