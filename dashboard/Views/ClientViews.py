@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
-from django.db.models import Q, F, ExpressionWrapper, DurationField
+from django.db.models import Q, F, ExpressionWrapper, DurationField, Count
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -972,12 +972,38 @@ class EngagementView(APIView, LimitOffsetPagination):
         )
 
     def get(self, request):
+        job_id = request.query_params.get("job_id")
+        specialization = request.query_params.get("specialization")
+        notice_period = request.query_params.get("np")
+        search_filter = request.query_params.get("q")
+
         organization = request.user.clientuser.organization
         engagements = (
             Engagement.objects.select_related("client", "job", "candidate")
             .prefetch_related("engagementoperations")
             .filter(client__organization=organization)
         )
+        engagement_summary = engagements.aggregate(
+            total_candidates=Count("id"),
+            joined=Count("id", filter=Q(status="JND")),
+            declined=Count("id", filter=Q(status="DCL")),
+            pending=Count("id", filter=Q(status="YTJ")),
+        )
+        if job_id:
+            engagements = engagements.filter(job_id=job_id)
+        if specialization:
+            engagements = engagements.filter(candidate__specialization=specialization)
+        if notice_period:
+            engagements = engagements.filter(notice_period=notice_period)
+        if search_filter:
+            engagements = engagements.filter(
+                Q(candidate_name__icontains=search_filter)
+                | Q(candidate__name__icontains=search_filter)
+                | Q(candidate_email__icontains=search_filter)
+                | Q(candidate__email__icontains=search_filter)
+                | Q(candidate_phone__icontains=search_filter)
+                | Q(candidate__phone__icontains=search_filter)
+            )
         paginated_engagements = self.paginate_queryset(engagements, request)
         serializer = self.serializer_class(paginated_engagements, many=True)
         paginated_response = self.get_paginated_response(serializer.data)
@@ -985,6 +1011,7 @@ class EngagementView(APIView, LimitOffsetPagination):
             {
                 "status": "success",
                 "message": "Successfully retrieved engagements",
+                **engagement_summary,
                 **paginated_response.data,
             },
             status=status.HTTP_200_OK,
