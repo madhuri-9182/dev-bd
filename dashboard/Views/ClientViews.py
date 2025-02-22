@@ -972,29 +972,37 @@ class EngagementView(APIView, LimitOffsetPagination):
         )
 
     def get(self, request):
-        job_id = request.query_params.get("job_id")
-        specialization = request.query_params.get("specialization")
-        notice_period = request.query_params.get("np")
-        search_filter = request.query_params.get("q")
+        query_params = request.query_params
+        job_id = query_params.get("job_id")
+        specialization = query_params.get("specialization")
+        notice_period = query_params.get("np")
+        search_filter = query_params.get("q")
 
-        organization = request.user.clientuser.organization
-        engagements = (
-            Engagement.objects.select_related("client", "job", "candidate")
-            .prefetch_related("engagementoperations")
-            .filter(client__organization=organization)
-        )
-        engagement_summary = engagements.aggregate(
+        filters = {
+            "client__organization_id": request.user.clientuser.organization_id,
+        }
+        if job_id:
+            filters["job_id"] = job_id
+        if specialization:
+            filters["candidate__specialization"] = specialization
+        if notice_period:
+            filters["notice_period"] = notice_period
+
+        engagement_summary = Engagement.objects.filter(
+            client__organization=request.user.clientuser.organization
+        ).aggregate(
             total_candidates=Count("id"),
             joined=Count("id", filter=Q(status="JND")),
             declined=Count("id", filter=Q(status="DCL")),
             pending=Count("id", filter=Q(status="YTJ")),
         )
-        if job_id:
-            engagements = engagements.filter(job_id=job_id)
-        if specialization:
-            engagements = engagements.filter(candidate__specialization=specialization)
-        if notice_period:
-            engagements = engagements.filter(notice_period=notice_period)
+
+        engagements = (
+            Engagement.objects.select_related("client", "job", "candidate")
+            .prefetch_related("engagementoperations")
+            .filter(**filters)
+        )
+
         if search_filter:
             engagements = engagements.filter(
                 Q(candidate_name__icontains=search_filter)
@@ -1004,9 +1012,11 @@ class EngagementView(APIView, LimitOffsetPagination):
                 | Q(candidate_phone__icontains=search_filter)
                 | Q(candidate__phone__icontains=search_filter)
             )
+
         paginated_engagements = self.paginate_queryset(engagements, request)
         serializer = self.serializer_class(paginated_engagements, many=True)
         paginated_response = self.get_paginated_response(serializer.data)
+
         return Response(
             {
                 "status": "success",
