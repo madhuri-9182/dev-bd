@@ -15,4 +15,5 @@ from dashboard.Views import (
     PotentialInterviewerAvailabilityForCandidateView,
     InterviewerReqeustView,
     InterviewerRequestResponseView,
+    EngagementOperationUpdateView,
 )

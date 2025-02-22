@@ -511,6 +511,7 @@ class EngagementOperationSerializer(serializers.ModelSerializer):
     class Meta:
         model = EngagementOperation
         fields = (
+            "id",
             "template",
             "week",
             "date",

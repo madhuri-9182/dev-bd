@@ -1,6 +1,9 @@
+from celery import group
+from celery.result import AsyncResult
 from datetime import datetime, timedelta
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
+from django.db import transaction
 from django.db.models import Q, F, ExpressionWrapper, DurationField, Count
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
@@ -13,9 +16,9 @@ from ..models import (
     Job,
     Candidate,
     EngagementTemplates,
-    InternalInterviewer,
     InterviewerAvailability,
     Engagement,
+    EngagementOperation,
 )
 from ..serializer import (
     ClientUserSerializer,
@@ -41,6 +44,7 @@ from hiringdogbackend.utils import validate_attachment
 import tempfile
 import os
 from django.core.files.storage import default_storage
+from ..tasks import send_schedule_engagement_email
 
 
 @extend_schema(tags=["Client"])
@@ -1076,3 +1080,327 @@ class EngagementOperationView(APIView, LimitOffsetPagination):
             status=status.HTTP_200_OK,
         )
     """
+
+
+@extend_schema(tags=["Client"])
+class EngagementOperationUpdateView(APIView):
+    permission_classes = [IsAuthenticated, IsClientAdmin | IsClientOwner | IsClientUser]
+
+    def patch(self, request, engagement_id):
+        with transaction.atomic():
+            engagement_operations = EngagementOperation.objects.filter(
+                template__organization=request.user.clientuser.organization,
+                engagement_id=engagement_id,
+            )
+
+            if not engagement_operations.exists():
+                return Response(
+                    {"status": "failed", "message": "Engagement not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            if "template_data" not in request.data or not isinstance(
+                request.data["template_data"], list
+            ):
+                return Response(
+                    {
+                        "status": "failed",
+                        "message": "template_data is required",
+                        "errors": {
+                            "template_data": [
+                                "This field must be a non-empty list of dictionaries with keys 'template_id' and 'date'.",
+                                "Expected format: [{'template_id': <int>, 'operation_id': <int>(optional), 'week': <int>(optional), 'date': '<dd/mm/yyyy hh:mm:ss>'}]",
+                            ]
+                        },
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            template_data = request.data.get("template_data")
+            for entry in template_data:
+                if (
+                    not isinstance(entry, dict)
+                    or ("template_id" not in entry and "operation_id" not in entry)
+                    or ("operation_id" not in entry and "week" not in entry)
+                    or "date" not in entry
+                ):
+                    return Response(
+                        {
+                            "status": "failed",
+                            "message": "Invalid template data",
+                            "errors": {
+                                "template_data": [
+                                    "Each item must match the following schema:",
+                                    "Expected format: {'template_id': <int>, 'operation_id': <int>(optional), 'week': <int>(optional), 'date': '<dd/mm/yyyy hh:mm:ss>'}",
+                                ]
+                            },
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+            for template in template_data:
+                try:
+                    datetime.strptime(template["date"], "%d/%m/%Y %H:%M:%S")
+                except ValueError:
+                    return Response(
+                        {
+                            "status": "failed",
+                            "message": "Invalid date format",
+                            "errors": {
+                                "template_data": [
+                                    "Each item must have a 'date' in this format: '%d/%m/%Y %H:%M:%S'",
+                                ]
+                            },
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+            invalid_dates = [
+                template["date"]
+                for template in template_data
+                if datetime.strptime(
+                    template["date"],
+                    "%d/%m/%Y %H:%M:%S",
+                )
+                < datetime.strptime(
+                    datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                    "%d/%m/%Y %H:%M:%S",
+                )
+            ]
+
+            for template in template_data:
+                template["date"] = datetime.strptime(
+                    template["date"], "%d/%m/%Y %H:%M:%S"
+                ).strftime("%Y-%m-%d %H:%M:%S")
+
+            if invalid_dates:
+                return Response(
+                    {
+                        "status": "failed",
+                        "message": "Invalid dates in template data",
+                        "errors": {
+                            "template_data": [
+                                f"Dates in the past are not allowed: {', '.join(invalid_dates)}"
+                            ]
+                        },
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            valid_template_ids = set(
+                EngagementTemplates.objects.filter(
+                    organization=request.user.clientuser.organization,
+                    pk__in=[template["template_id"] for template in template_data],
+                ).values_list("id", flat=True)
+            )
+            existing_template_ids = set(
+                EngagementOperation.objects.filter(
+                    engagement_id=engagement_id, template_id__in=valid_template_ids
+                ).values_list("template_id", flat=True)
+            )
+            if existing_template_ids:
+                return Response(
+                    {
+                        "status": "failed",
+                        "message": "Template id already exists for the given engagement",
+                        "errors": {
+                            "template_data": [
+                                "Template id already exists for the given engagement: {}".format(
+                                    template_id
+                                )
+                                for template_id in existing_template_ids
+                            ]
+                        },
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            invalid_template_ids = (
+                set(template["template_id"] for template in template_data)
+                - valid_template_ids
+            )
+
+            if invalid_template_ids:
+                return Response(
+                    {
+                        "status": "failed",
+                        "message": "Invalid template IDs",
+                        "errors": {
+                            "template_data": [
+                                "Invalid template_id: {}".format(
+                                    ", ".join(map(str, invalid_template_ids))
+                                )
+                            ]
+                        },
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            operation_ids = {
+                entry.get("operation_id")
+                for entry in template_data
+                if "operation_id" in entry
+            }
+            valid_operation_ids = set(
+                engagement_operations.values_list("id", flat=True)
+            )
+            invalid_operation_ids = operation_ids - valid_operation_ids
+
+            if invalid_operation_ids:
+                return Response(
+                    {
+                        "status": "failed",
+                        "message": "Invalid operation IDs",
+                        "errors": {
+                            "template_data": [
+                                f"operation_id {', '.join(map(str, invalid_operation_ids))} do not exist."
+                            ]
+                        },
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Prevent updating operations that are already successful
+            locked_operations = engagement_operations.filter(
+                pk__in=operation_ids, delivery_status="SUC"
+            ).values_list("id", flat=True)
+
+            if locked_operations:
+                return Response(
+                    {
+                        "status": "failed",
+                        "message": f"Cannot update operations: {', '.join(map(str, locked_operations))} as they are already successful.",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Dictionary mapping operation_id -> data
+            operation_data_map = {
+                entry["operation_id"]: entry
+                for entry in template_data
+                if "operation_id" in entry
+            }
+
+            rescheduled_operations = []
+            for operation in engagement_operations.filter(pk__in=operation_ids):
+                template_entry = operation_data_map.get(operation.id)
+                if template_entry:
+                    if operation.date != template_entry["date"]:
+                        # **Revoke old task if it exists**
+                        if operation.task_id:
+                            AsyncResult(operation.task_id).revoke(terminate=True)
+
+                        # **Schedule a new task**
+                        new_task = send_schedule_engagement_email.s(operation.id).set(
+                            eta=template_entry["date"]
+                        )
+                        new_task_result = new_task.apply_async()
+
+                        # **Update task ID with the new one**
+                        operation.task_id = new_task_result.id
+
+                    operation.template_id = template_entry["template_id"]
+                    operation.date = template_entry["date"]
+                    operation.week = template_entry.get("week", operation.week)
+                    rescheduled_operations.append(operation)
+
+            # Bulk update modified operations
+            EngagementOperation.objects.bulk_update(
+                rescheduled_operations, ["template_id", "date", "week", "task_id"]
+            )
+
+            # New operations (ones without operation_id)
+            new_operations = [
+                entry for entry in template_data if "operation_id" not in entry
+            ]
+
+            # Get engagement details
+            engagement = Engagement.objects.filter(pk=engagement_id).first()
+            if not engagement:
+                return Response(
+                    {"status": "failed", "message": "Engagement not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            notice_weeks = int(engagement.notice_period.split("-")[1]) / 7
+            max_template_assign = notice_weeks * 2
+
+            # Validate new template assignment limit
+            existing_count = EngagementOperation.objects.filter(
+                engagement=engagement
+            ).count()
+            if (
+                new_operations
+                and len(new_operations) + existing_count > max_template_assign
+            ):
+                return Response(
+                    {
+                        "status": "failed",
+                        "message": "Max template assignment exceeded",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Validate max templates per week
+            week_counts = (
+                EngagementOperation.objects.filter(engagement=engagement)
+                .values("week")
+                .annotate(count=Count("week"))
+            )
+            week_count_map = {entry["week"]: entry["count"] for entry in week_counts}
+
+            for template in new_operations:
+                week = template.get("week")
+                week_count_map[week] = week_count_map.get(week, 0) + 1
+                print(week_count_map, week_count_map[week])
+                if week is not None and week_count_map[week] > 2:
+                    return Response(
+                        {
+                            "status": "failed",
+                            "message": f"Week {week} has exceeded max templates (2).",
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+            if len(week_count_map) > notice_weeks:
+                return Response(
+                    {
+                        "status": "failed",
+                        "message": "Number of weeks with templates assigned exceeds the notice period weeks.",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Bulk create new operations
+            created_operations = EngagementOperation.objects.bulk_create(
+                [
+                    EngagementOperation(
+                        engagement=engagement,
+                        template_id=entry["template_id"],
+                        date=entry["date"],
+                        week=entry.get("week"),
+                    )
+                    for entry in new_operations
+                ]
+            )
+
+            # Schedule emails
+            task_group = group(
+                send_schedule_engagement_email.s(operation.id).set(eta=operation.date)
+                for operation in created_operations
+            )
+            result = task_group.apply_async()
+
+            # Assign task IDs in bulk update
+            for operation, task in zip(created_operations, result.children):
+                operation.task_id = task.id
+
+            EngagementOperation.objects.bulk_update(created_operations, ["task_id"])
+
+        return Response(
+            {
+                "status": "success",
+                "message": "Engagement operations updated successfully.",
+            },
+            status=status.HTTP_200_OK,
+        )

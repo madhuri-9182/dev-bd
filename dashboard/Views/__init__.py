@@ -8,6 +8,7 @@ from .ClientViews import (
     EngagementTemplateView,
     EngagementView,
     EngagementOperationView,
+    EngagementOperationUpdateView,
 )
 
 from .InternalViews import (
