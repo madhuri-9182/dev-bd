@@ -254,6 +254,7 @@ class EngagementOperation(models.Model):
         on_delete=models.CASCADE,
         related_name="engagementoperations",
     )
+    week = models.PositiveSmallIntegerField(blank=True)
     date = models.DateTimeField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     delivery_status = models.CharField(
