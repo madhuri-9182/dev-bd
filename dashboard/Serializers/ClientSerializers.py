@@ -403,7 +403,7 @@ class CandidateSerializer(serializers.ModelSerializer):
         },
         required=False,
     )
-    created_at = serializers.DateTimeField(format="%d/%m/%Y")
+    created_at = serializers.DateTimeField(format="%d/%m/%Y", read_only=True)
 
     class Meta:
         model = Candidate
