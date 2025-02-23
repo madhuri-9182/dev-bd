@@ -12,6 +12,7 @@ from .InternalSerializers import (
     InternalClientSerializer,
     InterviewerSerializer,
     AgreementSerializer,
+    OrganizationSerializer,
 )
 from .InterviewerSerializers import (
     InterviewerAvailabilitySerializer,

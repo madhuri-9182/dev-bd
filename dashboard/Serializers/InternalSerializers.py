@@ -428,6 +428,7 @@ class AgreementSerializer(serializers.ModelSerializer):
         },
         required=False,
     )
+    organization_id = serializers.IntegerField(min_value=1, required=False)
 
     class Meta:
         model = Agreement
@@ -439,11 +440,11 @@ class AgreementSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, data):
-
         errors = validate_incoming_data(
             self.initial_data,
             required_keys=[
                 "years_of_experience",
+                "organization_id",
                 "rate",
             ],
             partial=self.partial,
@@ -453,13 +454,29 @@ class AgreementSerializer(serializers.ModelSerializer):
         if "rate" in data and data["rate"] <= 0:
             errors.setdefault("rate", []).append("Rate must be a positive value.")
 
-        organization = Organization.objects.filter(
-            id=data.get("organization_id")
-        ).first()
-        if not organization:
-            errors.setdefault("organization_id", []).append("Invalid organization_id")
+        if organization_id := data.get("organization_id"):
+            if (
+                not self.partial
+                and Agreement.objects.filter(organization_id=organization_id).exists()
+            ):
+                errors.setdefault("organization_id", []).append(
+                    "Organization already existed"
+                )
+            elif not Organization.objects.filter(id=organization_id).exists():
+                errors.setdefault("organization_id", []).append(
+                    "Invalid organization_id"
+                )
 
         if errors:
             raise serializers.ValidationError({"errors": errors})
 
         return data
+
+
+class OrganizationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Organization
+        fields = (
+            "id",
+            "name",
+        )

@@ -1,5 +1,6 @@
 from drf_spectacular.utils import extend_schema
 from django.db.models import Count, Q
+from organizations.models import Organization
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import LimitOffsetPagination
@@ -15,6 +16,7 @@ from ..serializer import (
     InternalClientSerializer,
     InterviewerSerializer,
     AgreementSerializer,
+    OrganizationSerializer,
 )
 
 
@@ -499,4 +501,24 @@ class AgreementDetailView(APIView):
                 "message": "Agreement deleted successfully.",
             },
             status=status.HTTP_204_NO_CONTENT,
+        )
+
+
+class OrganizationView(APIView, LimitOffsetPagination):
+    serializer_class = OrganizationSerializer
+    permission_classes = [IsAuthenticated, IsModerator | IsSuperAdmin]
+
+    def get(self, request):
+        organization = Organization.objects.all()
+        paginated_queryset = self.paginate_queryset(organization, request)
+        serializer = self.serializer_class(paginated_queryset, many=True)
+        paginated_response = self.get_paginated_response(serializer.data)
+
+        return Response(
+            {
+                "status": "success",
+                "message": "Organization list retrieved successfully.",
+                **paginated_response.data,
+            },
+            status=status.HTTP_200_OK,
         )

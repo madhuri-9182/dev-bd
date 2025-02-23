@@ -18,6 +18,7 @@ from .InternalViews import (
     InterviewerDetails,
     AgreementView,
     AgreementDetailView,
+    OrganizationView,
 )
 
 from .InterviewerViews import (
