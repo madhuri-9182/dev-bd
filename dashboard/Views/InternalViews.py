@@ -276,123 +276,123 @@ class InterviewerDetails(APIView):
 
 @extend_schema(tags=["Internal"])
 class AgreementView(APIView, LimitOffsetPagination):
+    serializer_class = AgreementSerializer
     permission_classes = [IsAuthenticated, IsSuperAdmin | IsModerator]
-     
+
     def get(self, request):
         agreements_qs = Agreement.objects.all()
         paginated_qs = self.paginate_queryset(agreements_qs, request)
-        serializer = AgreementSerializer(paginated_qs, many=True)
+        serializer = self.serializer_class(paginated_qs, many=True)
         paginated_data = self.get_paginated_response(serializer.data)
-        
+
         return Response(
-             {
+            {
                 "status": "success",
                 "message": "Agreement list retrieved successfully.",
                 **paginated_data.data,
             },
-             status=status.HTTP_200_OK)
+            status=status.HTTP_200_OK,
+        )
 
     def post(self, request):
-        serializer = AgreementSerializer(data=request.data, context={"request":request})
+        serializer = self.serializer_class(data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(
-               {
+                {
                     "status": "success",
                     "message": "Agreement added successfully.",
                     "data": serializer.data,
                 },
-               status=status.HTTP_201_CREATED)
-        custom_error = serializer.errors.pop("errors", None)    
+                status=status.HTTP_201_CREATED,
+            )
+        custom_error = serializer.errors.pop("errors", None)
         return Response(
             {
-                "status" : "failed",
-                "message" : "Invalid data.",
+                "status": "failed",
+                "message": "Invalid data.",
                 "errors": serializer.errors if not custom_error else custom_error,
-            }, 
-            status=status.HTTP_400_BAD_REQUEST
+            },
+            status=status.HTTP_400_BAD_REQUEST,
         )
-
-    def finalize_response(self, request, response, *args, **kwargs):
-        if response.data.get("errors"):
-            response.data["status"] = "failed"
-            response.data["message"] = "Invalid data"
-            errors = response.data["errors"]
-            del response.data["errors"]
-            response.data["errors"] = errors
-        return super().finalize_response(request, response, *args, **kwargs)
 
 
 @extend_schema(tags=["Internal"])
 class AgreementDetailView(APIView):
+    serializer_class = AgreementSerializer
     permission_classes = [IsAuthenticated, IsSuperAdmin | IsModerator]
 
-    def get(self,request, pk):
+    def get(self, request, pk):
         try:
             agreement = Agreement.objects.get(pk=pk)
         except Agreement.DoesNotExist:
             return Response(
-                {"errors" : "Agreement not found"}, status = status.HTTP_404_NOT_FOUND
+                {"errors": "Agreement not found"}, status=status.HTTP_404_NOT_FOUND
             )
 
-        serializer = AgreementSerializer(agreement)
+        serializer = self.serializer_class(agreement)
         return Response(
             {
                 "status": "success",
-                "message": "Agreement successfully retrived.",
+                "message": "Agreement successfully retrieved.",
                 "data": serializer.data,
             },
             status=status.HTTP_200_OK,
         )
 
     def patch(self, request, pk):
-        
         try:
             agreement = Agreement.objects.get(pk=pk)
         except Agreement.DoesNotExist:
             return Response(
-                {"errors": "Agreement not found."}, status = status.HTTP_404_NOT_FOUND
+                {
+                    "status": "failed",
+                    "message": "Agreement not found.",
+                },
+                status=status.HTTP_404_NOT_FOUND,
             )
-            
-        serializer = AgreementSerializer(
-            agreement, data = request.data , partial=True , context={"request":request}
+
+        serializer = self.serializer_class(
+            agreement, data=request.data, partial=True, context={"request": request}
         )
         if serializer.is_valid():
             serializer.save()
             return Response(
                 {
                     "status": "success",
-                    "message" : "Agrement updated successfully.",
+                    "message": "Agreement updated successfully.",
                     "data": serializer.data,
                 },
-                status=status.HTTP_200_OK
+                status=status.HTTP_200_OK,
             )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
-        
+        custom_error = serializer.errors.pop("errors", None)
+        return Response(
+            {
+                "status": "failed",
+                "message": "Invalid data.",
+                "errors": serializer.errors if not custom_error else custom_error,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
     def delete(self, request, pk):
         try:
             agreement = Agreement.objects.get(pk=pk)
         except Agreement.DoesNotExist:
             return Response(
-                {"errors": "Agreement not found"}, status = status.HTTP_404_NOT_FOUND
+                {
+                    "status": "failed",
+                    "message": "Agreement not found.",
+                },
+                status=status.HTTP_404_NOT_FOUND,
             )
-            
+
         agreement.archived = True
         agreement.save()
         return Response(
             {
-               "status": "success",
+                "status": "success",
                 "message": "Agreement deleted successfully.",
             },
-            status = status.HTTP_204_NO_CONTENT,
+            status=status.HTTP_204_NO_CONTENT,
         )
-        
-    def finalize_response(self, request, response, *args, **kwargs):
-        if response.data.get("errors"):
-            response.data["status"] = "failed"
-            response.data["message"] = "Invalid data"
-            errors = response.data["errors"]
-            del response.data["errors"]
-            response.data["errors"] = errors
-        return super().finalize_response(request, response, *args, **kwargs)
