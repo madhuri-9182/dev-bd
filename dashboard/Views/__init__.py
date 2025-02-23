@@ -16,6 +16,8 @@ from .InternalViews import (
     InternalClientDetailsView,
     InterviewerView,
     InterviewerDetails,
+    AgreementView,
+    AgreementDetailView,
 )
 
 from .InterviewerViews import (
