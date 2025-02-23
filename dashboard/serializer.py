@@ -11,4 +11,5 @@ from .Serializers import (
     EngagementTemplateSerializer,
     EngagementSerializer,
     EngagementOperationSerializer,
+    EngagementUpdateStatusSerializer,
 )

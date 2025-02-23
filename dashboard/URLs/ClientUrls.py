@@ -47,6 +47,11 @@ urlpatterns = [
     ),
     path("engagements/", EngagementView.as_view(), name="candidate-engagements"),
     path(
+        "engagements/<int:engagement_id>/",
+        EngagementView.as_view(),
+        name="candidate-engagements-details",
+    ),
+    path(
         "engagement-operation/",
         EngagementOperationView.as_view(),
         name="engagement-operation",

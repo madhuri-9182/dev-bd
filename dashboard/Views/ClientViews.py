@@ -27,6 +27,7 @@ from ..serializer import (
     EngagementTemplateSerializer,
     EngagementSerializer,
     EngagementOperationSerializer,
+    EngagementUpdateStatusSerializer,
 )
 from ..permissions import CanDeleteUpdateUser, UserRoleDeleteUpdateClientData
 from externals.parser.resume_parser import ResumerParser
@@ -951,7 +952,14 @@ class EngagementView(APIView, LimitOffsetPagination):
     serializer_class = EngagementSerializer
     permission_classes = [IsAuthenticated, IsClientAdmin | IsClientOwner | IsClientUser]
 
-    def post(self, request):
+    def post(self, request, **kwargs):
+        engagement_id = kwargs.get("engagement_id")
+        if engagement_id:
+            return Response(
+                {"status": "failed", "message": "Invalid request."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         serializer = self.serializer_class(
             data=request.data, context={"request": request}
         )
@@ -975,7 +983,13 @@ class EngagementView(APIView, LimitOffsetPagination):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    def get(self, request):
+    def get(self, request, **kwargs):
+        engagement_id = kwargs.get("engagement_id")
+        if engagement_id:
+            return Response(
+                {"status": "failed", "message": "Invalid request."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         query_params = request.query_params
         job_id = query_params.get("job_id")
         specialization = query_params.get("specialization")
@@ -1029,6 +1043,45 @@ class EngagementView(APIView, LimitOffsetPagination):
                 **paginated_response.data,
             },
             status=status.HTTP_200_OK,
+        )
+
+    def patch(self, request, **kwargs):
+        engagement_id = kwargs.get("engagement_id")
+        if not engagement_id:
+            return Response(
+                {"status": "failed", "message": "Engagement id is required in url"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        engagement = Engagement.objects.filter(
+            client__organization=request.user.clientuser.organization, pk=engagement_id
+        ).first()
+
+        if not engagement:
+            return Response(
+                {"status": "failed", "message": "Invalid engagement id"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = EngagementUpdateStatusSerializer(
+            engagement, data=request.data, partial=True, context={"request": request}
+        )
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {"status": "success", "message": "Engagement updated successfully"},
+                status=status.HTTP_200_OK,
+            )
+
+        custom_errors = serializer.errors.pop("errors", None)
+        return Response(
+            {
+                "status": "failed",
+                "message": "Invalid data.",
+                "errors": custom_errors if custom_errors else serializer.errors,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
         )
 
 

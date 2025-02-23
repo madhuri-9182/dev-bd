@@ -919,3 +919,17 @@ class EngagementSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"errors": errors})
 
         return data
+
+
+class EngagementUpdateStatusSerializer(serializers.ModelSerializer):
+    status = serializers.ChoiceField(
+        choices=Engagement.STATUS_CHOICE,
+        error_messages={
+            "invalid_choice": f"This is an invalid choice. Valid choices are {', '.join([f'{key}({value})' for key, value in Engagement.STATUS_CHOICE])}"
+        },
+        required=False,
+    )
+
+    class Meta:
+        model = Engagement
+        fields = ("status",)
