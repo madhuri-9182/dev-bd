@@ -6,6 +6,6 @@ from .Client import (
     EngagementTemplates,
     EngagementOperation,
 )
-from .Internal import ClientPointOfContact, InternalClient, InternalInterviewer
+from .Internal import ClientPointOfContact, InternalClient, InternalInterviewer, HDIPUsers
 from .Interviewer import InterviewerAvailability, InterviewerRequest
 from .Interviews import Interview

@@ -3,6 +3,7 @@ from .Models import (
     InternalClient,
     ClientPointOfContact,
     InternalInterviewer,
+    HDIPUsers,
     Job,
     Candidate,
     Engagement,

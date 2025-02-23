@@ -11,6 +11,7 @@ from ..models import (
     ClientPointOfContact,
     InternalInterviewer,
     ClientUser,
+    HDIPUsers,
 )
 from hiringdogbackend.utils import (
     validate_incoming_data,
@@ -416,3 +417,68 @@ class InterviewerSerializer(serializers.ModelSerializer):
             user.profile.name = name
             user.profile.save()
         return interviewer_obj
+    
+    
+class InternalUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ClientUser
+        fields = ["client", "user", "email", "phone", "domain", "access"]
+        
+    def run_validation(self, data=...):
+        request = self.context.get("request")
+        email = data.get("email")
+        phone = data.get("phone")
+        
+        errors = check_for_email_and_phone_uniqueness(email, phone, User)
+        if errors:
+            raise serializers.ValidationError({"errors": errors})
+        
+        return super().run_validation(data)
+    
+    def validate(self, data):
+        errors = validate_incoming_data(
+            self.initial_data,
+            required_keys=["client", "user", "email", "phone", "domain", "access"],
+            partial=self.partial,
+        )
+        if errors:
+            raise serializers.ValidationError(errors)
+        return data
+    
+class HDIPUsersSerializer(serializers.ModelSerializer):
+    role = serializers.ChoiceField(
+        choices=HDIPUsers.ROLE_CHOICES,
+        error_messages={
+            "invalid_choice": f"This is an invalid choice. Valid choices are {', '.join([f'{key}({value})' for key, value in HDIPUsers.ROLE_CHOICES])}"
+        },
+        required=False,
+    )
+    class Meta:
+        model = HDIPUsers
+        fields = ["name", "role", "email", "phone", "client"]
+        read_only_fields = ["created_at"]
+        
+    def run_validation(self, data=...):
+        request = self.context.get("request")
+        email = data.get("email")
+        phone = data.get("phone")
+
+        errors = check_for_email_and_phone_uniqueness(email, phone, User)
+        if errors:
+            raise serializers.ValidationError({"errors": errors})
+
+        return super().run_validation(data)
+    
+    def validate(self, data):
+        
+        errors = validate_incoming_data(
+            self.initial_data,
+            required_keys=["client", "name", "email", "phone", "access"],
+            partial=self.partial,
+        )
+        
+        if errors:
+            raise serializers.ValidationError(errors)
+
+        return data
+    

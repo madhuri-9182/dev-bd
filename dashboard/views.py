@@ -15,4 +15,7 @@ from dashboard.Views import (
     PotentialInterviewerAvailabilityForCandidateView,
     InterviewerReqeustView,
     InterviewerRequestResponseView,
+    InternalDashboardView,
+    InternalUserView,
+    HDIPUsersViews,
 )

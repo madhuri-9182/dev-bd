@@ -4,6 +4,9 @@ from ..views import (
     InternalClientDetailsView,
     InterviewerDetails,
     InterviewerView,
+    InternalDashboardView,
+    InternalUserView,
+    HDIPUsersViews,
 )
 
 urlpatterns = [
@@ -19,4 +22,7 @@ urlpatterns = [
         InterviewerDetails.as_view(),
         name="interviewer-details",
     ),
+    path("dashboard/", InternalDashboardView.as_view(),name="dashboard"),
+    path("hdip-user/", HDIPUsersViews.as_view(), name="hdip-user"),
+    path("internal-user/", InternalUserView.as_view(), name="internal-user")
 ]

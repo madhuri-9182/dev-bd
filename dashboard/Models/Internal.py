@@ -6,6 +6,7 @@ from core.models import User
 from hiringdogbackend.ModelUtils import SoftDelete, CreateUpdateDateTimeAndArchivedField
 
 
+
 class InternalClient(CreateUpdateDateTimeAndArchivedField):
     objects = SoftDelete()
     object_all = models.Manager()
@@ -126,3 +127,25 @@ class InternalInterviewer(CreateUpdateDateTimeAndArchivedField):
 
     def __str__(self):
         return f"{self.name} - {self.organization}"
+
+
+
+class HDIPUsers(CreateUpdateDateTimeAndArchivedField):
+    
+    objects = SoftDelete()
+    object_all = models.Manager()
+    
+    ROLE_CHOICES=(
+        ("ADMIN", "admin"),
+        ("USER", "user"),
+        ("AGENCY", "agency")
+    )
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name="hdipuser", blank=True
+    )
+    
+    name = models.CharField(max_length=255, blank=True)
+    role = models.CharField(max_length=255, blank=True, choices=ROLE_CHOICES)
+    email = models.EmailField(unique=True, blank=True)
+    phone = PhoneNumberField(region="IN", unique=True, blank=True)
+    client = models.ForeignKey(InternalClient, on_delete=models.CASCADE, related_name="client")
