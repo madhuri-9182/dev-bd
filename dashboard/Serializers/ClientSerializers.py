@@ -403,6 +403,7 @@ class CandidateSerializer(serializers.ModelSerializer):
         },
         required=False,
     )
+    created_at = serializers.DateTimeField(format="%d/%m/%Y", read_only=True)
 
     class Meta:
         model = Candidate
@@ -426,8 +427,9 @@ class CandidateSerializer(serializers.ModelSerializer):
             "remark",
             "reason_for_dropping",
             "job_id",
+            "created_at",
         )
-        read_only_fields = ["designation"]
+        read_only_fields = ["designation", "created_at"]
 
     def validate(self, data):
         request = self.context.get("request")
@@ -489,6 +491,7 @@ class EngagementOperationDataSerializer(serializers.Serializer):
     date = serializers.DateTimeField(
         input_formats=["%d/%m/%Y %H:%M:%S"], format="%d/%m/%Y %H:%M"
     )
+    week = serializers.IntegerField(min_value=1, max_value=12)
 
 
 class EngagementOperationTemplateSerializer(serializers.ModelSerializer):
@@ -508,13 +511,15 @@ class EngagementOperationSerializer(serializers.ModelSerializer):
     class Meta:
         model = EngagementOperation
         fields = (
+            "id",
             "template",
+            "week",
             "date",
             "delivery_status",
             "engagement_id",
             "template_data",
         )
-        read_only_fields = ["date", "delivery_status"]
+        read_only_fields = ["week", "date", "delivery_status"]
 
     def to_internal_value(self, data):
         template_data = data.get("template_data", [])
@@ -526,7 +531,7 @@ class EngagementOperationSerializer(serializers.ModelSerializer):
                 {
                     "template_data": [
                         "This field must be a non-empty list of dictionaries with keys 'template_id' and 'date'.",
-                        "Expected format: [{'template_id': <int>, 'date': '<dd/mm/yyyy hh:mm:ss>'}]",
+                        "Expected format: [{'template_id': <int>, 'week': <int>, 'date': '<dd/mm/yyyy hh:mm:ss>'}]",
                     ]
                 }
             )
@@ -536,12 +541,13 @@ class EngagementOperationSerializer(serializers.ModelSerializer):
                 not isinstance(entry, dict)
                 or "template_id" not in entry
                 or "date" not in entry
+                or "week" not in entry
             ):
                 raise serializers.ValidationError(
                     {
                         "template_data": [
                             "Each item must match the following schema:",
-                            "Expected format: {'template_id': <int>, 'date': '<dd/mm/yyyy hh:mm:ss>'}",
+                            "Expected format: {'template_id': <int>, 'week': <int>, 'date': '<dd/mm/yyyy hh:mm:ss>'}",
                         ]
                     }
                 )
@@ -583,8 +589,24 @@ class EngagementOperationSerializer(serializers.ModelSerializer):
                     "Max {} templates can be assigned ".format(int(max_template_assign))
                 )
 
+            week_count = {}
+            for template in templates:
+                week = template.get("week")
+                if week is not None:
+                    week_count[week] = week_count.get(week, 0) + 1
+
+            if len(week_count) > notice_weeks:
+                errors.setdefault("template_data", []).append(
+                    "Number of weeks with templates assigned exceeds the notice period weeks."
+                )
+
+            if any(count > 2 for count in week_count.values()):
+                errors.setdefault("template_data", []).append(
+                    "Max 2 templates can be assigned per week."
+                )
+
             invalid_dates = [
-                template["date"].strftime("%d-%m-%Y %H:%M:%S")
+                template["date"].strftime("%d/%m/%Y %H:%M:%S")
                 for template in templates
                 if datetime.strptime(
                     template["date"].strftime("%d-%m-%Y %H:%M:%S"),
@@ -659,6 +681,7 @@ class EngagementOperationSerializer(serializers.ModelSerializer):
                 engagement=engagement,
                 template_id=template["template_id"],
                 date=template["date"],
+                week=template["week"],
             )
             for template in templates
         ]
@@ -896,3 +919,17 @@ class EngagementSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"errors": errors})
 
         return data
+
+
+class EngagementUpdateStatusSerializer(serializers.ModelSerializer):
+    status = serializers.ChoiceField(
+        choices=Engagement.STATUS_CHOICE,
+        error_messages={
+            "invalid_choice": f"This is an invalid choice. Valid choices are {', '.join([f'{key}({value})' for key, value in Engagement.STATUS_CHOICE])}"
+        },
+        required=False,
+    )
+
+    class Meta:
+        model = Engagement
+        fields = ("status",)

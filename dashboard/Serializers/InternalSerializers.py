@@ -1,6 +1,7 @@
 import datetime
 from rest_framework import serializers
 from organizations.utils import create_organization
+from organizations.models import Organization
 from django.conf import settings
 from django.db import transaction
 from django.utils.encoding import force_bytes
@@ -11,6 +12,7 @@ from ..models import (
     ClientPointOfContact,
     InternalInterviewer,
     ClientUser,
+    Agreement,
 )
 from hiringdogbackend.utils import (
     validate_incoming_data,
@@ -78,7 +80,7 @@ class InternalClientSerializer(serializers.ModelSerializer):
         )
 
     def to_internal_value(self, data):
-        request = self.context.get("request")
+
         points_of_contact = data.get("points_of_contact")
         errors = {}
         if not points_of_contact:
@@ -416,3 +418,65 @@ class InterviewerSerializer(serializers.ModelSerializer):
             user.profile.name = name
             user.profile.save()
         return interviewer_obj
+
+
+class AgreementSerializer(serializers.ModelSerializer):
+    years_of_experience = serializers.ChoiceField(
+        choices=Agreement.YEARS_OF_EXPERIENCE_CHOICES,
+        error_messages={
+            "invalid_choice": f"This is an invalid choice. Valid choices are {', '.join([f'{key}({value})' for key, value in Agreement.YEARS_OF_EXPERIENCE_CHOICES])}"
+        },
+        required=False,
+    )
+    organization_id = serializers.IntegerField(min_value=1, required=False)
+
+    class Meta:
+        model = Agreement
+        fields = [
+            "id",
+            "organization_id",
+            "years_of_experience",
+            "rate",
+        ]
+
+    def validate(self, data):
+        errors = validate_incoming_data(
+            self.initial_data,
+            required_keys=[
+                "years_of_experience",
+                "organization_id",
+                "rate",
+            ],
+            partial=self.partial,
+            original_data=data,
+        )
+
+        if "rate" in data and data["rate"] <= 0:
+            errors.setdefault("rate", []).append("Rate must be a positive value.")
+
+        if organization_id := data.get("organization_id"):
+            if (
+                not self.partial
+                and Agreement.objects.filter(organization_id=organization_id).exists()
+            ):
+                errors.setdefault("organization_id", []).append(
+                    "Organization already existed"
+                )
+            elif not Organization.objects.filter(id=organization_id).exists():
+                errors.setdefault("organization_id", []).append(
+                    "Invalid organization_id"
+                )
+
+        if errors:
+            raise serializers.ValidationError({"errors": errors})
+
+        return data
+
+
+class OrganizationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Organization
+        fields = (
+            "id",
+            "name",
+        )

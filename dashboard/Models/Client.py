@@ -203,9 +203,7 @@ class Engagement(CreateUpdateDateTimeAndArchivedField):
         ClientUser, on_delete=models.CASCADE, related_name="engagements"
     )
 
-    status = models.CharField(
-        max_length=11, choices=STATUS_CHOICE, default="YET_TO_JOIN"
-    )
+    status = models.CharField(max_length=11, choices=STATUS_CHOICE, default="YTJ")
     notice_period = models.CharField(
         max_length=10, choices=NOTICE_PERIOD_CHOICE, default="16-30"
     )
@@ -256,6 +254,7 @@ class EngagementOperation(models.Model):
         on_delete=models.CASCADE,
         related_name="engagementoperations",
     )
+    week = models.PositiveSmallIntegerField(blank=True)
     date = models.DateTimeField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     delivery_status = models.CharField(

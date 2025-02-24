@@ -4,6 +4,9 @@ from ..views import (
     InternalClientDetailsView,
     InterviewerDetails,
     InterviewerView,
+    AgreementView,
+    AgreementDetailView,
+    OrganizationView,
 )
 
 urlpatterns = [
@@ -19,4 +22,9 @@ urlpatterns = [
         InterviewerDetails.as_view(),
         name="interviewer-details",
     ),
+    path("agreements/", AgreementView.as_view(), name="agreement"),
+    path(
+        "agreement/<int:pk>/", AgreementDetailView.as_view(), name="agreement-details"
+    ),
+    path("organizations/", OrganizationView.as_view(), name="organizations"),
 ]

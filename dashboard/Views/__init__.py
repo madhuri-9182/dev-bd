@@ -8,6 +8,7 @@ from .ClientViews import (
     EngagementTemplateView,
     EngagementView,
     EngagementOperationView,
+    EngagementOperationUpdateView,
 )
 
 from .InternalViews import (
@@ -15,6 +16,9 @@ from .InternalViews import (
     InternalClientDetailsView,
     InterviewerView,
     InterviewerDetails,
+    AgreementView,
+    AgreementDetailView,
+    OrganizationView,
 )
 
 from .InterviewerViews import (

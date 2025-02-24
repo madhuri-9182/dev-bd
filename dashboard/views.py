@@ -5,6 +5,8 @@ from dashboard.Views import (
     InternalClientDetailsView,
     InterviewerView,
     InterviewerDetails,
+    AgreementView,
+    AgreementDetailView,
     ClientInvitationActivateView,
     CandidateView,
     EngagementTemplateView,
@@ -15,4 +17,6 @@ from dashboard.Views import (
     PotentialInterviewerAvailabilityForCandidateView,
     InterviewerReqeustView,
     InterviewerRequestResponseView,
+    EngagementOperationUpdateView,
+    OrganizationView,
 )

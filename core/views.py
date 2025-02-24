@@ -24,6 +24,7 @@ from .serializer import (
     UserLoginSerializer,
     CookieTokenRefreshSerializer,
     ResetPasswordConfirmSerailizer,
+    GoogleAuthCallbackSerializer,
 )
 from rest_framework.request import Request
 from drf_spectacular.utils import extend_schema
@@ -326,7 +327,14 @@ class GoogleAuthInitView(APIView):
             print("INSDIE GOOGLE AUTH INIT", state)
             request.session["state"] = state
             print("AFTER THAT", request.session.get("state"))
-            return HttpResponseRedirect(authorization_url)
+            return Response(
+                {
+                    "status": "success",
+                    "message": "Initialize successfully",
+                    "data": {"url": authorization_url},
+                },
+                status=status.HTTP_200_OK,
+            )
 
         except Exception as e:
             return Response(
@@ -369,24 +377,44 @@ class GoogleAuthInitView(APIView):
     tags=["Authentication"],
 )
 class GoogleAuthCallbackView(APIView):
-    serializer_class = None
+    serializer_class = GoogleAuthCallbackSerializer
     permission_classes = (IsAuthenticated,)
 
-    def get(self, request):
+    def post(self, request):
         state = request.session.get("state")
-        # print("INSIDE GOOGLE AUTH CALLBACK", state, request.query_params.get("state"))
-        if not state or request.query_params.get("state") != state:
+
+        serializer = self.serializer_class(data=request.data)
+
+        if not serializer.is_valid():
             return Response(
-                {"status": "failed", "message": "Invalid state parameter"},
+                {
+                    "status": "failed",
+                    "message": "Invalid request",
+                    "errors": serializer.errors,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        validated_data = serializer.validated_data
+        received_state = validated_data.get("state")
+        authorization_response = validated_data.get("authorization_response")
+
+        if not state or received_state != state:
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "Invalid state parameter",
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         try:
             google_calendar = GoogleCalendar()
             access_token, refresh_token, expired_time = google_calendar.auth_callback(
-                state, request.build_absolute_uri()
+                received_state, authorization_response
             )
-            # print("ACCESS -------> ", access_token, refresh_token, expired_time)
+
+            # Store tokens in DB
             OAuthToken.objects.update_or_create(
                 user=request.user,
                 defaults={
@@ -395,6 +423,7 @@ class GoogleAuthCallbackView(APIView):
                     "expires_at": expired_time,
                 },
             )
+
             return Response(
                 {
                     "status": "success",
@@ -402,6 +431,7 @@ class GoogleAuthCallbackView(APIView):
                 },
                 status=status.HTTP_200_OK,
             )
+
         except Exception as e:
             return Response(
                 {
