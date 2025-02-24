@@ -1139,7 +1139,7 @@ class EngagementOperationView(APIView, LimitOffsetPagination):
 class EngagementOperationUpdateView(APIView):
     permission_classes = [IsAuthenticated, IsClientAdmin | IsClientOwner | IsClientUser]
 
-    def patch(self, request, engagement_id):
+    def put(self, request, engagement_id):
         with transaction.atomic():
             engagement_operations = EngagementOperation.objects.filter(
                 template__organization=request.user.clientuser.organization,
@@ -1208,70 +1208,22 @@ class EngagementOperationUpdateView(APIView):
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 
-            invalid_dates = [
-                template["date"]
-                for template in template_data
-                if datetime.strptime(
-                    template["date"],
-                    "%d/%m/%Y %H:%M:%S",
-                )
-                < datetime.strptime(
-                    datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
-                    "%d/%m/%Y %H:%M:%S",
-                )
+            week_counts = engagement_operations.values("week").annotate(
+                count=Count("week")
+            )
+            week_count_map = {entry["week"]: entry["count"] for entry in week_counts}
+
+            incoming_template_ids = [
+                template["template_id"] for template in template_data
             ]
-
-            for template in template_data:
-                template["date"] = datetime.strptime(
-                    template["date"], "%d/%m/%Y %H:%M:%S"
-                ).strftime("%Y-%m-%d %H:%M:%S")
-
-            if invalid_dates:
-                return Response(
-                    {
-                        "status": "failed",
-                        "message": "Invalid dates in template data",
-                        "errors": {
-                            "template_data": [
-                                f"Dates in the past are not allowed: {', '.join(invalid_dates)}"
-                            ]
-                        },
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
 
             valid_template_ids = set(
                 EngagementTemplates.objects.filter(
                     organization=request.user.clientuser.organization,
-                    pk__in=[template["template_id"] for template in template_data],
+                    pk__in=incoming_template_ids,
                 ).values_list("id", flat=True)
             )
-            existing_template_ids = set(
-                EngagementOperation.objects.filter(
-                    engagement_id=engagement_id, template_id__in=valid_template_ids
-                ).values_list("template_id", flat=True)
-            )
-            if existing_template_ids:
-                return Response(
-                    {
-                        "status": "failed",
-                        "message": "Template id already exists for the given engagement",
-                        "errors": {
-                            "template_data": [
-                                "Template id already exists for the given engagement: {}".format(
-                                    template_id
-                                )
-                                for template_id in existing_template_ids
-                            ]
-                        },
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            invalid_template_ids = (
-                set(template["template_id"] for template in template_data)
-                - valid_template_ids
-            )
+            invalid_template_ids = set(incoming_template_ids) - valid_template_ids
 
             if invalid_template_ids:
                 return Response(
@@ -1283,6 +1235,21 @@ class EngagementOperationUpdateView(APIView):
                                 "Invalid template_id: {}".format(
                                     ", ".join(map(str, invalid_template_ids))
                                 )
+                            ]
+                        },
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # validation of template ids uniqueness
+            if len(incoming_template_ids) != len(set(incoming_template_ids)):
+                return Response(
+                    {
+                        "status": "failed",
+                        "message": "Template IDs must be unique",
+                        "errors": {
+                            "template_data": [
+                                "Template IDs must be unique, but got duplicates"
                             ]
                         },
                     },
@@ -1318,21 +1285,105 @@ class EngagementOperationUpdateView(APIView):
                 pk__in=operation_ids, delivery_status="SUC"
             ).values_list("id", flat=True)
 
-            if locked_operations:
+            # retrieving edge case validation delete operation_ids
+            validation_operation_ids_after_success_operation = set(
+                engagement_operations.filter(delivery_status="PED").values_list(
+                    "id", flat=True
+                )
+            )
+            delete_operation_ids = (
+                validation_operation_ids_after_success_operation - operation_ids
+            )
+
+            # validating dates of only allowed operations
+            invalid_dates = [
+                template["date"]
+                for template in template_data
+                if (
+                    "operation_id" not in template
+                    or template["operation_id"] not in locked_operations
+                )
+                and datetime.strptime(
+                    template["date"],
+                    "%d/%m/%Y %H:%M:%S",
+                )
+                < datetime.strptime(
+                    datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                    "%d/%m/%Y %H:%M:%S",
+                )
+            ]
+
+            if invalid_dates:
                 return Response(
                     {
                         "status": "failed",
-                        "message": f"Cannot update operations: {', '.join(map(str, locked_operations))} as they are already successful.",
+                        "message": "Invalid dates in template data",
+                        "errors": {
+                            "template_data": [
+                                f"Dates in the past are not allowed: {', '.join(invalid_dates)}"
+                            ]
+                        },
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+
+            for template in template_data:
+                template["date"] = datetime.strptime(
+                    template["date"], "%d/%m/%Y %H:%M:%S"
+                ).strftime("%Y-%m-%d %H:%M:%S")
 
             # Dictionary mapping operation_id -> data
             operation_data_map = {
                 entry["operation_id"]: entry
                 for entry in template_data
                 if "operation_id" in entry
+                and entry["operation_id"] not in locked_operations
             }
+
+            # New operations (ones without operation_id)
+            new_operations = [
+                entry for entry in template_data if "operation_id" not in entry
+            ]
+
+            # Get engagement details
+            engagement = Engagement.objects.filter(pk=engagement_id).first()
+            if not engagement:
+                return Response(
+                    {"status": "failed", "message": "Engagement not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            notice_weeks = int(engagement.notice_period.split("-")[1]) / 7
+            max_template_assign = notice_weeks * 2
+
+            # Validate new template assignment limit
+            existing_count = EngagementOperation.objects.filter(
+                engagement=engagement
+            ).count()
+            if (
+                len(new_operations) + (existing_count - len(delete_operation_ids))
+                > max_template_assign
+            ):
+                return Response(
+                    {
+                        "status": "failed",
+                        "message": "Max template assignment exceeded",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Validate max templates per week
+            for template in new_operations:
+                week = template.get("week")
+                week_count_map[int(week)] = week_count_map.get(int(week), 0) + 1
+                if week is not None and week_count_map[int(week)] > 2:
+                    return Response(
+                        {
+                            "status": "failed",
+                            "message": f"Week {week} has exceeded max templates (2).",
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
 
             rescheduled_operations = []
             for operation in engagement_operations.filter(pk__in=operation_ids):
@@ -1362,67 +1413,19 @@ class EngagementOperationUpdateView(APIView):
                 rescheduled_operations, ["template_id", "date", "week", "task_id"]
             )
 
-            # New operations (ones without operation_id)
-            new_operations = [
-                entry for entry in template_data if "operation_id" not in entry
-            ]
-
-            # Get engagement details
-            engagement = Engagement.objects.filter(pk=engagement_id).first()
-            if not engagement:
-                return Response(
-                    {"status": "failed", "message": "Engagement not found"},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-
-            notice_weeks = int(engagement.notice_period.split("-")[1]) / 7
-            max_template_assign = notice_weeks * 2
-
-            # Validate new template assignment limit
-            existing_count = EngagementOperation.objects.filter(
-                engagement=engagement
-            ).count()
-            if (
-                new_operations
-                and len(new_operations) + existing_count > max_template_assign
+            # cancel the deleted operation ids task
+            delete_scheduled_operations = []
+            for delete_operation in EngagementOperation.objects.filter(
+                pk__in=delete_operation_ids
             ):
-                return Response(
-                    {
-                        "status": "failed",
-                        "message": "Max template assignment exceeded",
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+                AsyncResult(delete_operation.id).revoke(terminate=True)
+                delete_operation.archived = True
+                delete_scheduled_operations.append(delete_operation)
 
-            # Validate max templates per week
-            week_counts = (
-                EngagementOperation.objects.filter(engagement=engagement)
-                .values("week")
-                .annotate(count=Count("week"))
+            # Delete the cancelled operations
+            EngagementOperation.objects.bulk_update(
+                delete_scheduled_operations, ["archived"]
             )
-            week_count_map = {entry["week"]: entry["count"] for entry in week_counts}
-
-            for template in new_operations:
-                week = template.get("week")
-                week_count_map[week] = week_count_map.get(week, 0) + 1
-                print(week_count_map, week_count_map[week])
-                if week is not None and week_count_map[week] > 2:
-                    return Response(
-                        {
-                            "status": "failed",
-                            "message": f"Week {week} has exceeded max templates (2).",
-                        },
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-
-            if len(week_count_map) > notice_weeks:
-                return Response(
-                    {
-                        "status": "failed",
-                        "message": "Number of weeks with templates assigned exceeds the notice period weeks.",
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
 
             # Bulk create new operations
             created_operations = EngagementOperation.objects.bulk_create(
@@ -1437,7 +1440,6 @@ class EngagementOperationUpdateView(APIView):
                 ]
             )
 
-            # Schedule emails
             task_group = group(
                 send_schedule_engagement_email.s(operation.id).set(eta=operation.date)
                 for operation in created_operations

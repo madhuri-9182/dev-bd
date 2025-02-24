@@ -240,7 +240,9 @@ class EngagementTemplates(CreateUpdateDateTimeAndArchivedField):
     )
 
 
-class EngagementOperation(models.Model):
+class EngagementOperation(CreateUpdateDateTimeAndArchivedField):
+    objects = SoftDelete()
+    object_all = models.Manager()
     DELIVERY_STATUS_CHOICES = (
         ("PED", "Pending"),
         ("SUC", "Success"),
@@ -262,12 +264,5 @@ class EngagementOperation(models.Model):
     )
     task_id = models.UUIDField(null=True, editable=False, blank=True)
 
-    def __str__(self):
-        return f"{self.engagement.candidate.name} - {self.template.template_name} - {self.delivery_status}"
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["engagement", "template"], name="unique_engagement_operation"
-            )
-        ]
+    # def __str__(self):
+    #     return f"{self.engagement.candidate.name} - {self.template.template_name} - {self.delivery_status}"
