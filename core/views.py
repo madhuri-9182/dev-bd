@@ -318,7 +318,14 @@ class GoogleAuthInitView(APIView):
             print("INSDIE GOOGLE AUTH INIT", state)
             request.session["state"] = state
             print("AFTER THAT", request.session.get("state"))
-            return HttpResponseRedirect(authorization_url)
+            return Response(
+                {
+                    "status": "success",
+                    "message": "Initialize successfully",
+                    "data": {"url": authorization_url},
+                },
+                status=status.HTTP_200_OK,
+            )
 
         except Exception as e:
             return Response(
