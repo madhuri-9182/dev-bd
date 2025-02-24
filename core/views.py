@@ -1,5 +1,5 @@
 import datetime
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, JsonResponse
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from drf_spectacular.utils import extend_schema
@@ -29,6 +29,14 @@ from rest_framework.request import Request
 from drf_spectacular.utils import extend_schema
 
 from externals.google.google_calendar import GoogleCalendar
+
+def custom_404(request, exception):
+    response_data = {
+        "error": "Not Found",
+        "message": "Invalid route.",
+        "status": 404
+    }
+    return JsonResponse(response_data, status=404)
 
 
 @extend_schema(tags=["Authentication"])
