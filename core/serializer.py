@@ -167,3 +167,7 @@ class ResetPasswordConfirmSerailizer(PasswordTokenSerializer):
             )
 
         return super().validate(data)
+
+class GoogleAuthCallbackSerializer(serializers.Serializer):
+    state = serializers.CharField(max_length=255)
+    authorization_response = serializers.URLField()
