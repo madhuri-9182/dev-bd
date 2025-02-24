@@ -420,7 +420,6 @@ class GoogleAuthCallbackView(APIView):
                 {
                     "status": "success",
                     "message": "Authentication Successful",
-                    "data": {"access_token": access_token},
                 },
                 status=status.HTTP_200_OK,
             )
