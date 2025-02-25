@@ -1389,7 +1389,10 @@ class EngagementOperationUpdateView(APIView):
             for operation in engagement_operations.filter(pk__in=operation_ids):
                 template_entry = operation_data_map.get(operation.id)
                 if template_entry:
-                    if operation.date != template_entry["date"]:
+                    if (
+                        operation.date != template_entry["date"]
+                        or operation.template != template_entry["template_id"]
+                    ):
                         # **Revoke old task if it exists**
                         if operation.task_id:
                             AsyncResult(operation.task_id).revoke(terminate=True)
@@ -1418,7 +1421,7 @@ class EngagementOperationUpdateView(APIView):
             for delete_operation in EngagementOperation.objects.filter(
                 pk__in=delete_operation_ids
             ):
-                AsyncResult(delete_operation.id).revoke(terminate=True)
+                AsyncResult(delete_operation.task_id).revoke(terminate=True)
                 delete_operation.archived = True
                 delete_scheduled_operations.append(delete_operation)
 
