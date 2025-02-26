@@ -1,6 +1,7 @@
 from celery import group
 from celery.result import AsyncResult
 from datetime import datetime, timedelta
+from django.utils import timezone
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from django.db import transaction
@@ -1142,15 +1143,9 @@ class EngagementOperationUpdateView(APIView):
     def put(self, request, engagement_id):
         with transaction.atomic():
             engagement_operations = EngagementOperation.objects.filter(
-                template__organization=request.user.clientuser.organization,
+                engagement__client__organization=request.user.clientuser.organization,
                 engagement_id=engagement_id,
             )
-
-            if not engagement_operations.exists():
-                return Response(
-                    {"status": "failed", "message": "Engagement not found"},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
 
             if "template_data" not in request.data or not isinstance(
                 request.data["template_data"], list
@@ -1207,11 +1202,6 @@ class EngagementOperationUpdateView(APIView):
                         },
                         status=status.HTTP_400_BAD_REQUEST,
                     )
-
-            week_counts = engagement_operations.values("week").annotate(
-                count=Count("week")
-            )
-            week_count_map = {entry["week"]: entry["count"] for entry in week_counts}
 
             incoming_template_ids = [
                 template["template_id"] for template in template_data
@@ -1287,7 +1277,7 @@ class EngagementOperationUpdateView(APIView):
 
             # retrieving edge case validation delete operation_ids
             validation_operation_ids_after_success_operation = set(
-                engagement_operations.filter(delivery_status="PED").values_list(
+                engagement_operations.filter(~Q(delivery_status="SUC")).values_list(
                     "id", flat=True
                 )
             )
@@ -1330,7 +1320,7 @@ class EngagementOperationUpdateView(APIView):
             for template in template_data:
                 template["date"] = datetime.strptime(
                     template["date"], "%d/%m/%Y %H:%M:%S"
-                ).strftime("%Y-%m-%d %H:%M:%S")
+                )
 
             # Dictionary mapping operation_id -> data
             operation_data_map = {
@@ -1357,13 +1347,10 @@ class EngagementOperationUpdateView(APIView):
             max_template_assign = notice_weeks * 2
 
             # Validate new template assignment limit
-            existing_count = EngagementOperation.objects.filter(
-                engagement=engagement
-            ).count()
-            if (
-                len(new_operations) + (existing_count - len(delete_operation_ids))
-                > max_template_assign
-            ):
+            # existing_count = EngagementOperation.objects.filter(
+            #     engagement=engagement
+            # ).count()
+            if len(template_data) > max_template_assign:
                 return Response(
                     {
                         "status": "failed",
@@ -1373,10 +1360,11 @@ class EngagementOperationUpdateView(APIView):
                 )
 
             # Validate max templates per week
-            for template in new_operations:
+            week_count_map = {}
+            for template in template_data:
                 week = template.get("week")
-                week_count_map[int(week)] = week_count_map.get(int(week), 0) + 1
-                if week is not None and week_count_map[int(week)] > 2:
+                week_count_map[week] = week_count_map.get(week, 0) + 1
+                if week is not None and week_count_map[week] > 2:
                     return Response(
                         {
                             "status": "failed",
@@ -1390,16 +1378,29 @@ class EngagementOperationUpdateView(APIView):
                 template_entry = operation_data_map.get(operation.id)
                 if template_entry:
                     if (
-                        operation.date != template_entry["date"]
-                        or operation.template != template_entry["template_id"]
+                        timezone.localtime(operation.date).strftime("%d/%m/%Y %H:%M:%S")
+                        != template_entry["date"].strftime("%d/%m/%Y %H:%M:%S")
+                        or operation.template_id != template_entry["template_id"]
                     ):
                         # **Revoke old task if it exists**
                         if operation.task_id:
-                            AsyncResult(operation.task_id).revoke(terminate=True)
+                            result = AsyncResult(str(operation.task_id))
+                            print(result.state)
+                            if result.state in [
+                                "PENDING",
+                                "RECEIVED",
+                                "STARTED",
+                                "QUEUED",
+                            ]:
+                                result.revoke(terminate=True, signal="SIGTERM")
+
+                        if result.state in ["FAILURE", "RETRY"]:
+                            result.forget()
 
                         # **Schedule a new task**
+                        new_eta = timezone.make_aware(template_entry["date"])
                         new_task = send_schedule_engagement_email.s(operation.id).set(
-                            eta=template_entry["date"]
+                            eta=new_eta
                         )
                         new_task_result = new_task.apply_async()
 
@@ -1444,7 +1445,9 @@ class EngagementOperationUpdateView(APIView):
             )
 
             task_group = group(
-                send_schedule_engagement_email.s(operation.id).set(eta=operation.date)
+                send_schedule_engagement_email.s(operation.id).set(
+                    eta=timezone.make_aware(operation.date)
+                )
                 for operation in created_operations
             )
             result = task_group.apply_async()

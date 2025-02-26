@@ -1,6 +1,7 @@
 from django.core.mail import EmailMultiAlternatives, get_connection
 from django.template.loader import render_to_string
 from celery import shared_task
+from celery.exceptions import Ignore
 from django.conf import settings
 from django.utils.safestring import mark_safe
 from .models import EngagementOperation
@@ -95,4 +96,6 @@ def send_schedule_engagement_email(self, engagement_operation_id):
     except Exception as e:
         engagement_operation_obj.delivery_status = "FLD"
         engagement_operation_obj.save()
+        if self.request.is_revoked():
+            raise Ignore()
         self.retry(exec=e, countdown=60)

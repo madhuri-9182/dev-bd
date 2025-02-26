@@ -260,9 +260,18 @@ class EngagementOperation(CreateUpdateDateTimeAndArchivedField):
     date = models.DateTimeField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     delivery_status = models.CharField(
-        max_length=15, choices=DELIVERY_STATUS_CHOICES, default="PED"
+        max_length=15,
+        choices=DELIVERY_STATUS_CHOICES,
+        default="PED",
+        help_text="Email Delivery Status",
+    )
+    operation_complete_status = models.CharField(
+        max_length=15,
+        choices=DELIVERY_STATUS_CHOICES,
+        default="PED",
+        help_text="Operation Completation Status",
     )
     task_id = models.UUIDField(null=True, editable=False, blank=True)
 
-    # def __str__(self):
-    #     return f"{self.engagement.candidate.name} - {self.template.template_name} - {self.delivery_status}"
+    def __str__(self):
+        return f"{self.template.template_name} - {self.delivery_status}"
