@@ -6,6 +6,7 @@ from .ClientSerializers import (
     EngagementSerializer,
     EngagementOperationSerializer,
     EngagementUpdateStatusSerializer,
+    EngagmentOperationStatusUpdateSerializer,
 )
 from .InternalSerializers import (
     ClientPointOfContactSerializer,

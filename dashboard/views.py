@@ -19,4 +19,5 @@ from dashboard.Views import (
     InterviewerRequestResponseView,
     EngagementOperationUpdateView,
     OrganizationView,
+    EngagementOperationStatusUpdateView,
 )

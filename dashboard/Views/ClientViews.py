@@ -29,6 +29,7 @@ from ..serializer import (
     EngagementSerializer,
     EngagementOperationSerializer,
     EngagementUpdateStatusSerializer,
+    EngagmentOperationStatusUpdateSerializer,
 )
 from ..permissions import CanDeleteUpdateUser, UserRoleDeleteUpdateClientData
 from externals.parser.resume_parser import ResumerParser
@@ -85,7 +86,7 @@ class ClientUserView(APIView, LimitOffsetPagination):
             {
                 "status": "success",
                 "message": "Client users retrieved successfully.",
-                "data": paginated_data.data,
+                **paginated_data.data,
             },
             status=status.HTTP_200_OK,
         )
@@ -1464,4 +1465,43 @@ class EngagementOperationUpdateView(APIView):
                 "message": "Engagement operations updated successfully.",
             },
             status=status.HTTP_200_OK,
+        )
+
+
+class EngagementOperationStatusUpdateView(APIView):
+    permission_classes = (IsAuthenticated, IsClientAdmin | IsClientOwner | IsClientUser)
+    serializer_class = EngagmentOperationStatusUpdateSerializer
+
+    def put(self, request, engagement_operation_id):
+        engagement_operation = EngagementOperation.objects.filter(
+            template__organization=request.user.clientuser.organization,
+            pk=engagement_operation_id,
+        ).first()
+        if not engagement_operation:
+            return Response(
+                {"status": "failed", "message": "Engagement operation does not exist"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = self.serializer_class(
+            engagement_operation, request.data
+        )
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {
+                    "status": "success",
+                    "message": "Engagement operation status updated successfully.",
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        custom_errors = serializer.errors.pop("errors", None)
+        return Response(
+            {
+                "status": "failed",
+                "message": "Invalid data",
+                "errors": serializer.errors if not custom_errors else custom_errors,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
         )
