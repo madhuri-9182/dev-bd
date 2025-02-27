@@ -1158,7 +1158,7 @@ class EngagementOperationUpdateView(APIView):
                         "errors": {
                             "template_data": [
                                 "This field must be a non-empty list of dictionaries with keys 'template_id' and 'date'.",
-                                "Expected format: [{'template_id': <int>, 'operation_id': <int>(optional), 'week': <int>(optional), 'date': '<dd/mm/yyyy hh:mm:ss>'}]",
+                                "Expected format: [{'template_id': <int>, 'operation_id': <int>(optional), 'operation_complete_status': <string>(optional), 'week': <int>(optional), 'date': '<dd/mm/yyyy hh:mm:ss>'}]",
                             ]
                         },
                     },
@@ -1180,7 +1180,7 @@ class EngagementOperationUpdateView(APIView):
                             "errors": {
                                 "template_data": [
                                     "Each item must match the following schema:",
-                                    "Expected format: {'template_id': <int>, 'operation_id': <int>(optional), 'week': <int>(optional), 'date': '<dd/mm/yyyy hh:mm:ss>'}",
+                                    "Expected format: {'template_id': <int>, 'operation_id': <int>(optional), 'operation_complete_status':<string>(optional), 'week': <int>(optional), 'date': '<dd/mm/yyyy hh:mm:ss>'}",
                                 ]
                             },
                         },
@@ -1388,7 +1388,7 @@ class EngagementOperationUpdateView(APIView):
                 locked_template_entry = locked_operation_data_map.get(operation.id)
                 if locked_template_entry:
                     operation.operation_complete_status = locked_template_entry.get(
-                        "status", "PED"
+                        "operation_complete_status", "PED"
                     )
                     locked_update_template_operation.append(operation)
 
