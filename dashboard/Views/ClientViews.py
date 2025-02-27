@@ -1331,6 +1331,13 @@ class EngagementOperationUpdateView(APIView):
                 and entry["operation_id"] not in locked_operations
             }
 
+            locked_operation_data_map = {
+                entry["operation_id"]: entry
+                for entry in template_data
+                if "operation_id" in entry
+                and entry["operation_id"] in locked_operations
+            }
+
             # New operations (ones without operation_id)
             new_operations = [
                 entry for entry in template_data if "operation_id" not in entry
@@ -1375,7 +1382,16 @@ class EngagementOperationUpdateView(APIView):
                     )
 
             rescheduled_operations = []
+            locked_update_template_operation = []
             for operation in engagement_operations.filter(pk__in=operation_ids):
+
+                locked_template_entry = locked_operation_data_map.get(operation.id)
+                if locked_template_entry:
+                    operation.operation_complete_status = locked_template_entry.get(
+                        "status", "PED"
+                    )
+                    locked_update_template_operation.append(operation)
+
                 template_entry = operation_data_map.get(operation.id)
                 if template_entry:
                     if (
@@ -1419,6 +1435,12 @@ class EngagementOperationUpdateView(APIView):
                     rescheduled_operations, ["template_id", "date", "week", "task_id"]
                 )
 
+            # update the successfull status
+            if locked_update_template_operation:
+                EngagementOperation.objects.bulk_update(
+                    locked_update_template_operation, ["operation_complete_status"]
+                )
+
             # cancel the deleted operation ids task
             delete_scheduled_operations = []
             for delete_operation in EngagementOperation.objects.filter(
@@ -1449,7 +1471,13 @@ class EngagementOperationUpdateView(APIView):
                 )
 
                 if not all(op.id for op in created_operations):
-                    created_operations = list(EngagementOperation.objects.filter(engagement__in=[operation.engagement for operation in created_operations]))
+                    created_operations = list(
+                        EngagementOperation.objects.filter(
+                            engagement__in=[
+                                operation.engagement for operation in created_operations
+                            ]
+                        )
+                    )
 
                 task_group = group(
                     send_schedule_engagement_email.s(operation.id).set(
@@ -1462,7 +1490,7 @@ class EngagementOperationUpdateView(APIView):
                 # Assign task IDs in bulk update
                 for operation, task in zip(created_operations, result.children):
                     operation.task_id = task.id
-                
+
                 EngagementOperation.objects.bulk_update(created_operations, ["task_id"])
 
         return Response(
@@ -1489,9 +1517,7 @@ class EngagementOperationStatusUpdateView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        serializer = self.serializer_class(
-            engagement_operation, request.data
-        )
+        serializer = self.serializer_class(engagement_operation, request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(
