@@ -842,11 +842,13 @@ class EngagementSerializer(serializers.ModelSerializer):
             "client_user_id",
             "notice_period",
             "offered",
-            "offer_date",
             "offer_accepted",
             "other_offer",
         ]
-        allowed_keys = ["status"]
+        allowed_keys = [
+            "status",
+            "offer_date",
+        ]
 
         if (
             data.get("candidate_name")
