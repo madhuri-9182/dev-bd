@@ -518,8 +518,14 @@ class EngagementOperationSerializer(serializers.ModelSerializer):
             "delivery_status",
             "engagement_id",
             "template_data",
+            "operation_complete_status",
         )
-        read_only_fields = ["week", "date", "delivery_status"]
+        read_only_fields = [
+            "week",
+            "date",
+            "delivery_status",
+            "operation_complete_status",
+        ]
 
     def to_internal_value(self, data):
         template_data = data.get("template_data", [])
@@ -836,11 +842,13 @@ class EngagementSerializer(serializers.ModelSerializer):
             "client_user_id",
             "notice_period",
             "offered",
-            "offer_date",
             "offer_accepted",
             "other_offer",
         ]
-        allowed_keys = ["status"]
+        allowed_keys = [
+            "status",
+            "offer_date",
+        ]
 
         if (
             data.get("candidate_name")
@@ -933,3 +941,30 @@ class EngagementUpdateStatusSerializer(serializers.ModelSerializer):
     class Meta:
         model = Engagement
         fields = ("status",)
+
+
+class EngagmentOperationStatusUpdateSerializer(serializers.ModelSerializer):
+    status = serializers.ChoiceField(
+        source="operation_complete_status",
+        choices=EngagementOperation.DELIVERY_STATUS_CHOICES,
+        error_messages={
+            "invalid_choice": f"This is an invalid choice. Valid choices are {', '.join([f'{key}({value})' for key, value in EngagementOperation.DELIVERY_STATUS_CHOICES])}"
+        },
+    )
+
+    class Meta:
+        model = EngagementOperation
+        fields = ("status",)
+
+    def validate(self, data):
+        errors = {}
+        engagement_operation = self.instance
+
+        if engagement_operation.delivery_status != "SUC":
+            errors.setdefault("status", []).append(
+                "Invalid status update request. As operation is not successfully delievered yet."
+            )
+
+        if errors:
+            raise serializers.ValidationError({"errors": errors})
+        return data
