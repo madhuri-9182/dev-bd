@@ -85,11 +85,11 @@ def process_resume(file_path):
             "- Phone numbers must start with '+' followed by country code\n"
             "- Remove all spaces from emails\n"
             "- Use full month names (January, February etc.)\n"
-            "- If information is missing, use 'Not Found'\n"
+            "- If information is missing, use ''\n"
             "- Current company is the most recent/last mentioned job\n"
         )
         prompt += f"Resume to parse:\n{text}"
-        model = genai.GenerativeModel("gemini-pro")
+        model = genai.GenerativeModel("gemini-1.5-pro-latest")
         try:
             response = model.generate_content(prompt)
             raw_response = response.text.strip()
@@ -112,7 +112,7 @@ def process_resume(file_path):
 
     def calculate_years_of_experience(graduation_date):
         """Calculates experience from graduation date to current date."""
-        if not graduation_date or graduation_date == "Not Found":
+        if not graduation_date or graduation_date == "":
             return {"year": 0, "month": 0}
         try:
             # Clean up the date string (remove commas and extra spaces)
@@ -133,12 +133,12 @@ def process_resume(file_path):
 
     def validate_phone_number(number):
         """Standardizes phone number format."""
-        if not number or number == "Not Found":
-            return "Not Found"
+        if not number or number == "":
+            return ""
         cleaned = re.sub(r"(?!^\+)\D", "", number)
         if cleaned.startswith("+"):
             return cleaned
-        return f"+{cleaned}" if cleaned else "Not Found"
+        return f"+{cleaned}" if cleaned else ""
 
     # Main processing logic
     file_name = os.path.basename(file_path)
@@ -159,17 +159,17 @@ def process_resume(file_path):
     parsed_data = parse_resume(text)
 
     # Process parsed data
-    grad_date = parsed_data.get("graduationDate", "Not Found")
+    grad_date = parsed_data.get("graduationDate", "")
     years_of_experience = calculate_years_of_experience(grad_date)
 
     processed_data = {
         "file_name": file_name,
-        "name": parsed_data.get("name", "Not Found"),
-        "email": parsed_data.get("email", "Not Found").replace(" ", ""),
+        "name": parsed_data.get("name", ""),
+        "email": parsed_data.get("email", "").replace(" ", ""),
         "phone_number": validate_phone_number(parsed_data.get("phoneNumber")),
         "years_of_experience": years_of_experience,
-        "current_company": parsed_data.get("currentCompanyName", "Not Found"),
-        "current_designation": parsed_data.get("currentDesignation", "Not Found"),
+        "current_company": parsed_data.get("currentCompanyName", ""),
+        "current_designation": parsed_data.get("currentDesignation", ""),
     }
 
     return processed_data

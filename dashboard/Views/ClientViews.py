@@ -1413,9 +1413,10 @@ class EngagementOperationUpdateView(APIView):
                     rescheduled_operations.append(operation)
 
             # Bulk update modified operations
-            EngagementOperation.objects.bulk_update(
-                rescheduled_operations, ["template_id", "date", "week", "task_id"]
-            )
+            if rescheduled_operations:
+                EngagementOperation.objects.bulk_update(
+                    rescheduled_operations, ["template_id", "date", "week", "task_id"]
+                )
 
             # cancel the deleted operation ids task
             delete_scheduled_operations = []
@@ -1427,36 +1428,41 @@ class EngagementOperationUpdateView(APIView):
                 delete_scheduled_operations.append(delete_operation)
 
             # Delete the cancelled operations
-            EngagementOperation.objects.bulk_update(
-                delete_scheduled_operations, ["archived"]
-            )
-
-            # Bulk create new operations
-            created_operations = EngagementOperation.objects.bulk_create(
-                [
-                    EngagementOperation(
-                        engagement=engagement,
-                        template_id=entry["template_id"],
-                        date=entry["date"],
-                        week=entry.get("week"),
-                    )
-                    for entry in new_operations
-                ]
-            )
-
-            task_group = group(
-                send_schedule_engagement_email.s(operation.id).set(
-                    eta=timezone.make_aware(operation.date)
+            if delete_scheduled_operations:
+                EngagementOperation.objects.bulk_update(
+                    delete_scheduled_operations, ["archived"]
                 )
-                for operation in created_operations
-            )
-            result = task_group.apply_async()
 
-            # Assign task IDs in bulk update
-            for operation, task in zip(created_operations, result.children):
-                operation.task_id = task.id
+            if new_operations:
+                # Bulk create new operations
+                created_operations = EngagementOperation.objects.bulk_create(
+                    [
+                        EngagementOperation(
+                            engagement=engagement,
+                            template_id=entry["template_id"],
+                            date=entry["date"],
+                            week=entry.get("week"),
+                        )
+                        for entry in new_operations
+                    ],
+                )
 
-            EngagementOperation.objects.bulk_update(created_operations, ["task_id"])
+                if not all(op.id for op in created_operations):
+                    created_operations = list(EngagementOperation.objects.filter(engagement__in=[operation.engagement for operation in created_operations]))
+
+                task_group = group(
+                    send_schedule_engagement_email.s(operation.id).set(
+                        eta=operation.date
+                    )
+                    for operation in created_operations
+                )
+                result = task_group.apply_async()
+
+                # Assign task IDs in bulk update
+                for operation, task in zip(created_operations, result.children):
+                    operation.task_id = task.id
+                
+                EngagementOperation.objects.bulk_update(created_operations, ["task_id"])
 
         return Response(
             {

@@ -48,7 +48,7 @@ class ClientUserSerializer(serializers.ModelSerializer):
     )
     phone = PhoneNumberField(write_only=True, required=False)
     jobs_assigned = serializers.ListField(
-        child=serializers.IntegerField(), min_length=1, required=False, write_only=True
+        child=serializers.IntegerField(), required=False, write_only=True
     )
     assigned_jobs = JobSpecificDetailsSerializer(
         read_only=True, many=True, source="jobs"

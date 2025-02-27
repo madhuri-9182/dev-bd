@@ -96,6 +96,6 @@ def send_schedule_engagement_email(self, engagement_operation_id):
     except Exception as e:
         engagement_operation_obj.delivery_status = "FLD"
         engagement_operation_obj.save()
-        if self.request.is_revoked():
+        if self.request.revoked:
             raise Ignore()
         self.retry(exec=e, countdown=60)

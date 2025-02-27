@@ -35,7 +35,7 @@ def password_reset_token_created(sender, reset_password_token, *args, **kwargs):
         "current_user": reset_password_token.user,
         "name": reset_password_token.user.email,
         "email": reset_password_token.user.email,
-        "reset_password_url": "/password-reset/{}".format(reset_password_token.key),
+        "reset_password_url": "/auth/password-reset/{}".format(reset_password_token.key),
         "site_domain": settings.SITE_DOMAIN,
     }
 
