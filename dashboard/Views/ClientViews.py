@@ -993,20 +993,20 @@ class EngagementView(APIView, LimitOffsetPagination):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         query_params = request.query_params
-        job_id = query_params.get("job_id")
-        specialization = query_params.get("specialization")
-        notice_period = query_params.get("np")
+        job_id = query_params.get("job_ids")
+        specialization = query_params.get("specializations")
+        notice_period = query_params.get("nps")
         search_filter = query_params.get("q")
 
         filters = {
             "client__organization_id": request.user.clientuser.organization_id,
         }
         if job_id:
-            filters["job_id"] = job_id
+            filters["job_id__in"] = job_id.split(",")
         if specialization:
-            filters["candidate__specialization"] = specialization
+            filters["candidate__specialization__in"] = specialization.split(",")
         if notice_period:
-            filters["notice_period"] = notice_period
+            filters["notice_period__in"] = notice_period.split(",")
 
         engagement_summary = Engagement.objects.filter(
             client__organization=request.user.clientuser.organization
