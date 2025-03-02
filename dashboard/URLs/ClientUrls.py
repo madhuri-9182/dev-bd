@@ -11,6 +11,7 @@ from ..views import (
     EngagementOperationView,
     EngagementOperationUpdateView,
     EngagementOperationStatusUpdateView,
+    ClientDashboardView,
 )
 
 
@@ -66,5 +67,10 @@ urlpatterns = [
         "engagement-operation-status-update/<int:engagement_operation_id>/",
         EngagementOperationStatusUpdateView.as_view(),
         name="engagement-operation-status-update",
+    ),
+    path(
+        "dashboard/",
+        ClientDashboardView.as_view(),
+        name="client-dashboard",
     ),
 ]

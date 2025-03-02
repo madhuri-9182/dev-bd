@@ -10,6 +10,7 @@ from .ClientViews import (
     EngagementOperationView,
     EngagementOperationUpdateView,
     EngagementOperationStatusUpdateView,
+    ClientDashboardView,
 )
 
 from .InternalViews import (

@@ -20,4 +20,5 @@ from dashboard.Views import (
     EngagementOperationUpdateView,
     OrganizationView,
     EngagementOperationStatusUpdateView,
+    ClientDashboardView,
 )

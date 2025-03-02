@@ -1537,3 +1537,54 @@ class EngagementOperationStatusUpdateView(APIView):
             },
             status=status.HTTP_400_BAD_REQUEST,
         )
+
+
+class ClientDashboardView(APIView):
+    permission_classes = (IsAuthenticated, IsClientAdmin | IsClientOwner | IsClientUser)
+    serializer_class = None
+
+    def get(self, request):
+        organization = request.user.clientuser.organization
+
+        all_jobs = Job.objects.filter(hiring_manager__organization=organization)
+        pending_jobs = all_jobs.filter(reason_for_archived__isnull=False)
+
+        # Job role aggregates
+        job_role_aggregates = all_jobs.values("name").annotate(count=Count("id"))
+
+        # Candidate progress aggregates
+        candidates = Candidate.objects.filter(organization=organization).aggregate(
+            total_candidates=Count("id"),
+            pending_schedule=Count("id", filter=Q(status="NSCH")),
+            selects=Count("id", filter=Q(final_selection_status="SLD")),
+            joined=Count("id", filter=Q(engagements__status="JND")),
+        )
+
+        # Job aggregation
+        job_aggregates = all_jobs.aggregate(
+            total_jobs=Count("id"),
+            total_candidates=Count("candidate"),
+            selects=Count(
+                "candidate", filter=Q(candidate__final_selection_status="SLD")
+            ),
+            rejects=Count(
+                "candidate", filter=Q(candidate__final_selection_status="RJD")
+            ),
+        )
+
+        data = {
+            "job_role_aggregates": list(job_role_aggregates),
+            "candidates": candidates,
+            "job_aggregates": job_aggregates,
+            "all_task": all_jobs.count(),
+            "pending_task": pending_jobs.count(),
+        }
+
+        return Response(
+            {
+                "status": "success",
+                "message": "Dashboard data fetched successfully.",
+                "data": data,
+            },
+            status=status.HTTP_200_OK,
+        )
