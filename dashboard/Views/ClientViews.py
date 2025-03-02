@@ -1000,6 +1000,7 @@ class EngagementView(APIView, LimitOffsetPagination):
 
         filters = {
             "client__organization_id": request.user.clientuser.organization_id,
+            "status__in": ["YTJ", "DBT", "OHD"],
         }
         if job_id:
             filters["job_id__in"] = job_id.split(",")
