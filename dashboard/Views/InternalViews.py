@@ -11,12 +11,19 @@ from ..models import (
     InternalClient,
     InternalInterviewer,
     Agreement,
+    Job,
+    Candidate,
+    InterviewerRequest,
+    ClientUser,
+    HDIPUsers,
 )
 from ..serializer import (
     InternalClientSerializer,
     InterviewerSerializer,
     AgreementSerializer,
     OrganizationSerializer,
+    InternalClientUserSerializer,
+    HDIPUsersSerializer,
 )
 
 
@@ -521,4 +528,234 @@ class OrganizationView(APIView, LimitOffsetPagination):
                 **paginated_response.data,
             },
             status=status.HTTP_200_OK,
+        )
+
+
+class InternalDashboardView(APIView):
+    permission_classes = (IsAuthenticated, IsModerator | IsSuperAdmin)
+
+    def get(self, request):
+
+        interviewers_stats = InternalInterviewer.objects.aggregate(
+            total=Count("id"),
+            pending_acceptance=Count(
+                "interview_requests", filter=Q(interview_requests__status="pending")
+            ),
+            interview_declined=Count(
+                "interview_requests", filter=Q(interview_requests__status="rejected")
+            ),
+        )
+
+        candidates_stats = Candidate.objects.aggregate(
+            recommended=Count("id", filter=Q(status="recommended")),
+            rejected=Count("id", filter=Q(final_selection_status="rejected")),
+            strong_candidates=Count("id", filter=Q(status="Highly Recommended")),
+            scheduled=Count("id", filter=Q(status="scheduled")),
+        )
+
+        clients_stats = ClientUser.objects.aggregate(
+            active_clients=Count("id", filter=Q(status="Active")),
+            passive_clients=Count("id", filter=Q(status="Inactive")),
+            pending_onboarding=Count("id", filter=Q(status="pending")),
+            client_users=Count("id"),
+        )
+
+        general_stats = InternalInterviewer.objects.aggregate(
+            total_interviewers=Count("id"),
+            new_interviewers=Count("id", filter=Q(created_at__gte="2025-03-01")),
+        )
+
+        active_jobs = Job.objects.filter(reason_for_archived=False).count()
+        total_candidates = Candidate.objects.count()
+
+        response_data = {
+            "interviewers": {**interviewers_stats, **candidates_stats},
+            "clients": clients_stats,
+            "details": {
+                **general_stats,
+                "active_jobs": active_jobs,
+                "total_candidates": total_candidates,
+            },
+        }
+
+        return Response(
+            {
+                "status": "success",
+                "message": "Internal data retrieved successfully.",
+                "data": response_data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class InternalClientUserView(APIView, LimitOffsetPagination):
+    serializer_class = InternalClientUserSerializer
+    permission_classes = [IsAuthenticated, IsSuperAdmin | IsModerator]
+
+    def get(self, request, **kwrags):
+
+        internal_user = ClientUser.objects.select_related(
+            "organization", "organization__internal_client"
+        ).order_by("organization__name")
+        paginated_queryset = self.paginate_queryset(internal_user, request)
+        serializer = self.serializer_class(paginated_queryset, many=True)
+        paginated_response = self.get_paginated_response(serializer.data)
+        return Response(
+            {
+                "status": "success",
+                "message": "internal user retrieve successfully.",
+                **paginated_response.data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    def post(self, request, **kwargs):
+        serializer = self.serializer_class(
+            data=request.data, context={"request": request}
+        )
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {
+                    "status": "success",
+                    "message": "internal user added successfully.",
+                    "data": serializer.data,
+                },
+                status=status.HTTP_201_CREATED,
+            )
+        custom_errors = serializer.errors.pop("errors", None)
+        return Response(
+            {
+                "status": "failed",
+                "message": "Invalid data.",
+                "errors": serializer.errors if not custom_errors else custom_errors,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    def patch(self, request, **kwargs):
+        pk = kwargs.get("pk")
+        if not pk:
+            return Response(
+                {"status": "failed", "message": "Invalid request"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            internal_client_user = ClientUser.objects.get(pk=pk)
+        except ClientUser.DoesNotExist:
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "User not found.",
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = self.serializer_class(
+            internal_client_user,
+            data=request.data,
+            partial=True,
+            context={"request": request},
+        )
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {
+                    "status": "success",
+                    "message": "internal user data updated successfully.",
+                    "data": serializer.data,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        custom_errors = serializer.errors.pop("errors", None)
+        return Response(
+            {
+                "status": "failed",
+                "message": "Invalid data.",
+                "errors": serializer.errors if not custom_errors else custom_errors,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+
+class HDIPUsersViews(APIView, LimitOffsetPagination):
+    serializer_class = HDIPUsersSerializer
+    permission_classes = [IsAuthenticated, IsSuperAdmin | IsModerator]
+
+    def get(self, request, **kwrags):
+        hdip_users = HDIPUsers.objects.all()
+        paginated_queryset = self.paginate_queryset(hdip_users, request)
+        serializer = self.serializer_class(paginated_queryset, many=True)
+        paginated_response = self.get_paginated_response(serializer.data)
+        return Response(
+            {
+                "status": "success",
+                "message": "HDIP user retrieve successfully.",
+                **paginated_response.data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    def post(self, request, **kwargs):
+        serializer = self.serializer_class(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {
+                    "status": "success",
+                    "message": "HDIP user added successfully.",
+                    "data": serializer.data,
+                },
+                status=status.HTTP_201_CREATED,
+            )
+        custom_errors = serializer.errors.pop("errors", None)
+        return Response(
+            {
+                "status": "failed",
+                "message": "Invalid data.",
+                "errors": custom_errors if custom_errors else serializer.errors,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    def patch(self, request, **kwargs):
+        pk = kwargs.get("pk")
+        if not pk:
+            return Response(
+                {"status": "failed", "message": "Invalid request"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            hdip_user = HDIPUsers.objects.get(pk=pk)
+        except HDIPUsers.DoesNotExist:
+            return Response(
+                {"status": "failed", "message": "User not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = self.serializer_class(
+            hdip_user, data=request.data, partial=True, context={"request": request}
+        )
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {
+                    "status": "success",
+                    "message": "HDIP user data updated successfully.",
+                    "data": serializer.data,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        custom_errors = serializer.errors.pop("errors", None)
+        return Response(
+            {
+                "status": "failed",
+                "message": "Invalid data.",
+                "errors": custom_errors if custom_errors else serializer.errors,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
         )

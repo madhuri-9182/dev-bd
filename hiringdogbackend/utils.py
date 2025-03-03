@@ -3,7 +3,7 @@ import string
 import secrets
 from django.conf import settings
 from django.core.validators import EmailValidator
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError as vde
 from jsonschema import validate
 from jsonschema.exceptions import ValidationError
 from typing import Dict, List, Any
@@ -69,13 +69,15 @@ def check_for_email_and_phone_uniqueness(
     email: str, phone: str, user
 ) -> Dict[str, List[str]]:
     errors = {}
+
     if email:
         try:
             EmailValidator()(email)
-        except ValidationError:
-            errors.setdefault("email", []).append("Invalid email")
-        if user.objects.filter(email=email).exists():
-            errors.setdefault("email", []).append("This email is already used.")
+        except vde as e:
+            errors.setdefault("email", []).extend(e.messages)
+        else:
+            if user.objects.filter(email=email).exists():
+                errors.setdefault("email", []).append("This email is already used.")
 
     if phone:
         if (

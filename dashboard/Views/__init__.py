@@ -21,6 +21,9 @@ from .InternalViews import (
     AgreementView,
     AgreementDetailView,
     OrganizationView,
+    InternalDashboardView,
+    InternalClientUserView,
+    HDIPUsersViews,
 )
 
 from .InterviewerViews import (

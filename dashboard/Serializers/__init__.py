@@ -14,6 +14,8 @@ from .InternalSerializers import (
     InterviewerSerializer,
     AgreementSerializer,
     OrganizationSerializer,
+    InternalClientUserSerializer,
+    HDIPUsersSerializer,
 )
 from .InterviewerSerializers import (
     InterviewerAvailabilitySerializer,

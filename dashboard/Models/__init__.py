@@ -11,6 +11,7 @@ from .Internal import (
     InternalClient,
     InternalInterviewer,
     Agreement,
+    HDIPUsers,
 )
 from .Interviewer import InterviewerAvailability, InterviewerRequest
 from .Interviews import Interview

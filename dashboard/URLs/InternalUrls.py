@@ -7,6 +7,9 @@ from ..views import (
     AgreementView,
     AgreementDetailView,
     OrganizationView,
+    InternalDashboardView,
+    InternalClientUserView,
+    HDIPUsersViews,
 )
 
 urlpatterns = [
@@ -27,4 +30,15 @@ urlpatterns = [
         "agreement/<int:pk>/", AgreementDetailView.as_view(), name="agreement-details"
     ),
     path("organizations/", OrganizationView.as_view(), name="organizations"),
+    path("dashboard/", InternalDashboardView.as_view(), name="dashboard"),
+    path("hdip-users/", HDIPUsersViews.as_view(), name="hdip-user"),
+    path("hdip-user/<int:pk>/", HDIPUsersViews.as_view(), name="hdip-user-details"),
+    path(
+        "internal-client-user/", InternalClientUserView.as_view(), name="internal-user"
+    ),
+    path(
+        "internal-client-user/<int:pk>/",
+        InternalClientUserView.as_view(),
+        name="internal-user",
+    ),
 ]

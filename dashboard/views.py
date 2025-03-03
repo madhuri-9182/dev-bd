@@ -21,4 +21,7 @@ from dashboard.Views import (
     OrganizationView,
     EngagementOperationStatusUpdateView,
     ClientDashboardView,
+    InternalDashboardView,
+    InternalClientUserView,
+    HDIPUsersViews,
 )

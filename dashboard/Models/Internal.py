@@ -6,6 +6,21 @@ from core.models import User
 from hiringdogbackend.ModelUtils import SoftDelete, CreateUpdateDateTimeAndArchivedField
 
 
+class HDIPUsers(CreateUpdateDateTimeAndArchivedField):
+    """I just keep this model for future enhancement otherwise I prefer to use userprofile model as HDIP User"""
+
+    objects = SoftDelete()
+    object_all = models.Manager()
+
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name="hdipuser", blank=True
+    )
+    name = models.CharField(max_length=255, blank=True)
+
+    def __str__(self):
+        return self.name
+
+
 class InternalClient(CreateUpdateDateTimeAndArchivedField):
     objects = SoftDelete()
     object_all = models.Manager()
@@ -21,7 +36,13 @@ class InternalClient(CreateUpdateDateTimeAndArchivedField):
     gstin = models.CharField(max_length=15, blank=True)
     pan = models.CharField(max_length=10, blank=True)
     is_signed = models.BooleanField(default=False)
-    assigned_to = models.CharField(max_length=255, blank=True)
+    assigned_to = models.ForeignKey(
+        HDIPUsers,
+        on_delete=models.SET_NULL,
+        related_name="internalclients",
+        null=True,
+        blank=True,
+    )
     address = models.TextField(max_length=255, blank=True)
 
     def __str__(self):
