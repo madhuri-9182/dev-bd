@@ -10,8 +10,8 @@ from .InternalSerializers import (
     ClientPointOfContactSerializer,
     InternalClientSerializer,
     InterviewerSerializer,
-    InternalUserSerializer,
-    HDIPUsersSerializer
+    InternalClientUserSerializer,
+    HDIPUsersSerializer,
 )
 from .InterviewerSerializers import (
     InterviewerAvailabilitySerializer,

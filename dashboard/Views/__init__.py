@@ -16,7 +16,7 @@ from .InternalViews import (
     InterviewerView,
     InterviewerDetails,
     InternalDashboardView,
-    InternalUserView,
+    InternalClientUserView,
     HDIPUsersViews,
 )
 

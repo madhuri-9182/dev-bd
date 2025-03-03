@@ -5,6 +5,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
+from phonenumber_field.serializerfields import PhoneNumberField
 from core.models import User, Role
 from ..models import (
     InternalClient,
@@ -417,49 +418,65 @@ class InterviewerSerializer(serializers.ModelSerializer):
             user.profile.name = name
             user.profile.save()
         return interviewer_obj
-    
-    
-class InternalUserSerializer(serializers.ModelSerializer):
+
+
+class UserInternalSerializer(serializers.ModelSerializer):
     class Meta:
-        model = ClientUser
-        fields = ["client", "user", "email", "phone", "domain", "access"]
-        
-    def run_validation(self, data=...):
-        request = self.context.get("request")
-        email = data.get("email")
-        phone = data.get("phone")
-        
-        errors = check_for_email_and_phone_uniqueness(email, phone, User)
-        if errors:
-            raise serializers.ValidationError({"errors": errors})
-        
-        return super().run_validation(data)
-    
-    def validate(self, data):
-        errors = validate_incoming_data(
-            self.initial_data,
-            required_keys=["client", "user", "email", "phone", "domain", "access"],
-            partial=self.partial,
-        )
-        if errors:
-            raise serializers.ValidationError(errors)
-        return data
-    
-class HDIPUsersSerializer(serializers.ModelSerializer):
+        model = User
+        fields = ("id", "email", "phone", "role")
+
+
+class ClientUserInternalSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InternalClient
+        fields = ("id", "name", "domain")
+
+
+class InternalClientUserSerializer(serializers.ModelSerializer):
+
+    email = serializers.EmailField(write_only=True, required=False)
+    phone = PhoneNumberField(write_only=True, required=False)
+    client = ClientUserInternalSerializer(
+        source="organization.internal_client", read_only=True
+    )
+    user = UserInternalSerializer(read_only=True)
+    internal_client_id = serializers.IntegerField(write_only=True, required=False)
     role = serializers.ChoiceField(
-        choices=HDIPUsers.ROLE_CHOICES,
+        choices=[
+            ("client_user", "Client User"),
+            ("client_admin", "Client Admin"),
+        ],
         error_messages={
-            "invalid_choice": f"This is an invalid choice. Valid choices are {', '.join([f'{key}({value})' for key, value in HDIPUsers.ROLE_CHOICES])}"
+            "invalid_choice": (
+                "This is an invalid choice. Valid choices are "
+                "client_user(Client User), client_admin(Client Admin), "
+            )
         },
         required=False,
     )
+    accessibility = serializers.ChoiceField(
+        choices=ClientUser.ACCESSIBILITY_CHOICES,
+        error_messages={
+            "invalid_choice": f"This is an invalid choice. Valid choices are {', '.join([f'{key}({value})' for key, value in ClientUser.ACCESSIBILITY_CHOICES])}"
+        },
+        required=False,
+    )
+
     class Meta:
-        model = HDIPUsers
-        fields = ["name", "role", "email", "phone", "client"]
-        read_only_fields = ["created_at"]
-        
-    def run_validation(self, data=...):
-        request = self.context.get("request")
+        model = ClientUser
+        fields = [
+            "id",
+            "internal_client_id",
+            "client",
+            "user",
+            "email",
+            "phone",
+            "name",
+            "role",
+            "accessibility",
+        ]
+
+    def run_validation(self, data):
         email = data.get("email")
         phone = data.get("phone")
 
@@ -468,17 +485,246 @@ class HDIPUsersSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"errors": errors})
 
         return super().run_validation(data)
-    
+
     def validate(self, data):
-        
+        required_keys = [
+            "email",
+            "phone",
+            "role",
+            "accessibility",
+            "internal_client_id",
+            "name",
+        ]
+        allowed_keys = []
+        if self.partial:
+            required_keys = []
+            allowed_keys = ["role", "accessibility", "name"]
         errors = validate_incoming_data(
             self.initial_data,
-            required_keys=["client", "name", "email", "phone", "access"],
+            required_keys=required_keys,
+            allowed_keys=allowed_keys,
             partial=self.partial,
         )
-        
+
+        internal_client_id = data.pop("internal_client_id", None)
+        if internal_client_id:
+            internal_client = InternalClient.objects.filter(
+                pk=internal_client_id
+            ).first()
+            if not internal_client:
+                errors.setdefault("internal_client_id", []).append(
+                    "Invalid internal_client_id"
+                )
+            self.context["internal_client"] = internal_client
+
         if errors:
-            raise serializers.ValidationError(errors)
+            raise serializers.ValidationError({"errors": errors})
 
         return data
-    
+
+    def create(self, validated_data):
+        email = validated_data.pop("email")
+        phone = validated_data.pop("phone")
+        role = validated_data.pop("role")
+        internal_client = self.context["internal_client"]
+        request = self.context["request"]
+        password = get_random_password()
+
+        with transaction.atomic():
+            user = User.objects.create_user(email, phone, password, role=role)
+            user.profile.name = validated_data.get("name")
+            user.profile.save()
+            validated_data["user"] = user
+            validated_data["organization"] = internal_client.organization
+            validated_data["invited_by"] = request.user
+            client_user = super().create(validated_data)
+
+            send_mail.delay(
+                email=email,
+                subject=WELCOME_MAIL_SUBJECT,
+                template=ONBOARD_EMAIL_TEMPLATE,
+                user_name=validated_data.get("name"),
+                password=password,
+                login_url=settings.LOGIN_URL,
+            )
+        return client_user
+
+    def update(self, instance, validated_data):
+        validated_data.pop("email", None)
+        validated_data.pop("phone", None)
+        role = validated_data.pop("role", None)
+
+        with transaction.atomic():
+            if role:
+                instance.user.role = role
+                instance.user.save()
+
+            if "name" in validated_data:
+                instance.user.profile.name = validated_data["name"]
+                instance.user.profile.save()
+
+            super().update(instance, validated_data)
+
+        return instance
+
+
+class HDIPUsersSerializer(serializers.ModelSerializer):
+    role = serializers.ChoiceField(
+        choices=[("moderator", "Moderator"), ("admin", "Admin")],
+        error_messages={
+            "invalid_choice": (
+                "This is an invalid choice. Valid choices are "
+                "moderator(Moderator), admin(Admin)"
+            )
+        },
+        required=False,
+    )
+    email = serializers.EmailField(write_only=True, required=False)
+    phone = PhoneNumberField(write_only=True, required=False)
+    client_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        min_length=1,
+        write_only=True,
+        required=False,
+    )
+    user = UserInternalSerializer(read_only=True)
+    client = ClientUserInternalSerializer(
+        source="internalclients", many=True, read_only=True
+    )
+
+    class Meta:
+        model = HDIPUsers
+        fields = [
+            "id",
+            "name",
+            "user",
+            "client",
+            "role",
+            "email",
+            "phone",
+            "client_ids",
+        ]
+
+    def run_validation(self, data):
+        email = data.get("email")
+        phone = data.get("phone")
+
+        errors = check_for_email_and_phone_uniqueness(email, phone, User)
+        if errors:
+            raise serializers.ValidationError({"errors": errors})
+
+        return super().run_validation(data)
+
+    def validate(self, data):
+        required_keys = ["name", "email", "phone", "role"]
+        allowed_keys = ["client_ids"]
+        if self.partial:
+            required_keys = []
+            allowed_keys.extend(["role", "name"])
+
+        errors = validate_incoming_data(
+            self.initial_data,
+            required_keys=required_keys,
+            allowed_keys=allowed_keys,
+            partial=self.partial,
+        )
+
+        client_ids = data.get("client_ids")
+        if client_ids:
+            existing_client_ids = set(
+                InternalClient.objects.filter(pk__in=client_ids).values_list(
+                    "id", flat=True
+                )
+            )
+            already_assign_client_ids = set(
+                HDIPUsers.objects.filter(internalclients__in=client_ids).values_list(
+                    "internalclients", flat=True
+                )
+            )
+            if self.partial:
+                already_assign_client_ids -= set(
+                    self.instance.internalclients.values_list("id", flat=True)
+                )
+            if not existing_client_ids:
+                errors.setdefault("client_ids", []).append("Invalid client ids")
+            elif already_assign_client_ids & existing_client_ids:
+                errors.setdefault("client_ids", []).append(
+                    f"These client ids are {', '.join(map(str, already_assign_client_ids & existing_client_ids))} already assigned to others."
+                )
+            else:
+                invalid_ids = set(client_ids) - existing_client_ids
+                if invalid_ids:
+                    errors.setdefault("client_ids", []).append(
+                        f"Invalid client ids: {', '.join(map(str, invalid_ids))}"
+                    )
+
+        if errors:
+            raise serializers.ValidationError({"errors": errors})
+
+        return data
+
+    def create(self, validated_data):
+        email = validated_data.pop("email")
+        phone_number = validated_data.pop("phone")
+        role = validated_data.pop("role")
+        client_ids = validated_data.pop("client_ids", None)
+        password = get_random_password()
+
+        with transaction.atomic():
+            user = User.objects.create_user(email, phone_number, password, role=role)
+            user.profile.name = validated_data.get("name")
+            user.profile.save()
+            validated_data["user"] = user
+            hdip_user = super().create(validated_data)
+            if client_ids:
+                InternalClient.objects.filter(pk__in=client_ids).update(
+                    assigned_to=hdip_user
+                )
+            send_mail.delay(
+                email=email,
+                subject=WELCOME_MAIL_SUBJECT,
+                template=ONBOARD_EMAIL_TEMPLATE,
+                user_name=validated_data.get("name"),
+                password=password,
+                login_url=settings.LOGIN_URL,
+            )
+        return hdip_user
+
+    def update(self, instance, validated_data):
+        validated_data.pop("email", None)
+        validated_data.pop("phone", None)
+        role = validated_data.pop("role", None)
+        client_ids = validated_data.pop("client_ids", None)
+
+        with transaction.atomic():
+
+            if role is not None:
+                instance.user.role = role
+                instance.user.save()
+
+            if validated_data.get("name"):
+                instance.user.profile.name = validated_data["name"]
+                instance.user.profile.save()
+
+            if client_ids is not None:
+                current_client_ids = set(
+                    InternalClient.objects.filter(assigned_to=instance).values_list(
+                        "id", flat=True
+                    )
+                )
+                new_client_ids = set(client_ids)
+                clients_to_assign = new_client_ids - current_client_ids
+                clients_to_unassign = current_client_ids - new_client_ids
+
+                if clients_to_assign:
+                    InternalClient.objects.filter(pk__in=clients_to_assign).update(
+                        assigned_to=instance
+                    )
+                if clients_to_unassign:
+                    InternalClient.objects.filter(pk__in=clients_to_unassign).update(
+                        assigned_to=None
+                    )
+
+            super().update(instance, validated_data)
+
+        return instance

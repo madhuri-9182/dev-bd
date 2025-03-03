@@ -16,6 +16,6 @@ from dashboard.Views import (
     InterviewerReqeustView,
     InterviewerRequestResponseView,
     InternalDashboardView,
-    InternalUserView,
+    InternalClientUserView,
     HDIPUsersViews,
 )

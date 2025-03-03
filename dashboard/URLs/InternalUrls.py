@@ -5,7 +5,7 @@ from ..views import (
     InterviewerDetails,
     InterviewerView,
     InternalDashboardView,
-    InternalUserView,
+    InternalClientUserView,
     HDIPUsersViews,
 )
 
@@ -22,7 +22,13 @@ urlpatterns = [
         InterviewerDetails.as_view(),
         name="interviewer-details",
     ),
-    path("dashboard/", InternalDashboardView.as_view(),name="dashboard"),
-    path("hdip-user/", HDIPUsersViews.as_view(), name="hdip-user"),
-    path("internal-user/", InternalUserView.as_view(), name="internal-user")
+    path("dashboard/", InternalDashboardView.as_view(), name="dashboard"),
+    path("hdip-users/", HDIPUsersViews.as_view(), name="hdip-user"),
+    path("hdip-user/<int:pk>/", HDIPUsersViews.as_view(), name="hdip-user-details"),
+    path(
+        "internal-client-user/", InternalClientUserView.as_view(), name="internal-user"
+    ),
+    path(
+        "internal-client-user/<int:pk>/", InternalClientUserView.as_view(), name="internal-user"
+    ),
 ]

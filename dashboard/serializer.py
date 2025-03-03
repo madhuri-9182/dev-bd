@@ -3,7 +3,7 @@ from .Serializers import (
     InternalClientSerializer,
     ClientPointOfContactSerializer,
     InterviewerSerializer,
-    InternalUserSerializer,
+    InternalClientUserSerializer,
     HDIPUsersSerializer,
     ClientUserSerializer,
     CandidateSerializer,

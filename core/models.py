@@ -9,6 +9,7 @@ from hiringdogbackend.ModelUtils import CreateUpdateDateTimeAndArchivedField, So
 
 class Role(models.TextChoices):
     SUPER_ADMIN = ("super_admin", "Super Admin")
+    ADMIN = ("admin", "Admin")
     MODERATOR = ("moderator", "Moderator")
     CLIENT_ADMIN = ("client_admin", "Client Admin")
     CLIENT_OWNER = ("client_owner", "Client Owner")

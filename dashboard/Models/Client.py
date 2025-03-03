@@ -44,7 +44,7 @@ class ClientUser(CreateUpdateDateTimeAndArchivedField):
         default="PEND",
     )
     accessibility = models.CharField(
-        max_length=5, choices=ACCESSIBILITY_CHOICES, blank=True
+        max_length=5, choices=ACCESSIBILITY_CHOICES, blank=True, default="AJ"
     )
 
 
