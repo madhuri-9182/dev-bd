@@ -18,4 +18,5 @@ from .Serializers import (
     OrganizationSerializer,
     EngagmentOperationStatusUpdateSerializer,
     DesignationDomainSerializer,
+    InternalClientStatSerializer,
 )

@@ -60,6 +60,14 @@ class ClientPointOfContactSerializer(serializers.ModelSerializer):
         return data
 
 
+class InternalClientStatSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    name = serializers.CharField(max_length=155)
+    active_jobs = serializers.IntegerField()
+    passive_jobs = serializers.IntegerField()
+    total_candidates = serializers.IntegerField()
+
+
 class InternalClientSerializer(serializers.ModelSerializer):
     onboarded_at = serializers.DateTimeField(
         source="created_at", format="%d/%m/%Y", read_only=True

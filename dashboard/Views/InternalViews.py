@@ -26,6 +26,7 @@ from ..serializer import (
     InternalClientUserSerializer,
     HDIPUsersSerializer,
     DesignationDomainSerializer,
+    InternalClientStatSerializer,
 )
 
 
@@ -35,11 +36,16 @@ class InternalClientView(APIView, LimitOffsetPagination):
     permission_classes = [IsAuthenticated, IsSuperAdmin | IsModerator]
 
     def get(self, request):
-        domain = request.query_params.get("domain")
+        client_id = request.query_params.get("client_id")
         status_ = request.query_params.get("status")
         search_term = request.query_params.get("q")
 
-        aggregation = InternalClient.objects.aggregate(
+        query = InternalClient.objects.values("id", "name")
+        if client_id:
+            query = query.filter(pk__in=client_id.split(","))
+        if search_term:
+            query = query.filter(name__icontains=search_term.lower())
+        client_stat = query.annotate(
             active_jobs=Count(
                 "organization__clientuser__jobs",
                 filter=Q(organization__clientuser__jobs__archived=False),
@@ -55,29 +61,14 @@ class InternalClientView(APIView, LimitOffsetPagination):
                 distinct=True,
             ),
         )
-        internal_clients = (
-            InternalClient.objects.select_related("organization")
-            .prefetch_related("points_of_contact")
-            .order_by("id")
-        )
-
-        if domain:
-            internal_clients = internal_clients.filter(domain__icontains=domain.lower())
-
-        if search_term:
-            internal_clients = internal_clients.filter(
-                name__icontains=search_term.lower()
-            )
-
         # remember to add the role based retreival after creating the hdip user functionality
-        paginated_queryset = self.paginate_queryset(internal_clients, request)
-        serializer = self.serializer_class(paginated_queryset, many=True)
+        paginated_queryset = self.paginate_queryset(client_stat, request)
+        serializer = InternalClientStatSerializer(paginated_queryset, many=True)
         paginated_data = self.get_paginated_response(serializer.data)
         return Response(
             {
                 "status": "success",
                 "message": "Client user retrieve successfully.",
-                **aggregation,
                 **paginated_data.data,
             },
             status=status.HTTP_200_OK,
