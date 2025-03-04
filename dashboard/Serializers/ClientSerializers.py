@@ -194,6 +194,13 @@ class JobSerializer(serializers.ModelSerializer):
         },
         required=False,
     )
+    specialization = serializers.ChoiceField(
+        choices=Candidate.SPECIALIZATION_CHOICES,
+        error_messages={
+            "invalid_choice": f"This is an invalid choice. Valid choices are {', '.join([f'{key}({value})' for key, value in Candidate.SPECIALIZATION_CHOICES])}"
+        },
+        required=False,
+    )
 
     class Meta:
         model = Job
@@ -211,6 +218,7 @@ class JobSerializer(serializers.ModelSerializer):
             "interview_time",
             "other_details",
             "reason_for_archived",
+            "specialization",
         )
 
     def run_validation(self, data=...):
@@ -238,6 +246,7 @@ class JobSerializer(serializers.ModelSerializer):
             "total_positions",
             "job_description_file",
             "mandatory_skills",
+            "specialization"
         ]
         allowed_keys = [
             "reason_for_archived",

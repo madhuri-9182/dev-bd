@@ -68,6 +68,7 @@ class Job(CreateUpdateDateTimeAndArchivedField):
         blank=True,
     )
     total_positions = models.PositiveSmallIntegerField(default=0)
+    specialization = models.CharField(max_length=100, blank=True, null=True)
     job_description_file = models.FileField(upload_to="job_descriptions", blank=True)
     mandatory_skills = models.JSONField(default=list, blank=True)
     interview_time = models.TimeField(help_text="duration", null=True)
