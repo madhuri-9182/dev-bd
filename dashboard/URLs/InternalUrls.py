@@ -10,6 +10,7 @@ from ..views import (
     InternalDashboardView,
     InternalClientUserView,
     HDIPUsersViews,
+    DomainDesignationView,
 )
 
 urlpatterns = [
@@ -40,5 +41,10 @@ urlpatterns = [
         "internal-client-user/<int:pk>/",
         InternalClientUserView.as_view(),
         name="internal-user",
+    ),
+    path(
+        "domain-designation/",
+        DomainDesignationView.as_view(),
+        name="domain-designation",
     ),
 ]

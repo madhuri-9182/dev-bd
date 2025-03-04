@@ -24,4 +24,5 @@ from dashboard.Views import (
     InternalDashboardView,
     InternalClientUserView,
     HDIPUsersViews,
+    DomainDesignationView,
 )

@@ -16,6 +16,7 @@ from ..models import (
     InterviewerRequest,
     ClientUser,
     HDIPUsers,
+    DesignationDomain,
 )
 from ..serializer import (
     InternalClientSerializer,
@@ -24,6 +25,7 @@ from ..serializer import (
     OrganizationSerializer,
     InternalClientUserSerializer,
     HDIPUsersSerializer,
+    DesignationDomainSerializer,
 )
 
 
@@ -334,7 +336,11 @@ class InterviewerDetails(APIView):
             interviewer = InternalInterviewer.objects.get(pk=pk)
         except InternalInterviewer.DoesNotExist:
             return Response(
-                {"errors": "Interviewer not found"}, status=status.HTTP_404_NOT_FOUND
+                {
+                    "status": "failed",
+                    "message": "Interviewer not found",
+                },
+                status=status.HTTP_404_NOT_FOUND,
             )
 
         serializer = self.serializer_class(interviewer, data=request.data, partial=True)
@@ -385,6 +391,24 @@ class InterviewerDetails(APIView):
             del response.data["errors"]
             response.data["errors"] = errors
         return super().finalize_response(request, response, *args, **kwargs)
+
+
+class DomainDesignationView(APIView, LimitOffsetPagination):
+    permission_classes = [IsAuthenticated]
+    serializer_class = DesignationDomainSerializer
+
+    def get(self, request):
+        domain_qs = DesignationDomain.objects.all()
+        paginated_qs = self.paginate_queryset(domain_qs, request)
+        serializer = self.serializer_class(paginated_qs, many=True)
+        paginated_response = self.get_paginated_response(serializer.data)
+        return Response(
+            {
+                "status": "success",
+                "message": "Retrieved Successfully",
+                **paginated_response.data,
+            }
+        )
 
 
 @extend_schema(tags=["Internal"])

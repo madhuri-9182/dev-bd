@@ -12,6 +12,7 @@ from .Internal import (
     InternalInterviewer,
     Agreement,
     HDIPUsers,
+    DesignationDomain,
 )
 from .Interviewer import InterviewerAvailability, InterviewerRequest
 from .Interviews import Interview

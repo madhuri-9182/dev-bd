@@ -17,4 +17,5 @@ from .Serializers import (
     EngagementUpdateStatusSerializer,
     OrganizationSerializer,
     EngagmentOperationStatusUpdateSerializer,
+    DesignationDomainSerializer,
 )

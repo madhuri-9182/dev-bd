@@ -73,7 +73,9 @@
             <p>Your account has been successfully created! Below are your account credentials:</p>
             <div class="credentials">
                 <p><strong>Email:</strong> {{email}}</p>
-                <p><strong>Password:</strong> {{password}}</p>
+                <p><strong>Password:</strong> {% if password %} {{ password }} {% else %} You can use your own password
+                    seamlessly {% endif %}</p>
+
             </div>
             {% if verification_link %}
             <p>Please confirm your email address by clicking on the following link: <a target="_blank"

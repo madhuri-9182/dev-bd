@@ -67,6 +67,13 @@ class ClientPointOfContact(CreateUpdateDateTimeAndArchivedField):
         return self.name
 
 
+class DesignationDomain(CreateUpdateDateTimeAndArchivedField):
+    name = models.CharField(max_length=15, blank=True, unique=True)
+
+    def __str__(self) -> str:
+        return self.name
+
+
 class InternalInterviewer(CreateUpdateDateTimeAndArchivedField):
     objects = SoftDelete()
     object_all = models.Manager()
@@ -136,9 +143,9 @@ class InternalInterviewer(CreateUpdateDateTimeAndArchivedField):
         ],
     )
     interview_experience_months = models.PositiveSmallIntegerField(default=0)
-    assigned_roles = models.CharField(
-        max_length=15, choices=ROLE_CHOICES, blank=True
-    )  # e.g., ["SDE III", "EM"]
+    assigned_domains = models.ManyToManyField(
+        DesignationDomain, related_name="interviewers", blank=True
+    )
     skills = models.JSONField(default=list, blank=True)  # e.g., ["Java", "Python"]
     strength = models.CharField(
         max_length=50, blank=True, choices=STRENGTH_CHOICES
@@ -147,6 +154,12 @@ class InternalInterviewer(CreateUpdateDateTimeAndArchivedField):
 
     def __str__(self):
         return f"{self.name} - {self.organization}"
+
+    def save(self, *args, **kwargs):
+        if self.name:
+            self.user.profile.name = self.name
+            self.user.profile.save()
+        return super().save(*args, **kwargs)
 
 
 class Agreement(CreateUpdateDateTimeAndArchivedField):

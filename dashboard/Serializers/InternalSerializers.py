@@ -15,6 +15,7 @@ from ..models import (
     ClientUser,
     Agreement,
     HDIPUsers,
+    DesignationDomain,
 )
 from hiringdogbackend.utils import (
     validate_incoming_data,
@@ -297,20 +298,25 @@ class InternalClientSerializer(serializers.ModelSerializer):
         return instance
 
 
+class DesignationDomainSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DesignationDomain
+        fields = ("id", "name")
+
+
 class InterviewerSerializer(serializers.ModelSerializer):
-    assigned_roles = serializers.ChoiceField(
-        choices=InternalInterviewer.ROLE_CHOICES,
-        error_messages={
-            "invalid_choice": f"This is an invalid choice. Valid choices are {', '.join([f'{key}({value})' for key, value in InternalInterviewer.ROLE_CHOICES])}"
-        },
-        required=False,
-    )
     strength = serializers.ChoiceField(
         choices=InternalInterviewer.STRENGTH_CHOICES,
         error_messages={
             "invalid_choice": f"This is an invalid choice. Valid choices are {', '.join([f'{key}({value})' for key, value in InternalInterviewer.STRENGTH_CHOICES])}"
         },
         required=False,
+    )
+    assigned_domains = DesignationDomainSerializer(many=True, read_only=True)
+    assigned_domain_ids = serializers.CharField(
+        max_length=100,
+        required=False,
+        write_only=True,
     )
 
     class Meta:
@@ -327,18 +333,14 @@ class InterviewerSerializer(serializers.ModelSerializer):
             "total_experience_months",
             "interview_experience_years",
             "interview_experience_months",
-            "assigned_roles",
+            "assigned_domains",
+            "assigned_domain_ids",
             "skills",
             "strength",
             "cv",
         )
 
     def run_validation(self, data=...):
-
-        if self.partial:
-            data.pop("email", None)
-            data.pop("phone_number", None)
-
         email = data.get("email")
         phone = data.get("phone_number")
         errors = check_for_email_and_phone_uniqueness(email, phone, User)
@@ -361,7 +363,7 @@ class InterviewerSerializer(serializers.ModelSerializer):
                 "total_experience_months",
                 "interview_experience_years",
                 "interview_experience_months",
-                "assigned_roles",
+                "assigned_domain_ids",
                 "skills",
                 "strength",
                 "cv",
@@ -378,10 +380,37 @@ class InterviewerSerializer(serializers.ModelSerializer):
         for key in ["total_experience_months", "interview_experience_months"]:
             if key in data and not 0 <= data[key] <= 12:
                 errors.setdefault(key, []).append("Invalid Experience")
-        if "total_experience_years" < "interview_experience_years":
+        if (
+            "total_experience_years" in data
+            and "interview_experience_years" in data
+            and data["total_experience_years"] < data["interview_experience_years"]
+        ):
             errors.setdefault("years", []).append(
                 "Total experience must be greater than interview experience."
             )
+
+        if "assigned_domain_ids" in data and isinstance(
+            data["assigned_domain_ids"], str
+        ):
+            try:
+                data["assigned_domain_ids"] = list(
+                    map(int, data["assigned_domain_ids"].split(","))
+                )
+            except ValueError:
+                raise serializers.ValidationError(
+                    {"assigned_domain_ids": ["It should be comma separated values."]}
+                )
+
+        assigned_domain_ids = set(data.get("assigned_domain_ids", []))
+        existing_domain_ids = set(
+            DesignationDomain.objects.values_list("id", flat=True)
+        )
+        invalid_domain_ids = assigned_domain_ids - existing_domain_ids
+        if invalid_domain_ids:
+            errors.setdefault("assigned_domain_ids", []).append(
+                f"Invalid domain IDs: {', '.join(map(str, invalid_domain_ids))}"
+            )
+
         if errors:
             raise serializers.ValidationError({"errors": errors})
         return data
@@ -390,6 +419,7 @@ class InterviewerSerializer(serializers.ModelSerializer):
         email = validated_data.get("email")
         phone = validated_data.get("phone_number")
         name = validated_data.get("name")
+        domain_ids = validated_data.pop("assigned_domain_ids", [])
         password = get_random_password()
         with transaction.atomic():
             user = User.objects.create_user(
@@ -401,6 +431,7 @@ class InterviewerSerializer(serializers.ModelSerializer):
             interviewer_obj = InternalInterviewer.objects.create(
                 user=user, **validated_data
             )
+            interviewer_obj.assigned_domains.add(*domain_ids)
             verification_data = (
                 f"{user.id}:{int(datetime.datetime.now().timestamp() + 86400)}"
             )
@@ -420,6 +451,49 @@ class InterviewerSerializer(serializers.ModelSerializer):
             user.profile.name = name
             user.profile.save()
         return interviewer_obj
+
+    def update(self, instance, validated_data):
+        email = validated_data.get("email", instance.email)
+        phone = validated_data.get("phone_number", instance.phone_number)
+        assigned_domain_ids = set(validated_data.get("assigned_domain_ids", []))
+
+        with transaction.atomic():
+            changes = {}
+
+            if instance.email != email:
+                instance.user.email = email
+                changes["email"] = email
+
+            if instance.phone_number != phone:
+                instance.user.phone = phone
+                changes["phone"] = phone
+
+            if changes:
+                instance.user.email_verified = False
+                instance.user.phone_verified = False
+                instance.user.save(
+                    update_fields=["email", "phone", "email_verified", "phone_verified"]
+                )
+
+            instance.assigned_domains.set(assigned_domain_ids)
+            instance = super().update(instance, validated_data)
+
+            if changes:
+                verification_data = f"{instance.user.id}:{int(datetime.datetime.now().timestamp() + 86400)}"
+                verification_data_uid = urlsafe_base64_encode(
+                    force_bytes(verification_data)
+                )
+                send_mail.delay(
+                    email=email,
+                    user_name=instance.name,
+                    template=ONBOARD_EMAIL_TEMPLATE,
+                    subject=WELCOME_MAIL_SUBJECT,
+                    login_url=settings.LOGIN_URL,
+                    site_domain=settings.SITE_DOMAIN,
+                    verification_link=f"/verification/{verification_data_uid}/",
+                )
+
+        return instance
 
 
 class AgreementSerializer(serializers.ModelSerializer):
@@ -627,7 +701,7 @@ class InternalClientUserSerializer(serializers.ModelSerializer):
                 instance.user.profile.name = validated_data["name"]
                 instance.user.profile.save()
 
-            super().update(instance, validated_data)
+            instance = super().update(instance, validated_data)
 
         return instance
 

@@ -13,4 +13,5 @@ from .Models import (
     InterviewerAvailability,
     InterviewerRequest,
     Interview,
+    DesignationDomain,
 )
