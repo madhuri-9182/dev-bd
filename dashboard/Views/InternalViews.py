@@ -36,13 +36,13 @@ class InternalClientView(APIView, LimitOffsetPagination):
     permission_classes = [IsAuthenticated, IsSuperAdmin | IsModerator]
 
     def get(self, request):
-        client_id = request.query_params.get("client_id")
+        client_ids = request.query_params.get("client_ids")
         status_ = request.query_params.get("status")
         search_term = request.query_params.get("q")
 
         query = InternalClient.objects.values("id", "name")
-        if client_id:
-            query = query.filter(pk__in=client_id.split(","))
+        if client_ids:
+            query = query.filter(pk__in=client_ids.split(","))
         if search_term:
             query = query.filter(name__icontains=search_term.lower())
         client_stat = query.annotate(
@@ -193,48 +193,63 @@ class InterviewerView(APIView, LimitOffsetPagination):
     permission_classes = [IsAuthenticated, IsModerator | IsSuperAdmin]
 
     def get(self, request):
-        strength = request.query_params.get("strength")
-        experience = request.query_params.get("experience")
+        strengths = request.query_params.get("strengths", "")
+        experiences = request.query_params.get("experiences", "")
         search_terms = request.query_params.get("q")
 
-        # Validate strength
-        valid_strengths = dict(InternalInterviewer.STRENGTH_CHOICES).keys()
-        if strength and strength not in valid_strengths:
-            return Response(
-                {
-                    "status": "failed",
-                    "message": f"This is an invalid strength. Valid strength are {', '.join([f'{key}({value})' for key, value in InternalInterviewer.STRENGTH_CHOICES])}",
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        # Validate strengths
+        if strengths:
+            strengths = strengths.split(",")
+            valid_strengths = dict(InternalInterviewer.STRENGTH_CHOICES).keys()
+            invalid_strengths = [s for s in strengths if s not in valid_strengths]
+            if invalid_strengths:
+                return Response(
+                    {
+                        "status": "failed",
+                        "message": f"Invalid strengths: {', '.join(invalid_strengths)}. Valid strengths are {', '.join(valid_strengths)}",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-        # Validate experience
+        # Validate experiences
         experience_choices = {
             "0-4": ("lte", 4),
             "5-8": ("range", (5, 8)),
             "9-10": ("range", (9, 10)),
             "11": ("gt", 11),
         }
-        if experience and experience not in experience_choices:
-            valid_experience_choices = ", ".join(experience_choices.keys())
-            return Response(
-                {
-                    "status": "failed",
-                    "message": f"Invalid experience. Valid choices are {valid_experience_choices}",
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        if experiences:
+            experiences = experiences.split(",")
+            invalid_experiences = [
+                e for e in experiences if e not in experience_choices
+            ]
+            if invalid_experiences:
+                valid_experience_choices = ", ".join(experience_choices.keys())
+                return Response(
+                    {
+                        "status": "failed",
+                        "message": f"Invalid experiences: {', '.join(invalid_experiences)}. Valid choices are {valid_experience_choices}",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         # Filter interviewers based on query parameters
-        filters = {}
-        if experience:
-            filters[f"total_experience_years__{experience_choices[experience][0]}"] = (
-                experience_choices[experience][1]
-            )
-        if strength:
-            filters["strength"] = strength
+        filters = Q()
+        if experiences:
+            for experience in experiences:
+                filters |= Q(
+                    **{
+                        f"total_experience_years__{experience_choices[experience][0]}": experience_choices[
+                            experience
+                        ][
+                            1
+                        ]
+                    }
+                )
+        if strengths:
+            filters &= Q(strength__in=strengths)
 
-        interviewers_qs = InternalInterviewer.objects.filter(**filters)
+        interviewers_qs = InternalInterviewer.objects.filter(filters)
 
         if search_terms:
             interviewers_qs = interviewers_qs.filter(
@@ -774,3 +789,11 @@ class HDIPUsersViews(APIView, LimitOffsetPagination):
             },
             status=status.HTTP_400_BAD_REQUEST,
         )
+
+
+class InternalEngagementViews(APIView, LimitOffsetPagination):
+    permission_classes = (IsAuthenticated, IsModerator | IsSuperAdmin)
+
+    def get(self, request):
+        client_ids = request.query_params.get("client_ids")
+        Engagement.objects.filter()
