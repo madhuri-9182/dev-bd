@@ -406,7 +406,7 @@ class InterviewerSerializer(serializers.ModelSerializer):
                 )
             except ValueError:
                 raise serializers.ValidationError(
-                    {"assigned_domain_ids": ["It should be comma separated values."]}
+                    {"assigned_domain_ids": ["Assigned domain IDs must be comma-separated and consist of valid IDs."]}
                 )
 
         assigned_domain_ids = set(data.get("assigned_domain_ids", []))
