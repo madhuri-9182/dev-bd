@@ -307,9 +307,15 @@ class InternalClientSerializer(serializers.ModelSerializer):
 
 
 class DesignationDomainSerializer(serializers.ModelSerializer):
+    full_name = serializers.SerializerMethodField()
+
     class Meta:
         model = DesignationDomain
-        fields = ("id", "name")
+        fields = ("id", "name", "full_name")
+
+    def get_full_name(self, obj):
+        role_choice = dict(InternalInterviewer.ROLE_CHOICES)
+        return role_choice.get(obj.name)
 
 
 class InterviewerSerializer(serializers.ModelSerializer):
@@ -406,7 +412,11 @@ class InterviewerSerializer(serializers.ModelSerializer):
                 )
             except ValueError:
                 raise serializers.ValidationError(
-                    {"assigned_domain_ids": ["Assigned domain IDs must be comma-separated and consist of valid IDs."]}
+                    {
+                        "assigned_domain_ids": [
+                            "Assigned domain IDs must be comma-separated and consist of valid IDs."
+                        ]
+                    }
                 )
 
         assigned_domain_ids = set(data.get("assigned_domain_ids", []))
