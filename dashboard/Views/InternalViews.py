@@ -27,7 +27,26 @@ from ..serializer import (
     HDIPUsersSerializer,
     DesignationDomainSerializer,
     InternalClientStatSerializer,
+    InternalClientDomainSerializer,
 )
+
+
+class InternalClientDomainView(APIView, LimitOffsetPagination):
+    permission_classes = [IsAuthenticated, IsModerator | IsSuperAdmin]
+    serializer_class = InternalClientDomainSerializer
+
+    def get(self, request):
+        client_domain_qs = InternalClient.objects.all().only("id", "name", "domain")
+        paginated_qs = self.paginate_queryset(client_domain_qs, request)
+        serializer = self.serializer_class(paginated_qs, many=True)
+        paginated_response = self.get_paginated_response(serializer.data)
+        return Response(
+            {
+                "status": "success",
+                "message": "Successfully retrieved client's domain",
+                **paginated_response.data,
+            }
+        )
 
 
 @extend_schema(tags=["Internal"])

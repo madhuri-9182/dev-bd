@@ -31,6 +31,12 @@ ONBOARD_EMAIL_TEMPLATE = "onboard.html"
 WELCOME_MAIL_SUBJECT = "Welcome to Hiring Dog"
 
 
+class InternalClientDomainSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InternalClient
+        fields = ("id", 'name', "domain")
+
+
 class ClientPointOfContactSerializer(serializers.ModelSerializer):
     created_at = serializers.DateTimeField(format="%d/%m/%Y", read_only=True)
 
