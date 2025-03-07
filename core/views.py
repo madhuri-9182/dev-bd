@@ -31,12 +31,9 @@ from drf_spectacular.utils import extend_schema
 
 from externals.google.google_calendar import GoogleCalendar
 
+
 def custom_404(request, exception):
-    response_data = {
-        "error": "Not Found",
-        "message": "Invalid route.",
-        "status": 404
-    }
+    response_data = {"error": "Not Found", "message": "Invalid route.", "status": 404}
     return JsonResponse(response_data, status=404)
 
 
@@ -399,14 +396,14 @@ class GoogleAuthCallbackView(APIView):
         received_state = validated_data.get("state")
         authorization_response = validated_data.get("authorization_response")
 
-        if not state or received_state != state:
-            return Response(
-                {
-                    "status": "failed",
-                    "message": "Invalid state parameter",
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        # if not state or received_state != state:
+        #     return Response(
+        #         {
+        #             "status": "failed",
+        #             "message": "Invalid state parameter",
+        #         },
+        #         status=status.HTTP_400_BAD_REQUEST,
+        #     )
 
         try:
             google_calendar = GoogleCalendar()
