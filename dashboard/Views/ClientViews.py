@@ -256,6 +256,7 @@ class JobView(APIView, LimitOffsetPagination):
 
     def get(self, request, **kwargs):
         job_id = kwargs.get("job_id")
+        active_status = request.query_params.get("status")
         job_ids = request.query_params.get("job_ids")
         try:
             job_ids = [int(i) for i in job_ids.split(",")] if job_ids else []
@@ -300,7 +301,8 @@ class JobView(APIView, LimitOffsetPagination):
         post_job_date = request.query_params.get("post_job_date")
 
         jobs = Job.objects.filter(
-            hiring_manager__organization_id=request.user.clientuser.organization_id
+            hiring_manager__organization_id=request.user.clientuser.organization_id,
+            reason_for_archived__isnull=active_status != "archive",
         ).prefetch_related("clients")
 
         if (
