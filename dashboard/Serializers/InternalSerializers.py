@@ -34,7 +34,7 @@ WELCOME_MAIL_SUBJECT = "Welcome to Hiring Dog"
 class InternalClientDomainSerializer(serializers.ModelSerializer):
     class Meta:
         model = InternalClient
-        fields = ("id", 'name', "domain")
+        fields = ("id", "name", "domain")
 
 
 class ClientPointOfContactSerializer(serializers.ModelSerializer):
@@ -66,6 +66,12 @@ class ClientPointOfContactSerializer(serializers.ModelSerializer):
         return data
 
 
+class HDIPUserForInterClientSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = HDIPUsers
+        fields = ("id", "name")
+
+
 class InternalClientStatSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     name = serializers.CharField(max_length=155)
@@ -79,6 +85,7 @@ class InternalClientSerializer(serializers.ModelSerializer):
         source="created_at", format="%d/%m/%Y", read_only=True
     )
     points_of_contact = ClientPointOfContactSerializer(many=True)
+    assigned_to = HDIPUserForInterClientSerializer(read_only=True)
 
     class Meta:
         model = InternalClient
