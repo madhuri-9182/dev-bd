@@ -256,7 +256,7 @@ class JobView(APIView, LimitOffsetPagination):
 
     def get(self, request, **kwargs):
         job_id = kwargs.get("job_id")
-        active_status = request.query_params.get("status")
+        active_status = request.query_params.get("status", "active")
         job_ids = request.query_params.get("job_ids")
         try:
             job_ids = [int(i) for i in job_ids.split(",")] if job_ids else []
