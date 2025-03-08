@@ -131,14 +131,10 @@ class InterviewerAvailabilityView(APIView, LimitOffsetPagination):
         )
 
     def get(self, request):
+        today_date = datetime.datetime.now().date()
         interviewer_avi_qs = InterviewerAvailability.objects.filter(
-            interviewer=request.user.interviewer
+            interviewer=request.user.interviewer, date__gte=today_date
         )
-        if not interviewer_avi_qs.exists():
-            return Response(
-                {"status": "failed", "message": "There is no availability for you."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
 
         paginated_queryset = self.paginate_queryset(interviewer_avi_qs, request, self)
         serializer = self.serializer_class(paginated_queryset, many=True)

@@ -735,7 +735,7 @@ class PotentialInterviewerAvailabilityForCandidateView(APIView):
 
         required_fields = {
             "date": date,
-            "time": time,
+            # "time": time,
             "designation_id": designation_id,
             "experience_year": experience,
             "specialization": specialization,
@@ -760,16 +760,19 @@ class PotentialInterviewerAvailabilityForCandidateView(APIView):
                     {"status": "failed", "message": "Invalid date"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            formatted__start_time = datetime.strptime(time, "%H:%M").time()
-            if (
-                formatted_date == datetime.today().date()
-                and formatted__start_time < datetime.now().time()
-            ):
-                return Response(
-                    {"status": "failed", "message": "Invalid time"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            end_time = (datetime.strptime(time, "%H:%M") + timedelta(hours=1)).time()
+            if time:
+                formatted__start_time = datetime.strptime(time, "%H:%M").time()
+                if (
+                    formatted_date == datetime.today().date()
+                    and formatted__start_time < datetime.now().time()
+                ):
+                    return Response(
+                        {"status": "failed", "message": "Invalid time"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                end_time = (
+                    datetime.strptime(time, "%H:%M") + timedelta(hours=1)
+                ).time()
         except ValueError:
             return Response(
                 {
@@ -831,18 +834,23 @@ class PotentialInterviewerAvailabilityForCandidateView(APIView):
         for skill in skills:
             query |= Q(interviewer__skills__icontains=f'"{skill}"')
 
-        interviewer_availability = (
-            InterviewerAvailability.objects.select_related("interviewer")
-            .filter(
-                date=formatted_date,
-                start_time__lte=formatted__start_time,
-                end_time__gte=end_time,
-                interviewer__assigned_roles=job.name,
-                interviewer__strength=specialization,
-                interviewer__total_experience_years__gte=experience + 2,
-                booked_by__isnull=True,
+        interviewer_availability = InterviewerAvailability.objects.select_related(
+            "interviewer"
+        ).filter(
+            date=formatted_date,
+            interviewer__assigned_domains__name=job.name,
+            interviewer__strength=specialization,
+            interviewer__total_experience_years__gte=experience + 2,
+            booked_by__isnull=True,
+        )
+
+        if time:
+            interviewer_availability = interviewer_availability.filter(
+                start_time__lte=formatted__start_time, end_time__gte=end_time
             )
-            .filter(query)
+
+        interviewer_availability = (
+            interviewer_availability.filter(query)
             .exclude(interviewer__current_company__iexact=company)
             .values("id", "date", "start_time", "end_time")
         )

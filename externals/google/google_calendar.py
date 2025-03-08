@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from django.conf import settings
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
-from google.auth.transport import Request
+from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from typing import List, Optional, Tuple, Dict, Any
 from core.models import OAuthToken
@@ -178,13 +178,15 @@ class GoogleCalendar:
 
         events = []
         for idx, event in enumerate(events_result.get("items", [])):
-            if idx == 0:
-                print(event)
+            # if idx == 0:
+            #     print(event)
             start = event["start"].get("dateTime", event["start"].get("date"))
+            end = event["end"].get("dateTime", event["end"].get("date"))
             events.append(
                 {
                     "id": event.get("id"),
                     "start": start,
+                    "end": end,
                     "summary": event.get("summary", "No Title"),
                     "status": event.get("status", "confirmed"),
                 }

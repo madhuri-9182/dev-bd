@@ -511,7 +511,11 @@ class GoogleCalenderGetEventView(APIView):
         except Exception as e:
             return Response(
                 {"status": "failed", "message": f"error occured. {e}"},
-                status=status.HTTP_400_BAD_REQUEST,
+                status=(
+                    status.HTTP_401_UNAUTHORIZED
+                    if "revoked" or "expired" in str(e)
+                    else status.HTTP_400_BAD_REQUEST
+                ),
             )
 
 
