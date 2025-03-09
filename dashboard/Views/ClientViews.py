@@ -117,7 +117,6 @@ class ClientUserView(APIView, LimitOffsetPagination):
         return self._update_delete_client_user(request, kwargs.get("client_user_id"))
 
     def _update_delete_client_user(self, request, client_user_id, partial=False):
-
         if not client_user_id:
             return Response(
                 {
@@ -142,25 +141,28 @@ class ClientUserView(APIView, LimitOffsetPagination):
             )
 
         self.check_object_permissions(request, client_user_obj)
-        if partial:
-            serializer = self.serializer_class(
-                client_user_obj, data=request.data, partial=partial
-            )
-            serializer.is_valid(raise_exception=True)
-            serializer.save()
-            message = "Client user updated successfully."
-        else:
-            client_user_obj.archived = True
-            client_user_obj.user.is_active = False
-            client_user_obj.user.email = f"{client_user_obj.user.email}.deleted.{client_user_obj.user.id}-{client_user_obj.organization}"
-            client_user_obj.user.phone = f"{client_user_obj.user.phone}.deleted.{client_user_obj.user.id}-{client_user_obj.organization}"
-            client_user_obj.user.save()
-            client_user_obj.save()
-            message = "Client user successfully deleted."
 
-        response_data = {"status": "success", "message": message}
-        if partial:
-            response_data["data"] = serializer.data
+        with transaction.atomic():
+            if partial:
+                serializer = self.serializer_class(
+                    client_user_obj, data=request.data, partial=partial
+                )
+                serializer.is_valid(raise_exception=True)
+                serializer.save()
+                message = "Client user updated successfully."
+            else:
+                client_user_obj.archived = True
+                client_user_obj.user.is_active = False
+                client_user_obj.user.email = f"{client_user_obj.user.email}.deleted.{client_user_obj.user.id}-{client_user_obj.organization}"
+                client_user_obj.user.phone = f"{client_user_obj.user.phone}.deleted.{client_user_obj.user.id}-{client_user_obj.organization}"
+                client_user_obj.user.save()
+                client_user_obj.save()
+                client_user_obj.jobs.clear()
+                message = "Client user successfully deleted."
+
+            response_data = {"status": "success", "message": message}
+            if partial:
+                response_data["data"] = serializer.data
 
         return Response(
             response_data,
