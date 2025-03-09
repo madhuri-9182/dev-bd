@@ -990,7 +990,7 @@ class EngagementView(APIView, LimitOffsetPagination):
             data=request.data, context={"request": request}
         )
         if serializer.is_valid():
-            serializer.save()
+            serializer.save(organization=request.user.clientuser.organization)
             return Response(
                 {
                     "status": "success",
@@ -1031,7 +1031,7 @@ class EngagementView(APIView, LimitOffsetPagination):
             search_filter = "+91" + search_filter
 
         filters = {
-            "client__organization_id": request.user.clientuser.organization_id,
+            "organization_id": request.user.clientuser.organization_id,
             "status__in": ["YTJ", "DBT", "OHD"],
         }
         if job_id:
@@ -1042,7 +1042,7 @@ class EngagementView(APIView, LimitOffsetPagination):
             filters["notice_period__in"] = notice_period.split(",")
 
         engagement_summary = Engagement.objects.filter(
-            client__organization=request.user.clientuser.organization
+            organization=request.user.clientuser.organization
         ).aggregate(
             total_candidates=Count("id"),
             joined=Count("id", filter=Q(status="JND")),
@@ -1051,7 +1051,7 @@ class EngagementView(APIView, LimitOffsetPagination):
         )
 
         engagements = (
-            Engagement.objects.select_related("client", "job", "candidate")
+            Engagement.objects.select_related("job", "candidate")
             .prefetch_related("engagementoperations")
             .filter(**filters)
         )
@@ -1089,7 +1089,7 @@ class EngagementView(APIView, LimitOffsetPagination):
             )
 
         engagement = Engagement.objects.filter(
-            client__organization=request.user.clientuser.organization, pk=engagement_id
+            organization=request.user.clientuser.organization, pk=engagement_id
         ).first()
 
         if not engagement:
@@ -1154,7 +1154,7 @@ class EngagementOperationView(APIView, LimitOffsetPagination):
     def get(self, request):
         organization = request.user.clientuser.organization
         engagement_operation = EngagementOperation.objects.filter(
-            engagement__client__organization=organization
+            engagement__organization=organization
         )
         paginated_engagements = self.paginate_queryset(engagement_operation, request)
         serializer = self.serializer_class(paginated_engagements, many=True)
@@ -1177,7 +1177,7 @@ class EngagementOperationUpdateView(APIView):
     def put(self, request, engagement_id):
         with transaction.atomic():
             engagement_operations = EngagementOperation.objects.filter(
-                engagement__client__organization=request.user.clientuser.organization,
+                engagement__organization=request.user.clientuser.organization,
                 engagement_id=engagement_id,
             )
 

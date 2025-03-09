@@ -200,9 +200,11 @@ class Engagement(CreateUpdateDateTimeAndArchivedField):
         upload_to="engagement-candidate-cv", blank=True, null=True
     )
     job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name="engagements")
-    client = models.ForeignKey(
-        ClientUser, on_delete=models.CASCADE, related_name="engagements"
+    organization = models.ForeignKey(
+        Organization, on_delete=models.CASCADE, related_name="engagements"
     )
+    gtp_email = models.EmailField(max_length=255, blank=True, null=True)
+    gtp_name = models.CharField(max_length=50, blank=True, null=True)
 
     status = models.CharField(max_length=11, choices=STATUS_CHOICE, default="YTJ")
     notice_period = models.CharField(
