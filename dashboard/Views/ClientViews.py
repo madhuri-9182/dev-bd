@@ -546,6 +546,14 @@ class CandidateView(APIView, LimitOffsetPagination):
         status_ = request.query_params.get("status")
         search_term = request.query_params.get("q")
 
+        if (
+            search_term
+            and search_term.isdigit()
+            and len(search_term) > 2
+            and not search_term.startswith("+91")
+        ):
+            search_term = "+91" + search_term
+
         if status_ and status_ not in dict(Candidate.STATUS_CHOICES).keys():
             return Response(
                 {"status": "failed", "message": "Invalid Status."},
@@ -574,8 +582,8 @@ class CandidateView(APIView, LimitOffsetPagination):
         if search_term:
             candidates = candidates.filter(
                 Q(name__icontains=search_term)
-                | Q(email=search_term)
-                | Q(phone=search_term)
+                | Q(email__iexact=search_term)
+                | Q(phone__startswith=search_term)
             )
 
         if candidate_id:
@@ -1014,6 +1022,14 @@ class EngagementView(APIView, LimitOffsetPagination):
         notice_period = query_params.get("nps")
         search_filter = query_params.get("q")
 
+        if (
+            search_filter
+            and search_filter.isdigit()
+            and len(search_filter) > 2
+            and not search_filter.startswith("+91")
+        ):
+            search_filter = "+91" + search_filter
+
         filters = {
             "client__organization_id": request.user.clientuser.organization_id,
             "status__in": ["YTJ", "DBT", "OHD"],
@@ -1044,10 +1060,10 @@ class EngagementView(APIView, LimitOffsetPagination):
             engagements = engagements.filter(
                 Q(candidate_name__icontains=search_filter)
                 | Q(candidate__name__icontains=search_filter)
-                | Q(candidate_email__icontains=search_filter)
-                | Q(candidate__email__icontains=search_filter)
-                | Q(candidate_phone__icontains=search_filter)
-                | Q(candidate__phone__icontains=search_filter)
+                | Q(candidate_email__iexact=search_filter)
+                | Q(candidate__email__iexact=search_filter)
+                | Q(candidate_phone__startswith=search_filter)
+                | Q(candidate__phone__startswith=search_filter)
             )
 
         paginated_engagements = self.paginate_queryset(engagements, request)
