@@ -240,7 +240,6 @@ class JobSerializer(serializers.ModelSerializer):
 
         required_keys = [
             "name",
-            "job_id",
             "hiring_manager_id",
             "recruiter_ids",
             "total_positions",
@@ -249,6 +248,7 @@ class JobSerializer(serializers.ModelSerializer):
             "specialization",
         ]
         allowed_keys = [
+            "job_id",
             "reason_for_archived",
             "other_details",
             "interview_time",
