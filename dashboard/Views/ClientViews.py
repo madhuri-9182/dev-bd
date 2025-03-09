@@ -127,9 +127,13 @@ class ClientUserView(APIView, LimitOffsetPagination):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        client_user_obj = ClientUser.objects.filter(
-            organization=request.user.clientuser.organization, pk=client_user_id
-        ).first()
+        client_user_obj = (
+            ClientUser.objects.filter(
+                organization=request.user.clientuser.organization, pk=client_user_id
+            )
+            .select_related("user")
+            .first()
+        )
 
         if not client_user_obj:
             return Response(
@@ -148,6 +152,8 @@ class ClientUserView(APIView, LimitOffsetPagination):
         else:
             client_user_obj.archived = True
             client_user_obj.user.is_active = False
+            client_user_obj.user.email = f"{client_user_obj.user.email}.deleted.{client_user_obj.user.id}-{client_user_obj.organization}"
+            client_user_obj.user.phone = f"{client_user_obj.user.phone}.deleted.{client_user_obj.user.id}-{client_user_obj.organization}"
             client_user_obj.user.save()
             client_user_obj.save()
             message = "Client user successfully deleted."
