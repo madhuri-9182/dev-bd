@@ -7,29 +7,34 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('dashboard', '0043_job_specialization'),
-        ('organizations', '0006_alter_organization_slug'),
+        ("dashboard", "0043_job_specialization"),
+        ("organizations", "0006_alter_organization_slug"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='engagement',
-            name='client',
+            model_name="engagement",
+            name="client",
         ),
         migrations.AddField(
-            model_name='engagement',
-            name='gtp_email',
+            model_name="engagement",
+            name="gtp_email",
             field=models.EmailField(blank=True, max_length=255, null=True),
         ),
         migrations.AddField(
-            model_name='engagement',
-            name='gtp_name',
+            model_name="engagement",
+            name="gtp_name",
             field=models.CharField(blank=True, max_length=50, null=True),
         ),
         migrations.AddField(
-            model_name='engagement',
-            name='organization',
-            field=models.ForeignKey(default=1, on_delete=django.db.models.deletion.CASCADE, related_name='engagements', to='organizations.organization'),
+            model_name="engagement",
+            name="organization",
+            field=models.ForeignKey(
+                default=6,
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="engagements",
+                to="organizations.organization",
+            ),
             preserve_default=False,
         ),
     ]
