@@ -104,8 +104,8 @@ class GoogleCalendar:
 
         if until:
             rrule_string += f";UNTIL={until.strftime('%Y%m%dT%H%M%SZ')}"
-        else:
-            rrule_string += f";COUNT={recurrence_data.get('count')}"
+        elif "count" in recurrence_data and recurrence_data["count"] is not None:
+            rrule_string += f";COUNT={recurrence_data['count']}"
 
         if freq != "DAILY":
             days = recurrence_data.get("days", [])
