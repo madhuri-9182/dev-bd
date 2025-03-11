@@ -170,11 +170,11 @@ class Agreement(CreateUpdateDateTimeAndArchivedField):
         ("0-4", "0 - 4 Years"),
         ("4-6", "4 - 6 Years"),
         ("6-8", "6 - 8 Years"),
-        ("8-10 years", "8 - 10 Years"),
+        ("8-10", "8 - 10 Years"),
         ("10+", "10+ Years"),
     )
 
-    organization = models.OneToOneField(
+    organization = models.ForeignKey(
         Organization,
         related_name="agreements",
         blank=True,
@@ -188,4 +188,4 @@ class Agreement(CreateUpdateDateTimeAndArchivedField):
     rate = models.DecimalField(max_digits=10, decimal_places=2, blank=True)
 
     def __str__(self):
-        return f"{self.client.name} - {self.rate}"
+        return f"{self.organization.name} - {self.rate}"

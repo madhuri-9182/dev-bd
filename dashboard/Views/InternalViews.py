@@ -21,13 +21,13 @@ from ..models import (
 from ..serializer import (
     InternalClientSerializer,
     InterviewerSerializer,
-    AgreementSerializer,
     OrganizationSerializer,
     InternalClientUserSerializer,
     HDIPUsersSerializer,
     DesignationDomainSerializer,
     InternalClientStatSerializer,
     InternalClientDomainSerializer,
+    OrganizationAgreementSerializer,
 )
 
 
@@ -437,12 +437,14 @@ class DomainDesignationView(APIView, LimitOffsetPagination):
 
 
 @extend_schema(tags=["Internal"])
-class AgreementView(APIView, LimitOffsetPagination):
-    serializer_class = AgreementSerializer
+class OrganizationAgreementView(APIView, LimitOffsetPagination):
+    serializer_class = OrganizationAgreementSerializer
     permission_classes = [IsAuthenticated, IsSuperAdmin | IsModerator]
 
     def get(self, request):
-        agreements_qs = Agreement.objects.all()
+        agreements_qs = Organization.objects.prefetch_related("agreements").order_by(
+            "-id"
+        )
         paginated_qs = self.paginate_queryset(agreements_qs, request)
         serializer = self.serializer_class(paginated_qs, many=True)
         paginated_data = self.get_paginated_response(serializer.data)
@@ -480,14 +482,14 @@ class AgreementView(APIView, LimitOffsetPagination):
 
 
 @extend_schema(tags=["Internal"])
-class AgreementDetailView(APIView):
-    serializer_class = AgreementSerializer
+class OrganizationAgreementDetailView(APIView):
+    serializer_class = OrganizationAgreementSerializer
     permission_classes = [IsAuthenticated, IsSuperAdmin | IsModerator]
 
     def get(self, request, pk):
         try:
-            agreement = Agreement.objects.get(pk=pk)
-        except Agreement.DoesNotExist:
+            agreement = Organization.objects.get(pk=pk)
+        except Organization.DoesNotExist:
             return Response(
                 {"errors": "Agreement not found"}, status=status.HTTP_404_NOT_FOUND
             )
@@ -502,10 +504,10 @@ class AgreementDetailView(APIView):
             status=status.HTTP_200_OK,
         )
 
-    def patch(self, request, pk):
+    def patch(self, request, organization_id):
         try:
-            agreement = Agreement.objects.get(pk=pk)
-        except Agreement.DoesNotExist:
+            organization_agreement = Organization.objects.get(pk=organization_id)
+        except Organization.DoesNotExist:
             return Response(
                 {
                     "status": "failed",
@@ -515,7 +517,10 @@ class AgreementDetailView(APIView):
             )
 
         serializer = self.serializer_class(
-            agreement, data=request.data, partial=True, context={"request": request}
+            organization_agreement,
+            data=request.data,
+            partial=True,
+            context={"request": request},
         )
         if serializer.is_valid():
             serializer.save()

@@ -528,6 +528,9 @@ class InterviewerSerializer(serializers.ModelSerializer):
 
 
 class AgreementSerializer(serializers.ModelSerializer):
+    agreement_id = serializers.IntegerField(
+        write_only=True, min_value=1, required=False
+    )
     years_of_experience = serializers.ChoiceField(
         choices=Agreement.YEARS_OF_EXPERIENCE_CHOICES,
         error_messages={
@@ -535,49 +538,168 @@ class AgreementSerializer(serializers.ModelSerializer):
         },
         required=False,
     )
-    organization_id = serializers.IntegerField(min_value=1, required=False)
 
     class Meta:
         model = Agreement
         fields = [
             "id",
-            "organization_id",
             "years_of_experience",
             "rate",
+            "agreement_id",
         ]
 
     def validate(self, data):
         errors = validate_incoming_data(
-            self.initial_data,
+            data.keys(),
             required_keys=[
                 "years_of_experience",
-                "organization_id",
                 "rate",
             ],
+            allowed_keys=["agreement_id"],
             partial=self.partial,
-            original_data=data,
         )
 
         if "rate" in data and data["rate"] <= 0:
             errors.setdefault("rate", []).append("Rate must be a positive value.")
 
-        if organization_id := data.get("organization_id"):
-            if (
+        if errors:
+            raise serializers.ValidationError({"errors": errors})
+
+        return data
+
+
+class OrganizationAgreementSerializer(serializers.ModelSerializer):
+    agreements = AgreementSerializer(required=False, many=True)
+    organization_id = serializers.IntegerField(
+        write_only=True, required=False, min_value=1
+    )
+
+    class Meta:
+        model = Organization
+        fields = ("id", "name", "agreements", "organization_id")
+        read_only_fields = ("name",)
+
+    def to_internal_value(self, data):
+        agreements = data.get("agreements")
+        errors = {}
+        if not agreements:
+            errors.setdefault("agreements", []).append(
+                "This field is required and must contain list of objects."
+            )
+
+        if not isinstance(agreements, list):
+            errors.setdefault("agreements", []).append(
+                "This field must be a list of objects."
+            )
+
+        if errors:
+            raise serializers.ValidationError(errors)
+
+        agreement_ids = []
+        for i, agreeemnt in enumerate(agreements):
+            if agreeemnt.get("id"):
+                agreement_ids.append(agreeemnt.get("id"))
+            serializer = AgreementSerializer(data=agreeemnt)
+            if not serializer.is_valid():
+                errors[f"{i + 1}"] = serializer.errors or serializer.errors["errors"]
+
+        if errors:
+            raise serializers.ValidationError(errors)
+
+        self.context["agreement_ids"] = agreement_ids
+        return super().to_internal_value(data)
+
+    def validate(self, data):
+        if self.partial:
+            required_keys = ["agreements"]
+        else:
+            required_keys = ["organization_id", "agreements"]
+
+        errors = validate_incoming_data(
+            self.initial_data,
+            required_keys=required_keys,
+            partial=self.partial,
+        )
+
+        if organization_id := data.pop("organization_id", None):
+            organization = Organization.objects.filter(id=organization_id).first()
+            if not organization:
+                errors.setdefault("organization_id", []).append(
+                    "Invalid organization_id"
+                )
+            elif (
                 not self.partial
                 and Agreement.objects.filter(organization_id=organization_id).exists()
             ):
                 errors.setdefault("organization_id", []).append(
-                    "Organization already existed"
+                    "Organization agreement already existed"
                 )
-            elif not Organization.objects.filter(id=organization_id).exists():
-                errors.setdefault("organization_id", []).append(
-                    "Invalid organization_id"
-                )
+            if not self.instance:
+                data["organization"] = organization
+
+        if self.partial and "agreements" in data:
+            existing_agreement_years = set(
+                Agreement.objects.values_list("years_of_experience", flat=True)
+            )
+            incoming_agreement_years = {
+                agreement.get("years_of_experience")
+                for agreement in data.get("agreements")
+                if "agreement_id" not in agreement
+            }
+            common_years = existing_agreement_years & incoming_agreement_years
+            if common_years:
+                error_message = f"Agreement with years_of_experience {', '.join(map(str, common_years))} already existed. Please update it by providing it's id"
+                for i, agreement in enumerate(data.get("agreements")):
+                    if agreement.get("years_of_experience") in common_years:
+                        errors.setdefault(f"{i}", []).append(error_message)
 
         if errors:
             raise serializers.ValidationError({"errors": errors})
 
         return data
+
+    def create(self, validated_data):
+        agreements_info = validated_data.pop("agreements")
+        organization = validated_data.get("organization")
+        agreements = [
+            Agreement(**agreement, organization=organization)
+            for agreement in agreements_info
+        ]
+        Agreement.objects.bulk_create(agreements)
+        return organization
+
+    def update(self, instance, validated_data):
+        agreements_info = validated_data.pop("agreements", None)
+        if agreements_info:
+            agreements_dict = {
+                agreement["agreement_id"]: agreement
+                for agreement in agreements_info
+                if "agreement_id" in agreement
+            }
+            existing_agreements = {
+                agreement.id: agreement
+                for agreement in Agreement.objects.filter(
+                    organization=instance, id__in=agreements_dict.keys()
+                )
+            }
+
+            # Update existing agreements
+            for agreement_id, agreement in existing_agreements.items():
+                agreement_info = agreements_dict.pop(agreement_id, None)
+                if agreement_info:
+                    for attr, value in agreement_info.items():
+                        setattr(agreement, attr, value)
+                    agreement.save()
+
+            # Create new agreements
+            new_agreements = [
+                Agreement(**agreement, organization=instance)
+                for agreement in agreements_info
+                if "agreement_id" not in agreement
+            ]
+            Agreement.objects.bulk_create(new_agreements)
+
+        return instance
 
 
 class OrganizationSerializer(serializers.ModelSerializer):
