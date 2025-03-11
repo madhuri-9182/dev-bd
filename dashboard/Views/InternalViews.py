@@ -6,7 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from core.permissions import IsSuperAdmin, IsModerator
+from core.permissions import IsSuperAdmin, IsModerator, IsAdmin
 from ..models import (
     InternalClient,
     InternalInterviewer,
@@ -32,7 +32,7 @@ from ..serializer import (
 
 
 class InternalClientDomainView(APIView, LimitOffsetPagination):
-    permission_classes = [IsAuthenticated, IsModerator | IsSuperAdmin]
+    permission_classes = [IsAuthenticated, IsModerator | IsSuperAdmin | IsAdmin]
     serializer_class = InternalClientDomainSerializer
 
     def get(self, request):
@@ -52,7 +52,7 @@ class InternalClientDomainView(APIView, LimitOffsetPagination):
 @extend_schema(tags=["Internal"])
 class InternalClientView(APIView, LimitOffsetPagination):
     serializer_class = InternalClientSerializer
-    permission_classes = [IsAuthenticated, IsSuperAdmin | IsModerator]
+    permission_classes = [IsAuthenticated, IsSuperAdmin | IsModerator | IsAdmin]
 
     def get(self, request):
         client_ids = request.query_params.get("client_ids")
@@ -127,7 +127,7 @@ class InternalClientView(APIView, LimitOffsetPagination):
 @extend_schema(tags=["Internal"])
 class InternalClientDetailsView(APIView):
     serializer_class = InternalClientSerializer
-    permission_classes = [IsAuthenticated, IsSuperAdmin | IsModerator]
+    permission_classes = [IsAuthenticated, IsSuperAdmin | IsModerator | IsAdmin]
 
     def get(self, request, pk):
 
@@ -209,7 +209,7 @@ class InternalClientDetailsView(APIView):
 @extend_schema(tags=["Internal"])
 class InterviewerView(APIView, LimitOffsetPagination):
     serializer_class = InterviewerSerializer
-    permission_classes = [IsAuthenticated, IsModerator | IsSuperAdmin]
+    permission_classes = [IsAuthenticated, IsModerator | IsSuperAdmin | IsAdmin]
 
     def get(self, request):
         strengths = request.query_params.get("strengths", "")
@@ -336,7 +336,7 @@ class InterviewerView(APIView, LimitOffsetPagination):
 @extend_schema(tags=["Internal"])
 class InterviewerDetails(APIView):
     serializer_class = InterviewerSerializer
-    permission_classes = [IsAuthenticated, IsSuperAdmin | IsModerator]
+    permission_classes = [IsAuthenticated, IsSuperAdmin | IsModerator | IsAdmin]
 
     def get(self, request, pk):
         try:
@@ -439,7 +439,7 @@ class DomainDesignationView(APIView, LimitOffsetPagination):
 @extend_schema(tags=["Internal"])
 class AgreementView(APIView, LimitOffsetPagination):
     serializer_class = AgreementSerializer
-    permission_classes = [IsAuthenticated, IsSuperAdmin | IsModerator]
+    permission_classes = [IsAuthenticated, IsSuperAdmin | IsModerator | IsAdmin]
 
     def get(self, request):
         agreements_qs = Agreement.objects.all()
@@ -482,7 +482,7 @@ class AgreementView(APIView, LimitOffsetPagination):
 @extend_schema(tags=["Internal"])
 class AgreementDetailView(APIView):
     serializer_class = AgreementSerializer
-    permission_classes = [IsAuthenticated, IsSuperAdmin | IsModerator]
+    permission_classes = [IsAuthenticated, IsSuperAdmin | IsModerator | IsAdmin]
 
     def get(self, request, pk):
         try:
@@ -562,7 +562,7 @@ class AgreementDetailView(APIView):
 
 class OrganizationView(APIView, LimitOffsetPagination):
     serializer_class = OrganizationSerializer
-    permission_classes = [IsAuthenticated, IsModerator | IsSuperAdmin]
+    permission_classes = [IsAuthenticated, IsModerator | IsSuperAdmin | IsAdmin]
 
     def get(self, request):
         organization = Organization.objects.all()
@@ -581,7 +581,7 @@ class OrganizationView(APIView, LimitOffsetPagination):
 
 
 class InternalDashboardView(APIView):
-    permission_classes = (IsAuthenticated, IsModerator | IsSuperAdmin)
+    permission_classes = (IsAuthenticated, IsModerator | IsSuperAdmin | IsAdmin)
 
     def get(self, request):
 
@@ -639,7 +639,7 @@ class InternalDashboardView(APIView):
 
 class InternalClientUserView(APIView, LimitOffsetPagination):
     serializer_class = InternalClientUserSerializer
-    permission_classes = [IsAuthenticated, IsSuperAdmin | IsModerator]
+    permission_classes = [IsAuthenticated, IsSuperAdmin | IsModerator | IsAdmin]
 
     def get(self, request, **kwrags):
 
@@ -731,7 +731,7 @@ class InternalClientUserView(APIView, LimitOffsetPagination):
 
 class HDIPUsersViews(APIView, LimitOffsetPagination):
     serializer_class = HDIPUsersSerializer
-    permission_classes = [IsAuthenticated, IsSuperAdmin | IsModerator]
+    permission_classes = [IsAuthenticated, IsSuperAdmin | IsModerator | IsAdmin]
 
     def get(self, request, **kwrags):
         hdip_users = HDIPUsers.objects.all()
@@ -811,7 +811,7 @@ class HDIPUsersViews(APIView, LimitOffsetPagination):
 
 
 class InternalEngagementViews(APIView, LimitOffsetPagination):
-    permission_classes = (IsAuthenticated, IsModerator | IsSuperAdmin)
+    permission_classes = (IsAuthenticated, IsModerator | IsSuperAdmin | IsAdmin)
 
     def get(self, request):
         client_ids = request.query_params.get("client_ids")
