@@ -158,6 +158,15 @@ class ClientUserView(APIView, LimitOffsetPagination):
                 client_user_obj.user.save()
                 client_user_obj.save()
                 client_user_obj.jobs.clear()
+                if client_user_obj.hiringmanager.exists():
+                    transaction.set_rollback(True)
+                    return Response(
+                        {
+                            "status": "failed",
+                            "message": "User cannot be deleted because they are assigned to multiple hiring manager roles. Please reassign those jobs before attempting deletion.",
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
                 message = "Client user successfully deleted."
 
             response_data = {"status": "success", "message": message}
