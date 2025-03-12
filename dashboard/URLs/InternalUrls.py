@@ -34,6 +34,11 @@ urlpatterns = [
         name="agreement-details",
     ),
     path("organizations/", OrganizationView.as_view(), name="organizations"),
+    path(
+        "agreement-organization/",
+        OrganizationView.as_view(),
+        name="agreement-organization",
+    ),
     path("dashboard/", InternalDashboardView.as_view(), name="dashboard"),
     path("hdip-users/", HDIPUsersViews.as_view(), name="hdip-user"),
     path("hdip-user/<int:pk>/", HDIPUsersViews.as_view(), name="hdip-user-details"),

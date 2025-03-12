@@ -874,7 +874,6 @@ class HDIPUsersSerializer(serializers.ModelSerializer):
     phone = PhoneNumberField(write_only=True, required=False)
     client_ids = serializers.ListField(
         child=serializers.IntegerField(min_value=1),
-        min_length=1,
         write_only=True,
         required=False,
     )
@@ -905,6 +904,16 @@ class HDIPUsersSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"errors": errors})
 
         return super().run_validation(data)
+
+    """ keeping this for future update 
+    def validate_client_ids(self, value):
+        request_method = self.context["request"].method
+        if request_method == "POST" and len(value) < 1:
+            raise serializers.ValidationError(
+                "This field must have at least 1 item for POST requests."
+            )
+        return value
+    """
 
     def validate(self, data):
         required_keys = ["name", "email", "phone", "role"]

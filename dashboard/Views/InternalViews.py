@@ -570,7 +570,12 @@ class OrganizationView(APIView, LimitOffsetPagination):
     permission_classes = [IsAuthenticated, IsModerator | IsSuperAdmin | IsAdmin]
 
     def get(self, request):
-        organization = Organization.objects.all()
+        filter_criteria = (
+            {"agreements__isnull": True}
+            if request.resolver_match.url_name == "agreement-organization"
+            else {"internal_client__assigned_to__isnull": True}
+        )
+        organization = Organization.objects.filter(**filter_criteria)
         paginated_queryset = self.paginate_queryset(organization, request)
         serializer = self.serializer_class(paginated_queryset, many=True)
         paginated_response = self.get_paginated_response(serializer.data)
@@ -753,7 +758,7 @@ class HDIPUsersViews(APIView, LimitOffsetPagination):
         )
 
     def post(self, request, **kwargs):
-        serializer = self.serializer_class(data=request.data)
+        serializer = self.serializer_class(data=request.data, context={"request":request})
         if serializer.is_valid():
             serializer.save()
             return Response(
