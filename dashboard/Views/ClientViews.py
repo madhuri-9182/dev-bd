@@ -317,12 +317,18 @@ class JobView(APIView, LimitOffsetPagination):
             )
         post_job_date = request.query_params.get("post_job_date")
 
-        jobs = Job.objects.filter(
-            hiring_manager__organization_id=request.user.clientuser.organization_id,
-        ).prefetch_related("clients")
+        jobs = (
+            Job.objects.filter(
+                hiring_manager__organization_id=request.user.clientuser.organization_id,
+            )
+            .prefetch_related("clients")
+            .order_by("-id")
+        )
 
         if active_status == "archive":
-            jobs = jobs.exclude(reason_for_archived__in=["", None])
+            jobs = jobs.exclude(
+                Q(reason_for_archived__isnull=True) | Q(reason_for_archived="")
+            )
         else:
             jobs = jobs.filter(
                 Q(reason_for_archived__isnull=True) | Q(reason_for_archived="")
