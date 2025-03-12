@@ -103,6 +103,15 @@ class ClientUserSerializer(serializers.ModelSerializer):
             partial=self.partial,
         )
 
+        if (
+            self.partial
+            and self.instance.user.role == Role.CLIENT_OWNER
+            and "email" in data
+        ):
+            errors.setdefault("email", []).append(
+                "Client Owner email is not for updation"
+            )
+
         if errors:
             raise serializers.ValidationError({"errors": errors})
 
