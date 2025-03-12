@@ -5,9 +5,15 @@ from core.models import Role
 class CanDeleteUpdateUser(BasePermission):
     def has_object_permission(self, request, view, obj):
         if request.user.role == Role.CLIENT_OWNER:
-            return obj.user.role in [Role.CLIENT_ADMIN, Role.CLIENT_USER, Role.AGENCY]
+            return (
+                obj.user.role in [Role.CLIENT_ADMIN, Role.CLIENT_USER, Role.AGENCY]
+                or obj.user == request.user
+            )
         if request.user.role == Role.CLIENT_ADMIN:
-            return obj.user.role in [Role.CLIENT_USER, Role.AGENCY]
+            return (
+                obj.user.role in [Role.CLIENT_USER, Role.AGENCY]
+                or obj.user == request.user
+            )
         return False
 
 
