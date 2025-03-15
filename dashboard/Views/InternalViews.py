@@ -442,9 +442,14 @@ class OrganizationAgreementView(APIView, LimitOffsetPagination):
     permission_classes = [IsAuthenticated, IsSuperAdmin | IsModerator | IsAdmin]
 
     def get(self, request):
+        search_term = request.query_params.get("q")
         agreements_qs = Organization.objects.prefetch_related("agreements").order_by(
             "-id"
         )
+
+        if search_term:
+            agreements_qs = agreements_qs.filter(name__icontains=search_term)
+
         paginated_qs = self.paginate_queryset(agreements_qs, request)
         serializer = self.serializer_class(paginated_qs, many=True)
         paginated_data = self.get_paginated_response(serializer.data)

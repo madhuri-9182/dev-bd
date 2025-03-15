@@ -203,6 +203,15 @@ class InternalClientSerializer(serializers.ModelSerializer):
                     organization = create_organization(
                         user, organization_name, is_active=False
                     )
+
+                    agreement_rates = [{"years_of_experience": "0-4", "rate": 2800},
+                                       {"years_of_experience": "4-6", "rate": 3500},
+                                       {"years_of_experience": "6-8", "rate": 4500},
+                                       {"years_of_experience": "8-10", "rate": 6000},
+                                       {"years_of_experience": "10+", "rate": 6500}]
+                    
+                    agreements = [Agreement(organization=organization, **agreement_rate) for agreement_rate in agreement_rates]
+                    Agreement.objects.bulk_create(agreements)
                 """ 
                 else:
                     # Not using OrganizationUser for now, instead UserProfile works as a organization user
