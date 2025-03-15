@@ -24,4 +24,5 @@ from .InternalSerializers import (
 from .InterviewerSerializers import (
     InterviewerAvailabilitySerializer,
     InterviewerRequestSerializer,
+    InterviewerDashboardSerializer,
 )

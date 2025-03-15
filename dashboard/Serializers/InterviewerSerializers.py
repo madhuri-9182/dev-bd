@@ -1,6 +1,6 @@
 import datetime
 from rest_framework import serializers
-from ..models import InterviewerAvailability, Candidate
+from ..models import InterviewerAvailability, Candidate, Interview, Job
 from hiringdogbackend.utils import validate_incoming_data
 
 
@@ -203,3 +203,41 @@ class InterviewerRequestSerializer(serializers.Serializer):
             raise serializers.ValidationError({"errors": errors})
 
         return data
+
+
+class InterviewerJobSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Job
+        fields = ("id", "name", "other_details")
+
+
+class InterviewerCandidateSerializer(serializers.ModelSerializer):
+    designation = InterviewerJobSerializer(read_only=True)
+
+    class Meta:
+        model = Candidate
+        fields = (
+            "id",
+            "name",
+            "designation",
+            "specialization",
+            "year",
+            "month",
+            "company",
+            "cv",
+        )
+
+
+class InterviewerInterviewsSerializer(serializers.ModelSerializer):
+    candidate = InterviewerCandidateSerializer(read_only=True)
+    scheduled_time = serializers.DateTimeField(format="%d/%m/%Y %H:%M:%S")
+
+    class Meta:
+        model = Interview
+        fields = ("id", "candidate", "scheduled_time")
+
+
+class InterviewerDashboardSerializer(serializers.Serializer):
+    accepted_interviews = InterviewerInterviewsSerializer(many=True)
+    pending_feedback = InterviewerInterviewsSerializer(many=True)
+    interview_history = InterviewerInterviewsSerializer(many=True)

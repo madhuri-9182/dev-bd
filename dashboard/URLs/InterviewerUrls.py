@@ -3,6 +3,7 @@ from ..views import (
     InterviewerAvailabilityView,
     InterviewerReqeustView,
     InterviewerRequestResponseView,
+    InterviewerDashboardView,
 )
 
 urlpatterns = [
@@ -20,5 +21,10 @@ urlpatterns = [
         "interviewer-requst-confirmation/<str:request_id>/",
         InterviewerRequestResponseView.as_view(),
         name="interviewer-request-confirmation",
+    ),
+    path(
+        "interviewer-dashboard/",
+        InterviewerDashboardView.as_view(),
+        name="interviewer-dashbard",
     ),
 ]

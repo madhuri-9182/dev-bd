@@ -21,4 +21,5 @@ from .Serializers import (
     DesignationDomainSerializer,
     InternalClientStatSerializer,
     InternalClientDomainSerializer,
+    InterviewerDashboardSerializer,
 )

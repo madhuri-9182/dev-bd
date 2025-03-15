@@ -1,5 +1,6 @@
 import datetime
 from django.db import transaction
+from django.db.models import Count, Q
 from django.conf import settings
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
@@ -9,7 +10,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import LimitOffsetPagination
-from ..serializer import InterviewerAvailabilitySerializer, InterviewerRequestSerializer
+from ..serializer import (
+    InterviewerAvailabilitySerializer,
+    InterviewerRequestSerializer,
+    InterviewerDashboardSerializer,
+)
 from ..models import InterviewerAvailability, Candidate, InternalInterviewer, Interview
 from ..tasks import send_email_to_multiple_recipients
 from core.permissions import (
@@ -363,3 +368,31 @@ class InterviewerRequestResponseView(APIView):
                 {"status": "failed", "message": f"Error: {str(e)}"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+
+class InterviewerDashboardView(APIView):
+    serializer_class = InterviewerDashboardSerializer
+    permission_classes = (IsAuthenticated, IsInterviewer)
+
+    def get(self, request):
+        interview_qs = Interview.objects.filter(
+            interviewer=request.user.interviewer
+        ).select_related("candidate", "candidate__designation")
+
+        data = {
+            "accepted_interviews": interview_qs.filter(status="SCH"),
+            "pending_feedback": interview_qs.filter(status="PENDING_EVAL"),
+            "interview_history": interview_qs.filter(
+                status__in=["HREC", "REC", "NREC", "SNREC"]
+            ),
+        }
+
+        serializer = self.serializer_class(data)
+        return Response(
+            {
+                "status": "success",
+                "message": "Interviewer records fetched successfully",
+                "data": serializer.data,
+            },
+            status=status.HTTP_200_OK,
+        )
