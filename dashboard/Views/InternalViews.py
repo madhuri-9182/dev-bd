@@ -1,5 +1,5 @@
 from drf_spectacular.utils import extend_schema
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Case, When, IntegerField
 from organizations.models import Organization
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -13,7 +13,6 @@ from ..models import (
     Agreement,
     Job,
     Candidate,
-    InterviewerRequest,
     ClientUser,
     HDIPUsers,
     DesignationDomain,
@@ -445,6 +444,30 @@ class OrganizationAgreementView(APIView, LimitOffsetPagination):
         search_term = request.query_params.get("q")
         agreements_qs = Organization.objects.prefetch_related("agreements").order_by(
             "-id"
+        )
+
+        agreements_qs = Organization.objects.annotate(
+                        experience_0_4=Count(
+                            Case(When(agreements__years_of_experience="0-4", then=1), output_field=IntegerField())
+                        ),
+                        experience_4_6=Count(
+                            Case(When(agreements__years_of_experience="4-6", then=1), output_field=IntegerField())
+                        ),
+                        experience_6_8=Count(
+                            Case(When(agreements__years_of_experience="6-8", then=1), output_field=IntegerField())
+                        ),
+                        experience_8_10=Count(
+                            Case(When(agreements__years_of_experience="8-10", then=1), output_field=IntegerField())
+                        ),
+                        experience_10_plus=Count(
+                            Case(When(agreements__years_of_experience="10+", then=1), output_field=IntegerField())
+                        ),
+                    ).filter(
+                        Q(experience_0_4__gt=0) &
+                        Q(experience_4_6__gt=0) &
+                        Q(experience_6_8__gt=0) &
+                        Q(experience_8_10__gt=0) &
+                        Q(experience_10_plus__gt=0)
         )
 
         if search_term:
