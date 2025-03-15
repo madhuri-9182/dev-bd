@@ -32,5 +32,7 @@ from .InterviewerViews import (
     InterviewerAvailabilityView,
     InterviewerReqeustView,
     InterviewerRequestResponseView,
-    InterviewerDashboardView,
+    InterviewerAcceptedInterviewsView,
+    InterviewerPendingFeedbackView,
+    InterviewerInterviewHistoryView,
 )

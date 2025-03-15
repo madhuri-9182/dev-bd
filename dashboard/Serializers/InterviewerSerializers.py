@@ -228,16 +228,10 @@ class InterviewerCandidateSerializer(serializers.ModelSerializer):
         )
 
 
-class InterviewerInterviewsSerializer(serializers.ModelSerializer):
+class InterviewerDashboardSerializer(serializers.ModelSerializer):
     candidate = InterviewerCandidateSerializer(read_only=True)
     scheduled_time = serializers.DateTimeField(format="%d/%m/%Y %H:%M:%S")
 
     class Meta:
         model = Interview
         fields = ("id", "candidate", "scheduled_time")
-
-
-class InterviewerDashboardSerializer(serializers.Serializer):
-    accepted_interviews = InterviewerInterviewsSerializer(many=True)
-    pending_feedback = InterviewerInterviewsSerializer(many=True)
-    interview_history = InterviewerInterviewsSerializer(many=True)

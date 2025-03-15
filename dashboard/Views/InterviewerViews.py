@@ -370,29 +370,67 @@ class InterviewerRequestResponseView(APIView):
             )
 
 
-class InterviewerDashboardView(APIView):
+class InterviewerAcceptedInterviewsView(APIView, LimitOffsetPagination):
     serializer_class = InterviewerDashboardSerializer
     permission_classes = (IsAuthenticated, IsInterviewer)
 
     def get(self, request):
-        interview_qs = Interview.objects.filter(
-            interviewer=request.user.interviewer
+        accepted_interviews_qs = Interview.objects.filter(
+            interviewer=request.user.interviewer, status="SCH"
         ).select_related("candidate", "candidate__designation")
-
-        data = {
-            "accepted_interviews": interview_qs.filter(status="SCH"),
-            "pending_feedback": interview_qs.filter(status="PENDING_EVAL"),
-            "interview_history": interview_qs.filter(
-                status__in=["HREC", "REC", "NREC", "SNREC"]
-            ),
-        }
-
-        serializer = self.serializer_class(data)
+        paginated_queryset = self.paginate_queryset(accepted_interviews_qs, request)
+        serializer = self.serializer_class(paginated_queryset, many=True)
+        paginated_data = self.get_paginated_response(serializer.data)
         return Response(
             {
                 "status": "success",
-                "message": "Interviewer records fetched successfully",
-                "data": serializer.data,
+                "message": "Accepted interviews fetched successfully",
+                **paginated_data.data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class InterviewerPendingFeedbackView(APIView, LimitOffsetPagination):
+    serializer_class = InterviewerDashboardSerializer
+    permission_classes = (IsAuthenticated, IsInterviewer)
+
+    def get(self, request):
+        pending_feedback_qs = Interview.objects.filter(
+            interviewer=request.user.interviewer, status="PENDING_EVAL"
+        ).select_related("candidate", "candidate__designation")
+
+        paginated_queryset = self.paginate_queryset(pending_feedback_qs, request)
+        serializer = self.serializer_class(paginated_queryset, many=True)
+        paginated_data = self.get_paginated_response(serializer.data)
+        return Response(
+            {
+                "status": "success",
+                "message": "Pending feedback fetched successfully",
+                **paginated_data.data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class InterviewerInterviewHistoryView(APIView, LimitOffsetPagination):
+    serializer_class = InterviewerDashboardSerializer
+    permission_classes = (IsAuthenticated, IsInterviewer)
+
+    def get(self, request):
+        interview_history_qs = Interview.objects.filter(
+            interviewer=request.user.interviewer,
+            status__in=["HREC", "REC", "NREC", "SNREC"],
+        ).select_related("candidate", "candidate__designation")
+
+        paginated_queryset = self.paginate_queryset(interview_history_qs, request)
+        serializer = self.serializer_class(paginated_queryset, many=True)
+        paginated_data = self.get_paginated_response(serializer.data)
+        return Response(
+            {
+                "status": "success",
+                "message": "Interview history fetched successfully",
+                **paginated_data.data,
             },
             status=status.HTTP_200_OK,
         )

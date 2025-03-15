@@ -3,7 +3,9 @@ from ..views import (
     InterviewerAvailabilityView,
     InterviewerReqeustView,
     InterviewerRequestResponseView,
-    InterviewerDashboardView,
+    InterviewerAcceptedInterviewsView,
+    InterviewerPendingFeedbackView,
+    InterviewerInterviewHistoryView,
 )
 
 urlpatterns = [
@@ -23,8 +25,18 @@ urlpatterns = [
         name="interviewer-request-confirmation",
     ),
     path(
-        "interviewer-dashboard/",
-        InterviewerDashboardView.as_view(),
-        name="interviewer-dashbard",
+        "accepted-interviews/",
+        InterviewerAcceptedInterviewsView.as_view(),
+        name="accepted-interviews",
+    ),
+    path(
+        "pending-feedback/",
+        InterviewerPendingFeedbackView.as_view(),
+        name="pending-feedback",
+    ),
+    path(
+        "interview-history/",
+        InterviewerInterviewHistoryView.as_view(),
+        name="interview-history",
     ),
 ]
