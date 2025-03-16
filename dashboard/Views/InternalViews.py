@@ -457,7 +457,7 @@ class OrganizationAgreementView(APIView, LimitOffsetPagination):
             "-id"
         )
 
-        agreements_qs = Organization.objects.annotate(
+        agreements_qs = agreements_qs.annotate(
                         experience_0_4=Count(
                             Case(When(agreements__years_of_experience="0-4", then=1), output_field=IntegerField())
                         ),
