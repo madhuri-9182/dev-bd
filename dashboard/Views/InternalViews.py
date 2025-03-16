@@ -691,10 +691,15 @@ class InternalClientUserView(APIView, LimitOffsetPagination):
     permission_classes = [IsAuthenticated, IsSuperAdmin | IsModerator | IsAdmin]
 
     def get(self, request, **kwrags):
+        search_term = request.query_params.get("q")
 
         internal_user = ClientUser.objects.select_related(
             "organization", "organization__internal_client"
         ).order_by("organization__name")
+
+        if search_term:
+            internal_user = internal_user.filter(organization__name__icontains=search_term)
+
         paginated_queryset = self.paginate_queryset(internal_user, request)
         serializer = self.serializer_class(paginated_queryset, many=True)
         paginated_response = self.get_paginated_response(serializer.data)
@@ -783,7 +788,12 @@ class HDIPUsersViews(APIView, LimitOffsetPagination):
     permission_classes = [IsAuthenticated, IsSuperAdmin | IsModerator | IsAdmin]
 
     def get(self, request, **kwrags):
+        search_term = request.query_params.get("q")
         hdip_users = HDIPUsers.objects.all()
+
+        if search_term:
+            hdip_users = hdip_users.filter(name__icontains=search_term)
+
         paginated_queryset = self.paginate_queryset(hdip_users, request)
         serializer = self.serializer_class(paginated_queryset, many=True)
         paginated_response = self.get_paginated_response(serializer.data)
