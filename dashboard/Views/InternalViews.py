@@ -55,14 +55,25 @@ class InternalClientView(APIView, LimitOffsetPagination):
 
     def get(self, request):
         client_ids = request.query_params.get("client_ids")
+        domains = request.query_params.get("domain")
         status_ = request.query_params.get("status")
         search_term = request.query_params.get("q")
 
         query = InternalClient.objects.values("id", "name")
+        
         if client_ids:
             query = query.filter(pk__in=client_ids.split(","))
+        
+        if domains:
+            query = query.filter(domain__in=domains.split(","))
+        
+        if status_:
+            status_list = [True if status == "active" else False for status in status_.split(",")]
+            query = query.filter(is_signed__in=status_list)
+        
         if search_term:
             query = query.filter(name__icontains=search_term.lower())
+        
         client_stat = query.annotate(
             active_jobs=Count(
                 "organization__clientuser__jobs",
