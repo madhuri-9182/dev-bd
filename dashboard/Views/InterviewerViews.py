@@ -2,6 +2,7 @@ import datetime
 from django.db import transaction
 from django.db.models import Count, Q
 from django.conf import settings
+from django.utils import timezone
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from drf_spectacular.utils import extend_schema
@@ -172,7 +173,7 @@ class InterviewerReqeustView(APIView):
         if serializer.is_valid():
             candidate_id = serializer.validated_data["candidate_id"]
             interviewer_ids = serializer.validated_data["interviewer_ids"]
-            candidate = Candidate.objects.filter(pk=candidate_id).first()
+            candidate = serializer.validated_data.pop("candidate_obj")
             contexts = []
 
             for interviewer_obj in InterviewerAvailability.objects.filter(
@@ -205,6 +206,8 @@ class InterviewerReqeustView(APIView):
                 "Interview Opportunity Available - Confirm Your Availability",
                 "interviewer_interview_notification.html",
             )
+            candidate.last_scheduled_initiate_time = timezone.now()
+            candidate.save()
             return Response(
                 {
                     "status": "success",

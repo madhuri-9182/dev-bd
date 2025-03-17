@@ -583,9 +583,13 @@ class CandidateView(APIView, LimitOffsetPagination):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        candidates = Candidate.objects.filter(
-            organization=request.user.clientuser.organization,
-        ).select_related("designation")
+        candidates = (
+            Candidate.objects.filter(
+                organization=request.user.clientuser.organization,
+            )
+            .select_related("designation")
+            .order_by("-id")
+        )
 
         if request.user.role in [Role.CLIENT_USER, Role.AGENCY]:
             candidates = candidates.filter(designation__clients=request.user.clientuser)
@@ -723,6 +727,15 @@ class CandidateView(APIView, LimitOffsetPagination):
         candidate_instance = self.get_candidate_instance(request, candidate_id)
         if isinstance(candidate_instance, Response):
             return candidate_instance
+
+        if candidate_instance.status != "NSCH":
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "Candidate cannot be dropped because they are already scheduled or processed.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         if reason_for_dropping:
             candidate_instance.reason_for_dropping = reason_for_dropping

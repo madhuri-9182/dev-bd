@@ -35,10 +35,11 @@ class InternalClientDomainView(APIView, LimitOffsetPagination):
     serializer_class = InternalClientDomainSerializer
 
     def get(self, request):
-        client_domain_qs = (
-                InternalClient.objects.values("domain")  # Group by domain
-                .annotate(id=Min("id"))  # Pick the min id per domain
-            )
+        client_domain_qs = InternalClient.objects.values(
+            "domain"
+        ).annotate(  # Group by domain
+            id=Min("id")
+        )  # Pick the min id per domain
         paginated_qs = self.paginate_queryset(client_domain_qs, request)
         serializer = self.serializer_class(paginated_qs, many=True)
         paginated_response = self.get_paginated_response(serializer.data)
@@ -65,7 +66,9 @@ class InternalEngagementView(APIView, LimitOffsetPagination):
             qs = qs.filter(internal_client__domain__in=domains.split(","))
 
         if status_:
-            status_list = [True if status == "active" else False for status in status_.split(",")]
+            status_list = [
+                True if status == "active" else False for status in status_.split(",")
+            ]
             qs = qs.filter(is_active__in=status_list)
 
         if search_term:
@@ -73,18 +76,32 @@ class InternalEngagementView(APIView, LimitOffsetPagination):
 
         # Annotate each organization with candidate engagement details
         qs = qs.annotate(
-            active_candidates=Count("candidate", filter=Q(candidate__final_selection_status="SLD"), distinct=True),  # Count of candidates per organization
-            scheduled=Count("candidate", filter=Q(candidate__engagements__isnull=False) & Q(candidate__final_selection_status="SLD"), distinct=True),
-            pending_scheduled=Count("candidate", filter=Q(candidate__engagements__isnull=True) & Q(candidate__final_selection_status="SLD"), distinct=True),
+            active_candidates=Count(
+                "candidate",
+                filter=Q(candidate__final_selection_status="SLD"),
+                distinct=True,
+            ),  # Count of candidates per organization
+            scheduled=Count(
+                "candidate",
+                filter=Q(candidate__engagements__isnull=False)
+                & Q(candidate__final_selection_status="SLD"),
+                distinct=True,
+            ),
+            pending_scheduled=Count(
+                "candidate",
+                filter=Q(candidate__engagements__isnull=True)
+                & Q(candidate__final_selection_status="SLD"),
+                distinct=True,
+            ),
         )
 
         # Select the fields to return
         qs_values = qs.values(
-            'id',
-            'name',
-            'active_candidates',
-            'scheduled',
-            'pending_scheduled',
+            "id",
+            "name",
+            "active_candidates",
+            "scheduled",
+            "pending_scheduled",
             # Add other fields as needed
         )
 
@@ -113,20 +130,22 @@ class InternalClientView(APIView, LimitOffsetPagination):
         search_term = request.query_params.get("q")
 
         query = InternalClient.objects.values("id", "name")
-        
+
         if client_ids:
             query = query.filter(pk__in=client_ids.split(","))
-        
+
         if domains:
             query = query.filter(domain__in=domains.split(","))
-        
+
         if status_:
-            status_list = [True if status == "active" else False for status in status_.split(",")]
+            status_list = [
+                True if status == "active" else False for status in status_.split(",")
+            ]
             query = query.filter(is_signed__in=status_list)
-        
+
         if search_term:
             query = query.filter(name__icontains=search_term.lower())
-        
+
         client_stat = query.annotate(
             active_jobs=Count(
                 "organization__clientuser__jobs",
@@ -331,7 +350,7 @@ class InterviewerView(APIView, LimitOffsetPagination):
         if strengths:
             filters &= Q(strength__in=strengths)
 
-        interviewers_qs = InternalInterviewer.objects.filter(filters)
+        interviewers_qs = InternalInterviewer.objects.filter(filters).order_by("-id")
 
         if search_terms:
             interviewers_qs = interviewers_qs.filter(
@@ -511,27 +530,42 @@ class OrganizationAgreementView(APIView, LimitOffsetPagination):
         )
 
         agreements_qs = agreements_qs.annotate(
-                        experience_0_4=Count(
-                            Case(When(agreements__years_of_experience="0-4", then=1), output_field=IntegerField())
-                        ),
-                        experience_4_6=Count(
-                            Case(When(agreements__years_of_experience="4-6", then=1), output_field=IntegerField())
-                        ),
-                        experience_6_8=Count(
-                            Case(When(agreements__years_of_experience="6-8", then=1), output_field=IntegerField())
-                        ),
-                        experience_8_10=Count(
-                            Case(When(agreements__years_of_experience="8-10", then=1), output_field=IntegerField())
-                        ),
-                        experience_10_plus=Count(
-                            Case(When(agreements__years_of_experience="10+", then=1), output_field=IntegerField())
-                        ),
-                    ).filter(
-                        Q(experience_0_4__gt=0) &
-                        Q(experience_4_6__gt=0) &
-                        Q(experience_6_8__gt=0) &
-                        Q(experience_8_10__gt=0) &
-                        Q(experience_10_plus__gt=0)
+            experience_0_4=Count(
+                Case(
+                    When(agreements__years_of_experience="0-4", then=1),
+                    output_field=IntegerField(),
+                )
+            ),
+            experience_4_6=Count(
+                Case(
+                    When(agreements__years_of_experience="4-6", then=1),
+                    output_field=IntegerField(),
+                )
+            ),
+            experience_6_8=Count(
+                Case(
+                    When(agreements__years_of_experience="6-8", then=1),
+                    output_field=IntegerField(),
+                )
+            ),
+            experience_8_10=Count(
+                Case(
+                    When(agreements__years_of_experience="8-10", then=1),
+                    output_field=IntegerField(),
+                )
+            ),
+            experience_10_plus=Count(
+                Case(
+                    When(agreements__years_of_experience="10+", then=1),
+                    output_field=IntegerField(),
+                )
+            ),
+        ).filter(
+            Q(experience_0_4__gt=0)
+            & Q(experience_4_6__gt=0)
+            & Q(experience_6_8__gt=0)
+            & Q(experience_8_10__gt=0)
+            & Q(experience_10_plus__gt=0)
         )
 
         if search_term:
@@ -751,7 +785,9 @@ class InternalClientUserView(APIView, LimitOffsetPagination):
         ).order_by("organization__name")
 
         if search_term:
-            internal_user = internal_user.filter(organization__name__icontains=search_term)
+            internal_user = internal_user.filter(
+                organization__name__icontains=search_term
+            )
 
         paginated_queryset = self.paginate_queryset(internal_user, request)
         serializer = self.serializer_class(paginated_queryset, many=True)
@@ -860,7 +896,9 @@ class HDIPUsersViews(APIView, LimitOffsetPagination):
         )
 
     def post(self, request, **kwargs):
-        serializer = self.serializer_class(data=request.data, context={"request":request})
+        serializer = self.serializer_class(
+            data=request.data, context={"request": request}
+        )
         if serializer.is_valid():
             serializer.save()
             return Response(

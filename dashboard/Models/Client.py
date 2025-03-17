@@ -158,6 +158,12 @@ class Candidate(CreateUpdateDateTimeAndArchivedField):
     reason_for_dropping = models.CharField(
         max_length=100, choices=REASON_FOR_DROPPING_CHOICES, blank=True, null=True
     )
+    last_scheduled_initiate_time = models.DateTimeField(
+        null=True,
+        db_index=True,
+        blank=True,
+        help_text="Gives the clarity the weather reinitiate the schedule again or not.",
+    )
     score = models.PositiveSmallIntegerField(default=0)
     total_score = models.PositiveSmallIntegerField(default=0)
     final_selection_status = models.CharField(

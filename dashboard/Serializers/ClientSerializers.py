@@ -434,6 +434,7 @@ class CandidateSerializer(serializers.ModelSerializer):
             "company",
             "specialization",
             "remark",
+            "last_scheduled_initiate_time",
             "reason_for_dropping",
             "job_id",
             "created_at",

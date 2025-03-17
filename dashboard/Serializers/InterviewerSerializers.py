@@ -1,4 +1,5 @@
 import datetime
+from django.utils import timezone
 from rest_framework import serializers
 from ..models import InterviewerAvailability, Candidate, Interview, Job
 from hiringdogbackend.utils import validate_incoming_data
@@ -188,6 +189,19 @@ class InterviewerRequestSerializer(serializers.Serializer):
         if not candidate:
             errors.setdefault("candidate_id", []).append("Invalid candidate_id")
 
+        if candidate.status != "NSCH":
+            errors.setdefault("candidate_id", []).append(
+                "Candidate is already scheduled and processed"
+            )
+        if (
+            candidate.last_scheduled_initiate_time
+            and timezone.now()
+            < candidate.last_scheduled_initiate_time + datetime.timedelta(hours=1)
+        ):
+            errors.setdefault("candidate_id", []).append(
+                "Can't reinitiate the scheduling for 1 hour. Previous scheduling is in progress"
+            )
+
         valid_interviewer_ids = set(
             InterviewerAvailability.objects.filter(
                 pk__in=data.get("interviewer_ids")
@@ -201,6 +215,8 @@ class InterviewerRequestSerializer(serializers.Serializer):
 
         if errors:
             raise serializers.ValidationError({"errors": errors})
+
+        data["candidate_obj"] = candidate
 
         return data
 
