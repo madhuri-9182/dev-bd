@@ -1,5 +1,5 @@
 from drf_spectacular.utils import extend_schema
-from django.db.models import Count, Q, Case, When, IntegerField
+from django.db.models import Count, Q, Case, When, IntegerField, Min
 from organizations.models import Organization
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -35,7 +35,10 @@ class InternalClientDomainView(APIView, LimitOffsetPagination):
     serializer_class = InternalClientDomainSerializer
 
     def get(self, request):
-        client_domain_qs = InternalClient.objects.all().only("id", "name", "domain")
+        client_domain_qs = (
+                InternalClient.objects.values("domain")  # Group by domain
+                .annotate(id=Min("id"))  # Pick the min id per domain
+            )
         paginated_qs = self.paginate_queryset(client_domain_qs, request)
         serializer = self.serializer_class(paginated_qs, many=True)
         paginated_response = self.get_paginated_response(serializer.data)
