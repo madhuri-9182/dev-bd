@@ -26,6 +26,7 @@ from .InternalViews import (
     HDIPUsersViews,
     DomainDesignationView,
     InternalClientDomainView,
+    InternalEngagementView
 )
 
 from .InterviewerViews import (

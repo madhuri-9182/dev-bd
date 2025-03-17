@@ -12,6 +12,7 @@ from ..views import (
     HDIPUsersViews,
     DomainDesignationView,
     InternalClientDomainView,
+    InternalEngagementView
 )
 
 urlpatterns = [
@@ -59,5 +60,10 @@ urlpatterns = [
         "client-domains/",
         InternalClientDomainView.as_view(),
         name="client-domains",
+    ),
+    path(
+        "engagements/",
+        InternalEngagementView.as_view(),
+        name="engagements",
     ),
 ]

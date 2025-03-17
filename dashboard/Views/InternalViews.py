@@ -48,6 +48,56 @@ class InternalClientDomainView(APIView, LimitOffsetPagination):
         )
 
 
+class InternalEngagementView(APIView, LimitOffsetPagination):
+    permission_classes = [IsAuthenticated, IsModerator | IsSuperAdmin | IsAdmin]
+
+    def get(self, request):
+        domains = request.query_params.get("domain")
+        status_ = request.query_params.get("status")
+        search_term = request.query_params.get("q")
+
+        qs = Organization.objects.prefetch_related("candidate").order_by("-id")
+
+        if domains:
+            qs = qs.filter(internal_client__domain__in=domains.split(","))
+
+        if status_:
+            status_list = [True if status == "active" else False for status in status_.split(",")]
+            qs = qs.filter(is_active__in=status_list)
+
+        if search_term:
+            qs = qs.filter(name__icontains=search_term.lower())
+
+        # Annotate each organization with candidate engagement details
+        qs = qs.annotate(
+            active_candidates=Count("candidate", filter=Q(candidate__final_selection_status="SLD"), distinct=True),  # Count of candidates per organization
+            scheduled=Count("candidate", filter=Q(candidate__engagements__isnull=False) & Q(candidate__final_selection_status="SLD"), distinct=True),
+            pending_scheduled=Count("candidate", filter=Q(candidate__engagements__isnull=True) & Q(candidate__final_selection_status="SLD"), distinct=True),
+        )
+
+        # Select the fields to return
+        qs_values = qs.values(
+            'id',
+            'name',
+            'active_candidates',
+            'scheduled',
+            'pending_scheduled',
+            # Add other fields as needed
+        )
+
+        # Paginate the queryset
+        paginated_qs = self.paginate_queryset(qs_values, request)
+        paginated_response = self.get_paginated_response(paginated_qs)
+
+        return Response(
+            {
+                "status": "success",
+                "message": "Successfully retrieved engagements",
+                **paginated_response.data,
+            }
+        )
+
+
 @extend_schema(tags=["Internal"])
 class InternalClientView(APIView, LimitOffsetPagination):
     serializer_class = InternalClientSerializer

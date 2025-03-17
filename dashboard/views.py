@@ -26,6 +26,7 @@ from dashboard.Views import (
     HDIPUsersViews,
     DomainDesignationView,
     InternalClientDomainView,
+    InternalEngagementView,
     InterviewerAcceptedInterviewsView,
     InterviewerPendingFeedbackView,
     InterviewerInterviewHistoryView,
