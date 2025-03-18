@@ -183,7 +183,7 @@ class InterviewerReqeustView(APIView):
                     serializer.validated_data.get("date"),
                     serializer.validated_data.get("time"),
                 )
-                data = f"interviewer_avialability_id:{interviewer_obj.id};candidate_id:{candidate_id};schedule_time:{schedule_datetime};expired_time:{datetime.datetime.now()+datetime.timedelta(hours=1)}"
+                data = f"interviewer_avialability_id:{interviewer_obj.id};candidate_id:{candidate_id};schedule_time:{schedule_datetime};booked_by:{request.user.id};expired_time:{datetime.datetime.now()+datetime.timedelta(hours=1)}"
                 accept_data = data + ";action:accept"
                 reject_data = data + ";action:reject"
                 accept_uid = urlsafe_base64_encode(force_bytes(accept_data))
@@ -237,13 +237,14 @@ class InterviewerRequestResponseView(APIView):
             try:
                 decode_data = force_str(urlsafe_base64_decode(request_id))
                 data_parts = decode_data.split(";")
-                if len(data_parts) != 5:
+                if len(data_parts) != 6:
                     raise ValueError("Invalid data format")
 
                 (
                     interviewer_availability_id,
                     candidate_id,
                     schedule_time,
+                    booked_by,
                     expired_time,
                     action,
                 ) = [item.split(":", 1)[1] for item in data_parts]
@@ -294,6 +295,36 @@ class InterviewerRequestResponseView(APIView):
             schedule_time = datetime.datetime.strptime(
                 schedule_time, "%Y-%m-%d %H:%M:%S"
             )
+            schedule_time = timezone.make_aware(schedule_time)
+
+            # To handle multiple interview requests from different clients to the same interviewer scenario
+            schedule_time_after_one_hour = schedule_time + datetime.timedelta(hours=1)
+            schedule_time_before_one_hour = schedule_time - datetime.timedelta(hours=1)
+            if (
+                Interview.objects.filter(
+                    interviewer=interviewer_availability.interviewer,
+                    status="SCH",
+                )
+                .filter(
+                    Q(scheduled_time=schedule_time)
+                    | Q(
+                        scheduled_time__gte=schedule_time_before_one_hour,
+                        scheduled_time__lt=schedule_time,
+                    )
+                    | Q(
+                        scheduled_time__lte=schedule_time_after_one_hour,
+                        scheduled_time__gt=schedule_time,
+                    )
+                )
+                .exists()
+            ):
+                return Response(
+                    {
+                        "status": "failed",
+                        "message": "There must be a 1-hour gap between two consecutive scheduled interviews.",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
             if action == "accept":
                 with transaction.atomic():
@@ -304,12 +335,71 @@ class InterviewerRequestResponseView(APIView):
                         scheduled_time=schedule_time,
                         total_score=100,
                     )
-                    interviewer_availability.booked_by = (
-                        interviewer_availability.interviewer.user
-                    )
+                    interviewer_availability.booked_by_id = booked_by
                     interviewer_availability.is_scheduled = True
+
+                    original_start_time = interviewer_availability.start_time
+                    original_end_time = interviewer_availability.end_time
+
+                    # updating with the booked time
+                    interviewer_availability.start_time = schedule_time.time()
+                    interviewer_availability.end_time = (
+                        schedule_time + datetime.timedelta(hours=1)
+                    ).time()
                     interviewer_availability.save()
 
+                    # creating new available instance for if interviewer is futher available with 1hour before and after time gap
+                    original_availability_date = interviewer_availability.date
+                    new_slots = []
+                    before_slot_end = (
+                        schedule_time - datetime.timedelta(hours=1)
+                    ).time()
+                    before_slot_start = original_start_time
+                    before_slot_end_dt = datetime.datetime.combine(
+                        original_availability_date, before_slot_end
+                    )
+                    before_slot_start_dt = datetime.datetime.combine(
+                        original_availability_date, before_slot_start
+                    )
+                    if (
+                        before_slot_end_dt - before_slot_start_dt
+                    ) >= datetime.timedelta(hours=1):
+                        new_slots.append(
+                            InterviewerAvailability(
+                                interviewer=interviewer_availability.interviewer,
+                                date=interviewer_availability.date,
+                                start_time=before_slot_start,
+                                end_time=before_slot_end,
+                                google_calendar_id=interviewer_availability.google_calendar_id,
+                            )
+                        )
+                    after_slot_start = (
+                        schedule_time + datetime.timedelta(hours=2)
+                    ).time()
+                    after_slot_end = original_end_time
+
+                    after_slot_start_dt = datetime.datetime.combine(
+                        original_availability_date, after_slot_start
+                    )
+                    after_slot_end_dt = datetime.datetime.combine(
+                        original_availability_date, after_slot_end
+                    )
+                    if (after_slot_end_dt - after_slot_start_dt) >= datetime.timedelta(
+                        hours=1
+                    ):
+                        new_slots.append(
+                            InterviewerAvailability(
+                                interviewer=interviewer_availability.interviewer,
+                                date=interviewer_availability.date,
+                                start_time=after_slot_start,
+                                end_time=after_slot_end,
+                                google_calendar_id=interviewer_availability.google_calendar_id,
+                            )
+                        )
+
+                    InterviewerAvailability.objects.bulk_create(new_slots)
+
+                    # sending the confirmation notification
                     interview_date = schedule_time.date().strftime("%d/%m/%Y")
                     interview_time = schedule_time.time().strftime("%H:%M:%S")
 
