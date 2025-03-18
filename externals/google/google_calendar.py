@@ -1,6 +1,7 @@
 import os
 from datetime import datetime, timedelta
 from django.conf import settings
+from django.utils import timezone
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
@@ -70,11 +71,14 @@ class GoogleCalendar:
 
         if credentials.expired and credentials.refresh_token:
             credentials.refresh(Request())
+            expiry = credentials.expiry
+            if timezone.is_naive(expiry):
+                expiry = timezone.make_aware(expiry)
             OAuthToken.objects.update_or_create(
                 user=user,
                 defaults={
                     "access_token": credentials.token,
-                    "expires_at": credentials.expiry,
+                    "expires_at": expiry,
                     "refresh_token": credentials.refresh_token,
                 },
             )
