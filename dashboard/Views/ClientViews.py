@@ -291,7 +291,7 @@ class JobView(APIView, LimitOffsetPagination):
 
         try:
             request.user.clientuser
-        except:
+        except User.clientuser.RelatedObjectDoesNotExist:
             if not org_id:
                 return Response(
                     {
@@ -345,8 +345,8 @@ class JobView(APIView, LimitOffsetPagination):
 
         jobs = (
             Job.objects.filter(
-                hiring_manager__organization_id=org_id
-                or request.user.clientuser.organization_id,
+                hiring_manager__organization=org_id
+                or request.user.clientuser.organization,
             )
             .prefetch_related("clients")
             .order_by("-id")
@@ -604,7 +604,13 @@ class CandidateView(APIView, LimitOffsetPagination):
         ):
             search_term = "+91" + search_term
 
-        if status_ and status_ not in dict(Candidate.STATUS_CHOICES).keys():
+        if (
+            status_
+            and status_
+            not in dict(
+                Candidate.STATUS_CHOICES + Candidate.FINAL_SELECTION_STATUS_CHOICES
+            ).keys()
+        ):
             return Response(
                 {"status": "failed", "message": "Invalid Status."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -631,7 +637,9 @@ class CandidateView(APIView, LimitOffsetPagination):
             candidates = candidates.filter(designation__id=job_id)
 
         if status_:
-            candidates = candidates.filter(status=status_)
+            candidates = candidates.filter(
+                Q(status=status_) | Q(final_selection_status=status_)
+            )
 
         if search_term:
             candidates = candidates.filter(
@@ -1095,6 +1103,7 @@ class EngagementView(APIView, LimitOffsetPagination):
         job_id = query_params.get("job_ids")
         specialization = query_params.get("specializations")
         notice_period = query_params.get("nps")
+        status_ = query_params.get("status")
         search_filter = query_params.get("q")
         org_id = query_params.get(
             "organization_id"
@@ -1120,6 +1129,12 @@ class EngagementView(APIView, LimitOffsetPagination):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
+        if status_ and status_ not in dict(Engagement.STATUS_CHOICE).keys():
+            return Response(
+                {"status": "failed", "message": "Invalid Status."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         if (
             search_filter
             and search_filter.isdigit()
@@ -1138,6 +1153,8 @@ class EngagementView(APIView, LimitOffsetPagination):
             filters["job__specialization__in"] = specialization.split(",")
         if notice_period:
             filters["notice_period__in"] = notice_period.split(",")
+        if status_:
+            filters["status"] = status_
 
         engagement_summary = Engagement.objects.filter(
             organization=org or request.user.clientuser.organization
@@ -1678,18 +1695,26 @@ class ClientDashboardView(APIView):
         organization = request.user.clientuser.organization
 
         all_jobs = Job.objects.filter(hiring_manager__organization=organization)
+        candidates = Candidate.objects.filter(organization=organization)
+        if request.user.role == Role.CLIENT_USER:
+            all_jobs = all_jobs.filter(clients=request.user.clientuser)
+            candidates = candidates.filter(designation__clients=request.user.clientuser)
+
         pending_jobs = all_jobs.filter(reason_for_archived__isnull=False)
 
         # Job role aggregates
         job_role_aggregates = all_jobs.values("name").annotate(
             count=Count(
                 "id",
+                filter=Q(reason_for_archived__isnull=True) | Q(reason_for_archived=""),
             )
         )
 
         # Candidate progress aggregates
-        candidates = Candidate.objects.filter(organization=organization).aggregate(
-            total_candidates=Count("id"),
+        candidates = candidates.aggregate(
+            total_interviews=Count(
+                "id", filter=Q(status__in=["COMPLETED", "HREC", "REC", "NREC", "SNREC"])
+            ),
             pending_schedule=Count("id", filter=Q(status="NSCH")),
             selects=Count("id", filter=Q(final_selection_status="SLD")),
             joined=Count("id", filter=Q(engagements__status="JND")),
@@ -1697,7 +1722,7 @@ class ClientDashboardView(APIView):
 
         # Job aggregation
         job_aggregates = all_jobs.aggregate(
-            total_jobs=Count("id"),
+            total_jobs=Count("id", distinct=True),
             total_candidates=Count("candidate"),
             selects=Count(
                 "candidate", filter=Q(candidate__final_selection_status="SLD")
