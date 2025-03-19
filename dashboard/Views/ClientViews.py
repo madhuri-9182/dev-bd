@@ -45,7 +45,7 @@ from core.permissions import (
     IsAdmin,
     IsModerator,
 )
-from core.models import Role
+from core.models import Role, User
 from hiringdogbackend.utils import validate_attachment
 import tempfile
 import os
@@ -1101,8 +1101,8 @@ class EngagementView(APIView, LimitOffsetPagination):
         )  # pass this to get details of for particular client - used in internal engagement section to view details
 
         try:
-            org = request.user.clientuser
-        except:
+            org = request.user.clientuser.organization
+        except User.clientuser.RelatedObjectDoesNotExist:
             if not org_id:
                 return Response(
                     {
@@ -1112,13 +1112,12 @@ class EngagementView(APIView, LimitOffsetPagination):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-        org = None
         if org_id:
-            try:
-                org = Organization.objects.filter(id=org_id).first()
-            except:
+            org = Organization.objects.filter(id=org_id).first()
+            if not org:
                 return Response(
-                    {"status": "failed", "message": "Invalid organization_id"}
+                    {"status": "failed", "message": "Invalid organization_id"},
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
 
         if (
