@@ -1136,7 +1136,7 @@ class EngagementView(APIView, LimitOffsetPagination):
         if job_id:
             filters["job_id__in"] = job_id.split(",")
         if specialization:
-            filters["candidate__specialization__in"] = specialization.split(",")
+            filters["job__specialization__in"] = specialization.split(",")
         if notice_period:
             filters["notice_period__in"] = notice_period.split(",")
 
