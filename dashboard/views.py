@@ -30,4 +30,5 @@ from dashboard.Views import (
     InterviewerAcceptedInterviewsView,
     InterviewerPendingFeedbackView,
     InterviewerInterviewHistoryView,
+    InterviewFeedbackView
 )

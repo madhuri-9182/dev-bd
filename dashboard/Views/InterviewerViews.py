@@ -1,6 +1,6 @@
 import datetime
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Q
 from django.conf import settings
 from django.utils import timezone
 from django.utils.encoding import force_bytes, force_str
@@ -15,8 +15,9 @@ from ..serializer import (
     InterviewerAvailabilitySerializer,
     InterviewerRequestSerializer,
     InterviewerDashboardSerializer,
+    InterviewFeedbackSerializer
 )
-from ..models import InterviewerAvailability, Candidate, InternalInterviewer, Interview
+from ..models import InterviewerAvailability, Candidate, Interview, InterviewFeedback
 from ..tasks import send_email_to_multiple_recipients
 from core.permissions import (
     IsInterviewer,
@@ -526,4 +527,60 @@ class InterviewerInterviewHistoryView(APIView, LimitOffsetPagination):
                 **paginated_data.data,
             },
             status=status.HTTP_200_OK,
+        )
+
+
+class InterviewFeedbackView(APIView, LimitOffsetPagination):
+    serializer_class = InterviewFeedbackSerializer
+    permission_classes = (IsAuthenticated, IsInterviewer)
+
+    def get(self, request, interview_id=None):
+        if not interview_id:
+            return Response({"status":"failed", "message":"Interview id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        interview_feedback_qs = InterviewFeedback.objects.filter(interview_id=interview_id).select_related("interview").order_by("-id")
+        if not interview_feedback_qs.exists():
+            return Response({"status":"failed", "message":"No interview feedback found for current interview id"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        serializer = self.serializer_class(interview_feedback_qs.first())
+        return Response(
+            {
+                "status": "success",
+                "message": "Interview feedback fetched successfully",
+                "data": serializer.data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(
+            {
+                "status": "success",
+                "message": "Interview feedback added successfully.",
+                "data": serializer.data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    def patch(self, request, interview_id=None):
+        if not interview_id:
+            return Response({"status":"failed", "message":"Interview id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        interview_feedback_qs = InterviewFeedback.objects.filter(interview_id=interview_id).select_related("interview").order_by("-id")
+        if not interview_feedback_qs.exists():
+            return Response({"status":"failed", "message":"No interview feedback found for current interview id"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        serializer = self.serializer_class(interview_feedback_qs.first(), data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(
+            {
+                "status": "success",
+                "message": "Interview feedback updated successfully.",
+                "data": serializer.data,
+            },
+            status=status.HTTP_201_CREATED,
         )

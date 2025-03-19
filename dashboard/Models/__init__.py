@@ -15,4 +15,4 @@ from .Internal import (
     DesignationDomain,
 )
 from .Interviewer import InterviewerAvailability, InterviewerRequest
-from .Interviews import Interview
+from .Interviews import Interview, InterviewFeedback

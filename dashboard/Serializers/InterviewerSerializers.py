@@ -1,7 +1,7 @@
 import datetime
 from django.utils import timezone
 from rest_framework import serializers
-from ..models import InterviewerAvailability, Candidate, Interview, Job
+from ..models import InterviewerAvailability, Candidate, Interview, InterviewFeedback, Job
 from hiringdogbackend.utils import validate_incoming_data
 
 
@@ -251,3 +251,115 @@ class InterviewerDashboardSerializer(serializers.ModelSerializer):
     class Meta:
         model = Interview
         fields = ("id", "candidate", "scheduled_time")
+
+
+class QuestionSerializer(serializers.Serializer):
+    que = serializers.CharField(min_length=1, max_length=100)
+    ans = serializers.CharField(min_length=1, max_length=500)
+
+
+class TopicSerializer(serializers.Serializer):
+    summary = serializers.CharField(min_length=1, max_length=500)
+    score = serializers.IntegerField(min_value=0, max_value=100)
+    questions = serializers.ListSerializer(child=QuestionSerializer(), min_length=1)
+
+
+class SkillBasedPerformanceSerializer(serializers.Serializer):
+    def validate(self, data):
+        if not data:
+            raise serializers.ValidationError("At least one skill must be provided.")
+
+        # Check for duplicate skills (case-insensitive)
+        skill_keys_lower = [key.lower() for key in data.keys()]
+        if len(skill_keys_lower) != len(set(skill_keys_lower)):
+            raise serializers.ValidationError("Duplicate skills are not allowed.")
+
+        return data
+
+    def to_internal_value(self, data):
+        if not isinstance(data, dict):
+            raise serializers.ValidationError("Expected a dictionary of skills.")
+
+        validated_data = {}
+        errors = {}
+
+        for skill_name, skill_data in data.items():
+            if not isinstance(skill_data, dict):
+                errors[skill_name] = "Each skill should have summary, score, and questions."
+                continue
+
+            topic_serializer = TopicSerializer(data=skill_data)
+            if not topic_serializer.is_valid():
+                errors[skill_name] = topic_serializer.errors
+            else:
+                validated_data[skill_name] = topic_serializer.validated_data
+
+        if errors:
+            raise serializers.ValidationError(errors)
+
+        return validated_data
+
+    def to_representation(self, instance):
+        return instance  # Ensure full validated data is returned
+
+
+class SkillEvaluationSerializer(serializers.Serializer):
+    """Validate skill evaluation dictionary"""
+
+    ALLOWED_CHOICES = ["poor", "average", "good", "excellent"]
+    REQUIRED_EVALUATIONS = ["Communication", "Attitude"]
+
+    def to_internal_value(self, data):
+        if not isinstance(data, dict):
+            raise serializers.ValidationError("Expected a dictionary for skill evaluations.")
+
+        validated_data = {}
+        errors = {}
+
+        # Validate choices first
+        for skill, rating in data.items():
+            if rating not in self.ALLOWED_CHOICES:
+                errors.setdefault(skill, []).append(f"Invalid value '{rating}'. Allowed values: {self.ALLOWED_CHOICES}.")
+
+        # Only check for missing required fields if there are no validation errors yet
+        if not errors:
+            missing_required = [skill for skill in self.REQUIRED_EVALUATIONS if skill not in data]
+            if missing_required:
+                for skill in missing_required:
+                    errors.setdefault(skill, []).append(f"{skill} evaluation is required.")
+
+        if errors:
+            raise serializers.ValidationError(errors)
+
+        return validated_data
+
+    def to_representation(self, instance):
+        return instance  # Ensure full validated data is returned
+    
+
+class InterviewFeedbackSerializer(serializers.ModelSerializer):
+    skill_based_performance = SkillBasedPerformanceSerializer()
+    skill_evaluation = SkillEvaluationSerializer()
+
+    class Meta:
+        model = InterviewFeedback
+        fields = ("interview_id", "skill_based_performance", "skill_evaluation", "strength", "improvement_points", "overall_remark", "overall_score")
+
+    def validate(self, data):
+        data = self.initial_data
+        errors = validate_incoming_data(data, list(self.fields.keys()), partial=self.partial)
+        if errors:
+            raise serializers.ValidationError({"errors": errors})
+
+        if data.get("interview_id"):
+            if not str(data.get("interview_id")).isdigit():
+                errors.setdefault("interview_id", []).append("Invalid interview_id")
+            else:
+                interview = Interview.objects.filter(pk=data.get("interview_id")).first()
+                if not interview:
+                    errors.setdefault("interview_id", []).append("No interview found for this interview_id")
+
+        if errors:
+            raise serializers.ValidationError({"errors": errors})
+        
+        return data

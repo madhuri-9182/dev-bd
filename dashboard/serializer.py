@@ -22,4 +22,5 @@ from .Serializers import (
     InternalClientStatSerializer,
     InternalClientDomainSerializer,
     InterviewerDashboardSerializer,
+    InterviewFeedbackSerializer
 )

@@ -36,4 +36,5 @@ from .InterviewerViews import (
     InterviewerAcceptedInterviewsView,
     InterviewerPendingFeedbackView,
     InterviewerInterviewHistoryView,
+    InterviewFeedbackView
 )

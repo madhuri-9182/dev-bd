@@ -6,6 +6,7 @@ from ..views import (
     InterviewerAcceptedInterviewsView,
     InterviewerPendingFeedbackView,
     InterviewerInterviewHistoryView,
+    InterviewFeedbackView,
 )
 
 urlpatterns = [
@@ -38,5 +39,15 @@ urlpatterns = [
         "interview-history/",
         InterviewerInterviewHistoryView.as_view(),
         name="interview-history",
+    ),
+    path(
+        "interview-feedback/",
+        InterviewFeedbackView.as_view(),
+        name="interview-feedback",
+    ),
+    path(
+        "interview-feedback/<int:interview_id>/",
+        InterviewFeedbackView.as_view(),
+        name="interview-feedback",
     ),
 ]
