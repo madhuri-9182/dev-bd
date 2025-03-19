@@ -244,7 +244,14 @@ class JobView(APIView, LimitOffsetPagination):
     serializer_class = JobSerializer
     permission_classes = [IsAuthenticated, HasRole, UserRoleDeleteUpdateClientData]
     roles_mapping = {
-        "GET": [Role.CLIENT_ADMIN, Role.CLIENT_OWNER, Role.CLIENT_USER, Role.ADMIN, Role.SUPER_ADMIN, Role.MODERATOR],
+        "GET": [
+            Role.CLIENT_ADMIN,
+            Role.CLIENT_OWNER,
+            Role.CLIENT_USER,
+            Role.ADMIN,
+            Role.SUPER_ADMIN,
+            Role.MODERATOR,
+        ],
         "POST": [Role.CLIENT_ADMIN, Role.CLIENT_OWNER],
         "PATCH": [Role.CLIENT_ADMIN, Role.CLIENT_OWNER, Role.CLIENT_USER],
         "DELETE": [Role.CLIENT_ADMIN, Role.CLIENT_OWNER, Role.CLIENT_USER],
@@ -278,14 +285,19 @@ class JobView(APIView, LimitOffsetPagination):
         job_id = kwargs.get("job_id")
         active_status = request.query_params.get("status", "active")
         job_ids = request.query_params.get("job_ids")
-        org_id = request.query_params.get("organization_id") #pass this to get details of for particular client - used in internal engagement section to view details
+        org_id = request.query_params.get(
+            "organization_id"
+        )  # pass this to get details of for particular client - used in internal engagement section to view details
 
         try:
             request.user.clientuser
         except:
             if not org_id:
                 return Response(
-                    {"status": "failed", "message": "Please pass organization_id in params."},
+                    {
+                        "status": "failed",
+                        "message": "Please pass organization_id in params.",
+                    },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -333,7 +345,8 @@ class JobView(APIView, LimitOffsetPagination):
 
         jobs = (
             Job.objects.filter(
-                hiring_manager__organization_id=org_id or request.user.clientuser.organization_id,
+                hiring_manager__organization_id=org_id
+                or request.user.clientuser.organization_id,
             )
             .prefetch_related("clients")
             .order_by("-id")
@@ -1028,11 +1041,18 @@ class EngagementView(APIView, LimitOffsetPagination):
     serializer_class = EngagementSerializer
     permission_classes = [IsAuthenticated, HasRole]
     roles_mapping = {
-        "GET": [Role.CLIENT_ADMIN, Role.CLIENT_OWNER, Role.CLIENT_USER, Role.ADMIN, Role.SUPER_ADMIN, Role.MODERATOR],
+        "GET": [
+            Role.CLIENT_ADMIN,
+            Role.CLIENT_OWNER,
+            Role.CLIENT_USER,
+            Role.ADMIN,
+            Role.SUPER_ADMIN,
+            Role.MODERATOR,
+        ],
         "POST": [Role.CLIENT_ADMIN, Role.CLIENT_OWNER, Role.CLIENT_USER],
         "PATCH": [Role.CLIENT_ADMIN, Role.CLIENT_OWNER, Role.CLIENT_USER],
     }
-    
+
     def post(self, request, **kwargs):
         engagement_id = kwargs.get("engagement_id")
         if engagement_id:
@@ -1076,23 +1096,30 @@ class EngagementView(APIView, LimitOffsetPagination):
         specialization = query_params.get("specializations")
         notice_period = query_params.get("nps")
         search_filter = query_params.get("q")
-        org_id = query_params.get("organization_id") #pass this to get details of for particular client - used in internal engagement section to view details
+        org_id = query_params.get(
+            "organization_id"
+        )  # pass this to get details of for particular client - used in internal engagement section to view details
 
         try:
             org = request.user.clientuser
         except:
             if not org_id:
                 return Response(
-                    {"status": "failed", "message": "Please pass organization_id in params."},
+                    {
+                        "status": "failed",
+                        "message": "Please pass organization_id in params.",
+                    },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-        
+
         org = None
         if org_id:
             try:
                 org = Organization.objects.filter(id=org_id).first()
             except:
-                return Response({"status":"failed", "message":"Invalid organization_id"})
+                return Response(
+                    {"status": "failed", "message": "Invalid organization_id"}
+                )
 
         if (
             search_filter
@@ -1655,7 +1682,11 @@ class ClientDashboardView(APIView):
         pending_jobs = all_jobs.filter(reason_for_archived__isnull=False)
 
         # Job role aggregates
-        job_role_aggregates = all_jobs.values("name").annotate(count=Count("id"))
+        job_role_aggregates = all_jobs.values("name").annotate(
+            count=Count(
+                "id",
+            )
+        )
 
         # Candidate progress aggregates
         candidates = Candidate.objects.filter(organization=organization).aggregate(
