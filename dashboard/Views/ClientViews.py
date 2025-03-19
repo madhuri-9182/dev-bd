@@ -1700,8 +1700,6 @@ class ClientDashboardView(APIView):
             all_jobs = all_jobs.filter(clients=request.user.clientuser)
             candidates = candidates.filter(designation__clients=request.user.clientuser)
 
-        pending_jobs = all_jobs.filter(reason_for_archived__isnull=False)
-
         # Job role aggregates
         job_role_aggregates = all_jobs.values("name").annotate(
             count=Count(
@@ -1736,8 +1734,6 @@ class ClientDashboardView(APIView):
             "job_role_aggregates": list(job_role_aggregates),
             "candidates": candidates,
             "job_aggregates": job_aggregates,
-            "all_task": all_jobs.count(),
-            "pending_task": pending_jobs.count(),
         }
 
         return Response(
