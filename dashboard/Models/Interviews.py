@@ -45,6 +45,10 @@ class Interview(CreateUpdateDateTimeAndArchivedField):
     )
     score = models.PositiveSmallIntegerField(default=0)
     total_score = models.PositiveSmallIntegerField(default=0)
+    scheduled_service_account_event_id = models.CharField(
+        max_length=255, null=True, blank=True
+    )
+    meeting_link = models.URLField(null=True, blank=True)
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
@@ -67,11 +71,19 @@ class InterviewFeedback(CreateUpdateDateTimeAndArchivedField):
     skill_evaluation = models.JSONField(default=dict)
     strength = models.CharField(max_length=500, null=True)
     improvement_points = models.CharField(max_length=500, null=True)
-    overall_remark = models.CharField(max_length=10, null=True,
-                                       choices=(("HREC", "Highly Recommended"), ("REC", "Recommended"),
-                                                ("NREC", "Not Recommended"), ("SNREC", "Strongly Not Recommended"),
-                                                ("NJ", "Not Joined")))
-    overall_score = models.PositiveSmallIntegerField(default=0,
+    overall_remark = models.CharField(
+        max_length=10,
+        null=True,
+        choices=(
+            ("HREC", "Highly Recommended"),
+            ("REC", "Recommended"),
+            ("NREC", "Not Recommended"),
+            ("SNREC", "Strongly Not Recommended"),
+            ("NJ", "Not Joined"),
+        ),
+    )
+    overall_score = models.PositiveSmallIntegerField(
+        default=0,
         validators=[
             MinValueValidator(0, message="Score should be greater than or equal to 0"),
             MaxValueValidator(100, message="Scroe must not exceed 100"),

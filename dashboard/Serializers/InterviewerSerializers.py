@@ -250,7 +250,7 @@ class InterviewerDashboardSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Interview
-        fields = ("id", "candidate", "scheduled_time")
+        fields = ("id", "candidate", "scheduled_time", "meeting_link")
 
 
 class QuestionSerializer(serializers.Serializer):

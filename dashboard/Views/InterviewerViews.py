@@ -15,7 +15,7 @@ from ..serializer import (
     InterviewerAvailabilitySerializer,
     InterviewerRequestSerializer,
     InterviewerDashboardSerializer,
-    InterviewFeedbackSerializer
+    InterviewFeedbackSerializer,
 )
 from ..models import InterviewerAvailability, Candidate, Interview, InterviewFeedback
 from ..tasks import send_email_to_multiple_recipients
@@ -28,6 +28,7 @@ from core.permissions import (
 )
 from core.models import OAuthToken
 from externals.google.google_calendar import GoogleCalendar
+from externals.google.google_meet import create_meet_and_calendar_invite
 
 
 @extend_schema(tags=["Interviewer"])
@@ -80,17 +81,14 @@ class InterviewerAvailabilityView(APIView, LimitOffsetPagination):
                             "dateTime": iso_format_end_time,
                             "timeZone": "Asia/Kolkata",
                         },
+                        "reminders": {
+                            "useDefault": False,
+                            "overrides": [],
+                        },
                         # "attendees": [
                         #     {"email": "attendee1@example.com"},
                         #     {"email": "attendee2@example.com"},
                         # ],
-                        # "reminders": {
-                        #     "useDefault": False,
-                        #     "overrides": [
-                        #         {"method": "email", "minutes": 24 * 60},  # 1 day before
-                        #         {"method": "popup", "minutes": 10},  # 10 minutes before
-                        #     ],
-                        # },
                     }
                     if recurrence:
                         event_details["recurrence"] = [
@@ -329,7 +327,7 @@ class InterviewerRequestResponseView(APIView):
 
             if action == "accept":
                 with transaction.atomic():
-                    Interview.objects.create(
+                    interview = Interview.objects.create(
                         candidate=candidate,
                         interviewer=interviewer_availability.interviewer,
                         status="SCH",
@@ -404,6 +402,17 @@ class InterviewerRequestResponseView(APIView):
                     interview_date = schedule_time.date().strftime("%d/%m/%Y")
                     interview_time = schedule_time.time().strftime("%H:%M:%S")
 
+                    meeting_link, event_id = create_meet_and_calendar_invite(
+                        interviewer_availability.interviewer.email,
+                        candidate.email,
+                        schedule_time,
+                        schedule_time + datetime.timedelta(hours=1),
+                    )
+
+                    interview.scheduled_service_account_event_id = event_id
+                    interview.meeting_link = meeting_link
+                    interview.save()
+
                     contexts = [
                         {
                             "name": candidate.name,
@@ -415,6 +424,7 @@ class InterviewerRequestResponseView(APIView):
                             "email": candidate.email,
                             "template": "interview_confirmation_candidate_notification.html",
                             "subject": f"Interview Scheduled - {candidate.designation.name}",
+                            "meeting_link": meeting_link,
                             "from_email": settings.EMAIL_HOST_USER,
                         },
                         {
@@ -426,6 +436,7 @@ class InterviewerRequestResponseView(APIView):
                             "email": interviewer_availability.interviewer.email,
                             "template": "interview_confirmation_interviewer_notification.html",
                             "subject": f"Interview Assigned - {candidate.name}",
+                            "meeting_link": meeting_link,
                             "from_email": settings.EMAIL_HOST_USER,
                         },
                         {
@@ -437,6 +448,7 @@ class InterviewerRequestResponseView(APIView):
                             "email": candidate.designation.hiring_manager.user.email,
                             "template": "interview_confirmation_client_notification.html",
                             "subject": f"Interview Scheduled - {candidate.name}",
+                            "meeting_link": meeting_link,
                             "from_email": settings.EMAIL_HOST_USER,
                         },
                     ]
@@ -536,12 +548,25 @@ class InterviewFeedbackView(APIView, LimitOffsetPagination):
 
     def get(self, request, interview_id=None):
         if not interview_id:
-            return Response({"status":"failed", "message":"Interview id is required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"status": "failed", "message": "Interview id is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        interview_feedback_qs = InterviewFeedback.objects.filter(interview_id=interview_id).select_related("interview").order_by("-id")
+        interview_feedback_qs = (
+            InterviewFeedback.objects.filter(interview_id=interview_id)
+            .select_related("interview")
+            .order_by("-id")
+        )
         if not interview_feedback_qs.exists():
-            return Response({"status":"failed", "message":"No interview feedback found for current interview id"}, status=status.HTTP_400_BAD_REQUEST)
-        
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "No interview feedback found for current interview id",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         serializer = self.serializer_class(interview_feedback_qs.first())
         return Response(
             {
@@ -567,13 +592,28 @@ class InterviewFeedbackView(APIView, LimitOffsetPagination):
 
     def patch(self, request, interview_id=None):
         if not interview_id:
-            return Response({"status":"failed", "message":"Interview id is required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"status": "failed", "message": "Interview id is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        interview_feedback_qs = InterviewFeedback.objects.filter(interview_id=interview_id).select_related("interview").order_by("-id")
+        interview_feedback_qs = (
+            InterviewFeedback.objects.filter(interview_id=interview_id)
+            .select_related("interview")
+            .order_by("-id")
+        )
         if not interview_feedback_qs.exists():
-            return Response({"status":"failed", "message":"No interview feedback found for current interview id"}, status=status.HTTP_400_BAD_REQUEST)
-        
-        serializer = self.serializer_class(interview_feedback_qs.first(), data=request.data, partial=True)
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "No interview feedback found for current interview id",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = self.serializer_class(
+            interview_feedback_qs.first(), data=request.data, partial=True
+        )
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(
