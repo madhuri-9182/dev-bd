@@ -555,7 +555,9 @@ class InterviewFeedbackView(APIView, LimitOffsetPagination):
 
         interview_feedback_qs = (
             InterviewFeedback.objects.filter(interview_id=interview_id)
-            .select_related("interview")
+            .select_related(
+                "interview__candidate__designation", "interview__interviewer"
+            )
             .order_by("-id")
         )
         if not interview_feedback_qs.exists():

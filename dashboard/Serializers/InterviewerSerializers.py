@@ -1,7 +1,14 @@
 import datetime
 from django.utils import timezone
 from rest_framework import serializers
-from ..models import InterviewerAvailability, Candidate, Interview, InterviewFeedback, Job
+from ..models import (
+    InterviewerAvailability,
+    Candidate,
+    Interview,
+    InterviewFeedback,
+    InternalInterviewer,
+    Job,
+)
 from hiringdogbackend.utils import validate_incoming_data
 
 
@@ -276,7 +283,9 @@ class SkillBasedPerformanceSerializer(serializers.Serializer):
 
         for skill_name, skill_data in data.items():
             if not isinstance(skill_data, dict):
-                errors[skill_name] = "Each skill should have summary, score, and questions."
+                errors[skill_name] = (
+                    "Each skill should have summary, score, and questions."
+                )
                 continue
 
             topic_serializer = TopicSerializer(data=skill_data)
@@ -302,7 +311,9 @@ class SkillEvaluationSerializer(serializers.Serializer):
 
     def to_internal_value(self, data):
         if not isinstance(data, dict):
-            raise serializers.ValidationError("Expected a dictionary for skill evaluations.")
+            raise serializers.ValidationError(
+                "Expected a dictionary for skill evaluations."
+            )
 
         validated_data = {}
         errors = {}
@@ -310,14 +321,20 @@ class SkillEvaluationSerializer(serializers.Serializer):
         # Validate choices first
         for skill, rating in data.items():
             if rating not in self.ALLOWED_CHOICES:
-                errors.setdefault(skill, []).append(f"Invalid value '{rating}'. Allowed values: {self.ALLOWED_CHOICES}.")
+                errors.setdefault(skill, []).append(
+                    f"Invalid value '{rating}'. Allowed values: {self.ALLOWED_CHOICES}."
+                )
 
         # Only check for missing required fields if there are no validation errors yet
         if not errors:
-            missing_required = [skill for skill in self.REQUIRED_EVALUATIONS if skill not in data]
+            missing_required = [
+                skill for skill in self.REQUIRED_EVALUATIONS if skill not in data
+            ]
             if missing_required:
                 for skill in missing_required:
-                    errors.setdefault(skill, []).append(f"{skill} evaluation is required.")
+                    errors.setdefault(skill, []).append(
+                        f"{skill} evaluation is required."
+                    )
 
         if errors:
             raise serializers.ValidationError(errors)
@@ -326,19 +343,59 @@ class SkillEvaluationSerializer(serializers.Serializer):
 
     def to_representation(self, instance):
         return instance  # Ensure full validated data is returned
-    
+
+
+class InterviewerFeedbackSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InternalInterviewer
+        fields = (
+            "total_experience_years",
+            "total_experience_months",
+            "current_company",
+        )
+
+
+class CandidateFeedbackSerializer(serializers.ModelSerializer):
+    role = serializers.CharField(source="designation.name")
+
+    class Meta:
+        model = Candidate
+        fields = ("name", "email", "phone", "year", "month", "company", "role")
+
 
 class InterviewFeedbackSerializer(serializers.ModelSerializer):
     skill_based_performance = SkillBasedPerformanceSerializer()
     skill_evaluation = SkillEvaluationSerializer()
+    interview_date = serializers.DateTimeField(
+        source="interview.scheduled_time", format="%d/%m/%Y %H:%M:%S", read_only=True
+    )
+    candidate = CandidateFeedbackSerializer(
+        source="interview.candidate", read_only=True
+    )
+    interviewer = InterviewerFeedbackSerializer(
+        source="interview.interviewer", read_only=True
+    )
 
     class Meta:
         model = InterviewFeedback
-        fields = ("interview_id", "skill_based_performance", "skill_evaluation", "strength", "improvement_points", "overall_remark", "overall_score")
+        fields = (
+            "interview_id",
+            "interview_date",
+            "candidate",
+            "interviewer",
+            "skill_based_performance",
+            "skill_evaluation",
+            "strength",
+            "improvement_points",
+            "overall_remark",
+            "overall_score",
+        )
 
     def validate(self, data):
         data = self.initial_data
-        errors = validate_incoming_data(data, list(self.fields.keys()), partial=self.partial)
+        errors = validate_incoming_data(
+            data, list(self.fields.keys()), partial=self.partial
+        )
         if errors:
             raise serializers.ValidationError({"errors": errors})
 
@@ -346,21 +403,24 @@ class InterviewFeedbackSerializer(serializers.ModelSerializer):
             if not str(data.get("interview_id")).isdigit():
                 errors.setdefault("interview_id", []).append("Invalid interview_id")
             else:
-                interview = Interview.objects.filter(pk=data.get("interview_id")).first()
+                interview = Interview.objects.filter(
+                    pk=data.get("interview_id")
+                ).first()
                 if not interview:
-                    errors.setdefault("interview_id", []).append("No interview found for this interview_id")
+                    errors.setdefault("interview_id", []).append(
+                        "No interview found for this interview_id"
+                    )
 
         if errors:
             raise serializers.ValidationError({"errors": errors})
-        
+
         return data
-    
+
 
 class InterviewerDashboardSerializer(serializers.ModelSerializer):
     candidate = InterviewerCandidateSerializer(read_only=True)
-    interview_feedback = InterviewFeedbackSerializer(read_only=True)
     scheduled_time = serializers.DateTimeField(format="%d/%m/%Y %H:%M:%S")
 
     class Meta:
         model = Interview
-        fields = ("id", "candidate", "scheduled_time", "meeting_link", "interview_feedback")
+        fields = ("id", "candidate", "scheduled_time", "meeting_link")
