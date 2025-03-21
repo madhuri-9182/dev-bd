@@ -244,15 +244,6 @@ class InterviewerCandidateSerializer(serializers.ModelSerializer):
         )
 
 
-class InterviewerDashboardSerializer(serializers.ModelSerializer):
-    candidate = InterviewerCandidateSerializer(read_only=True)
-    scheduled_time = serializers.DateTimeField(format="%d/%m/%Y %H:%M:%S")
-
-    class Meta:
-        model = Interview
-        fields = ("id", "candidate", "scheduled_time", "meeting_link")
-
-
 class QuestionSerializer(serializers.Serializer):
     que = serializers.CharField(min_length=1, max_length=100)
     ans = serializers.CharField(min_length=1, max_length=500)
@@ -363,3 +354,13 @@ class InterviewFeedbackSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"errors": errors})
         
         return data
+    
+
+class InterviewerDashboardSerializer(serializers.ModelSerializer):
+    candidate = InterviewerCandidateSerializer(read_only=True)
+    interview_feedback = InterviewFeedbackSerializer(read_only=True)
+    scheduled_time = serializers.DateTimeField(format="%d/%m/%Y %H:%M:%S")
+
+    class Meta:
+        model = Interview
+        fields = ("id", "candidate", "scheduled_time", "meeting_link", "interview_feedback")

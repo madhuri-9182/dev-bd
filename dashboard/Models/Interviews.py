@@ -59,7 +59,7 @@ class Interview(CreateUpdateDateTimeAndArchivedField):
 
 
 class InterviewFeedback(CreateUpdateDateTimeAndArchivedField):
-    interview = models.ForeignKey(
+    interview = models.OneToOneField(
         Interview,
         on_delete=models.CASCADE,
         related_name="interview_feedback",
