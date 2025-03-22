@@ -91,3 +91,9 @@ class InterviewFeedback(CreateUpdateDateTimeAndArchivedField):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        self.interview.score = self.overall_score
+        self.interview.status = self.overall_remark
+        self.interview.save()

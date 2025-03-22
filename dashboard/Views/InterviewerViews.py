@@ -25,8 +25,9 @@ from core.permissions import (
     IsClientUser,
     IsClientOwner,
     IsAgency,
+    HasRole,
 )
-from core.models import OAuthToken
+from core.models import OAuthToken, Role
 from externals.google.google_calendar import GoogleCalendar
 from externals.google.google_meet import create_meet_and_calendar_invite
 
@@ -544,7 +545,17 @@ class InterviewerInterviewHistoryView(APIView, LimitOffsetPagination):
 
 class InterviewFeedbackView(APIView, LimitOffsetPagination):
     serializer_class = InterviewFeedbackSerializer
-    permission_classes = (IsAuthenticated, IsInterviewer)
+    permission_classes = (IsAuthenticated, HasRole)
+    roles_mapping = {
+        "GET": [
+            Role.INTERVIEWER,
+            Role.CLIENT_ADMIN,
+            Role.CLIENT_OWNER,
+            Role.CLIENT_USER,
+        ],
+        "PATCH": [Role.INTERVIEWER],
+        "POST": [Role.INTERVIEWER],
+    }
 
     def get(self, request, interview_id=None):
         if not interview_id:
@@ -556,10 +567,17 @@ class InterviewFeedbackView(APIView, LimitOffsetPagination):
         interview_feedback_qs = (
             InterviewFeedback.objects.filter(interview_id=interview_id)
             .select_related(
-                "interview__candidate__designation", "interview__interviewer"
+                "interview",
+                "interview__candidate",
+                "interview__candidate__designation",
+                "interview__interviewer",
             )
             .order_by("-id")
         )
+        if request.user.role != Role.INTERVIEWER and request.method == "GET":
+            interview_feedback_qs = interview_feedback_qs.filter(
+                interview__candidate__organization=request.user.clientuser.organization
+            )
         if not interview_feedback_qs.exists():
             return Response(
                 {

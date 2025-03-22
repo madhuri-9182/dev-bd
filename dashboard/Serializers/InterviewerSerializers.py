@@ -349,6 +349,7 @@ class InterviewerFeedbackSerializer(serializers.ModelSerializer):
     class Meta:
         model = InternalInterviewer
         fields = (
+            "name",
             "total_experience_years",
             "total_experience_months",
             "current_company",
@@ -356,11 +357,26 @@ class InterviewerFeedbackSerializer(serializers.ModelSerializer):
 
 
 class CandidateFeedbackSerializer(serializers.ModelSerializer):
-    role = serializers.CharField(source="designation.name")
+    role = serializers.SerializerMethodField()
+
+    def get_role(self, obj):
+        return obj.designation.get_name_display()
 
     class Meta:
         model = Candidate
-        fields = ("name", "email", "phone", "year", "month", "company", "role")
+        fields = (
+            "name",
+            "email",
+            "phone",
+            "year",
+            "month",
+            "company",
+            "role",
+            "source",
+            "specialization",
+            "cv",
+            "remark",
+        )
 
 
 class InterviewFeedbackSerializer(serializers.ModelSerializer):

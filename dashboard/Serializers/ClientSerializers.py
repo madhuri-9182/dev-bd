@@ -438,6 +438,7 @@ class CandidateSerializer(serializers.ModelSerializer):
             "reason_for_dropping",
             "job_id",
             "created_at",
+            "interviews",
         )
         read_only_fields = ["designation", "created_at"]
 
