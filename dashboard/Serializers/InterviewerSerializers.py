@@ -385,6 +385,7 @@ class InterviewFeedbackSerializer(serializers.ModelSerializer):
     interview_date = serializers.DateTimeField(
         source="interview.scheduled_time", format="%d/%m/%Y %H:%M:%S", read_only=True
     )
+    recording_link = serializers.FileField(source="interview.recording", read_only=True)
     candidate = CandidateFeedbackSerializer(
         source="interview.candidate", read_only=True
     )
@@ -405,6 +406,7 @@ class InterviewFeedbackSerializer(serializers.ModelSerializer):
             "improvement_points",
             "overall_remark",
             "overall_score",
+            "recording_link",
         )
 
     def validate(self, data):
