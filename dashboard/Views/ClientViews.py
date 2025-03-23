@@ -618,6 +618,7 @@ class CandidateView(APIView, LimitOffsetPagination):
 
         candidates = (
             Candidate.objects.filter(
+                Q(final_selection_status="HD") | Q(final_selection_status__isnull=True),
                 organization=request.user.clientuser.organization,
             )
             .select_related("designation")
