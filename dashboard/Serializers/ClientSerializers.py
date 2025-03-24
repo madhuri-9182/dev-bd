@@ -459,13 +459,17 @@ class CandidateSerializer(serializers.ModelSerializer):
         ]
         allowed_keys = [
             "status",
-            "final_selection_status",
             "reason_for_dropping",
             "remark",
         ]
 
         if self.partial:
-            allowed_keys = ["specialization", "remark", "source"]
+            allowed_keys = [
+                "specialization",
+                "remark",
+                "source",
+                "final_selection_status",
+            ]
             required_keys = allowed_keys
 
         errors = validate_incoming_data(
