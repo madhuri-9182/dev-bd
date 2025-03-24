@@ -50,6 +50,9 @@ class Interview(CreateUpdateDateTimeAndArchivedField):
     )
     meeting_link = models.URLField(null=True, blank=True)
 
+    class Meta:
+        unique_together = ("interviewer", "scheduled_time")
+
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
         self.candidate.status = self.status
