@@ -1,6 +1,7 @@
 import datetime
 from django.db import transaction
 from django.db.models import Q
+from django.db.utils import IntegrityError
 from django.conf import settings
 from django.utils import timezone
 from django.utils.encoding import force_bytes, force_str
@@ -233,108 +234,125 @@ class InterviewerRequestResponseView(APIView):
 
     def post(self, request, request_id):
         try:
+            with transaction.atomic():
+                try:
+                    decode_data = force_str(urlsafe_base64_decode(request_id))
+                    data_parts = decode_data.split(";")
+                    if len(data_parts) != 6:
+                        raise ValueError("Invalid data format")
 
-            try:
-                decode_data = force_str(urlsafe_base64_decode(request_id))
-                data_parts = decode_data.split(";")
-                if len(data_parts) != 6:
-                    raise ValueError("Invalid data format")
-
-                (
-                    interviewer_availability_id,
-                    candidate_id,
-                    schedule_time,
-                    booked_by,
-                    expired_time,
-                    action,
-                ) = [item.split(":", 1)[1] for item in data_parts]
-            except Exception:
-                return Response(
-                    {"status": "failed", "message": "Invalid Request ID format."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            expired_time = datetime.datetime.strptime(
-                expired_time, "%Y-%m-%d %H:%M:%S.%f"
-            )
-            if datetime.datetime.now() > expired_time:
-                return Response(
-                    {"status": "failed", "message": "Request expired"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            interviewer_availability = InterviewerAvailability.objects.filter(
-                pk=interviewer_availability_id
-            ).first()
-            candidate = Candidate.objects.filter(pk=candidate_id).first()
-
-            if not interviewer_availability or not candidate:
-                return Response(
-                    {
-                        "status": "failed",
-                        "message": "Invalid Interviewer or Candidate.",
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            if candidate.status not in ["SCH", "NSCH"]:
-                return Response(
-                    {"status": "failed", "message": "Invalid request"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            if candidate.status == "SCH":
-                return Response(
-                    {
-                        "status": "failed",
-                        "message": "Candidate already has a scheduled interview.",
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            schedule_time = datetime.datetime.strptime(
-                schedule_time, "%Y-%m-%d %H:%M:%S"
-            )
-            schedule_time = timezone.make_aware(schedule_time)
-
-            # To handle multiple interview requests from different clients to the same interviewer scenario
-            schedule_time_after_one_hour = schedule_time + datetime.timedelta(hours=1)
-            schedule_time_before_one_hour = schedule_time - datetime.timedelta(hours=1)
-            if (
-                Interview.objects.filter(
-                    interviewer=interviewer_availability.interviewer,
-                    status="SCH",
-                )
-                .filter(
-                    Q(scheduled_time=schedule_time)
-                    | Q(
-                        scheduled_time__gte=schedule_time_before_one_hour,
-                        scheduled_time__lt=schedule_time,
+                    (
+                        interviewer_availability_id,
+                        candidate_id,
+                        schedule_time,
+                        booked_by,
+                        expired_time,
+                        action,
+                    ) = [item.split(":", 1)[1] for item in data_parts]
+                except Exception:
+                    return Response(
+                        {"status": "failed", "message": "Invalid Request ID format."},
+                        status=status.HTTP_400_BAD_REQUEST,
                     )
-                    | Q(
-                        scheduled_time__lte=schedule_time_after_one_hour,
-                        scheduled_time__gt=schedule_time,
-                    )
+
+                expired_time = datetime.datetime.strptime(
+                    expired_time, "%Y-%m-%d %H:%M:%S.%f"
                 )
-                .exists()
-            ):
-                return Response(
-                    {
-                        "status": "failed",
-                        "message": "There must be a 1-hour gap between two consecutive scheduled interviews.",
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
+                if datetime.datetime.now() > expired_time:
+                    return Response(
+                        {"status": "failed", "message": "Request expired"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                interviewer_availability = InterviewerAvailability.objects.filter(
+                    pk=interviewer_availability_id
+                ).first()
+                candidate = (
+                    Candidate.objects.select_for_update()
+                    .filter(pk=candidate_id)
+                    .first()
                 )
 
-            if action == "accept":
-                with transaction.atomic():
-                    interview = Interview.objects.create(
-                        candidate=candidate,
+                if not interviewer_availability or not candidate:
+                    return Response(
+                        {
+                            "status": "failed",
+                            "message": "Invalid Interviewer or Candidate.",
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                if candidate.status not in ["SCH", "NSCH"]:
+                    return Response(
+                        {"status": "failed", "message": "Invalid request"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                if candidate.status == "SCH":
+                    return Response(
+                        {
+                            "status": "failed",
+                            "message": "Candidate already has a scheduled interview.",
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                schedule_time = datetime.datetime.strptime(
+                    schedule_time, "%Y-%m-%d %H:%M:%S"
+                )
+                schedule_time = timezone.make_aware(schedule_time)
+
+                # To handle multiple interview requests from different clients to the same interviewer scenario
+                schedule_time_after_one_hour = schedule_time + datetime.timedelta(
+                    hours=1
+                )
+                schedule_time_before_one_hour = schedule_time - datetime.timedelta(
+                    hours=1
+                )
+                if (
+                    Interview.objects.select_for_update()
+                    .filter(
                         interviewer=interviewer_availability.interviewer,
                         status="SCH",
-                        scheduled_time=schedule_time,
-                        total_score=100,
                     )
+                    .filter(
+                        Q(scheduled_time=schedule_time)
+                        | Q(
+                            scheduled_time__gte=schedule_time_before_one_hour,
+                            scheduled_time__lt=schedule_time,
+                        )
+                        | Q(
+                            scheduled_time__lte=schedule_time_after_one_hour,
+                            scheduled_time__gt=schedule_time,
+                        )
+                    )
+                    .exists()
+                ):
+                    return Response(
+                        {
+                            "status": "failed",
+                            "message": "There must be a 1-hour gap between two consecutive scheduled interviews.",
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                if action == "accept":
+                    try:
+                        interview = Interview.objects.create(
+                            candidate=candidate,
+                            interviewer=interviewer_availability.interviewer,
+                            status="SCH",
+                            scheduled_time=schedule_time,
+                            total_score=100,
+                        )
+                    except IntegrityError as e:
+                        return Response(
+                            {
+                                "status": "failed",
+                                "message": "Interviewer already has a scheduled interview at this time.",
+                            },
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
                     interviewer_availability.booked_by_id = booked_by
                     interviewer_availability.is_scheduled = True
 
@@ -465,11 +483,10 @@ class InterviewerRequestResponseView(APIView):
                         status=status.HTTP_200_OK,
                     )
 
-            return Response(
-                {"status": "success", "message": "Interview Rejected"},
-                status=status.HTTP_200_OK,
-            )
-
+                return Response(
+                    {"status": "success", "message": "Interview Rejected"},
+                    status=status.HTTP_200_OK,
+                )
         except Exception as e:
             return Response(
                 {"status": "failed", "message": f"Error: {str(e)}"},
