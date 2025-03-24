@@ -11,6 +11,7 @@ from .models import (
     Job,
     ClientUser,
     EngagementTemplates,
+    Candidate
 )
 
 
@@ -57,3 +58,10 @@ class EnagagementTeamplteAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Any]:
         return EngagementTemplates.object_all.select_related("organization")
+
+@admin.register(Candidate)
+class CandidateAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "specialization", "organization__name")
+    search_fields = ("organization__name",)
+    readonly_fields = ["created_at", "updated_at"]
+    
