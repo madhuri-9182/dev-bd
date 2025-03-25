@@ -1,10 +1,14 @@
+import datetime
 from django.core.mail import EmailMultiAlternatives, get_connection
+from django.core.files.base import ContentFile
 from django.template.loader import render_to_string
-from celery import shared_task
+from django.utils import timezone
+from celery import shared_task, chain, group
 from celery.exceptions import Ignore
 from django.conf import settings
 from django.utils.safestring import mark_safe
-from .models import EngagementOperation
+from .models import EngagementOperation, Interview
+from externals.google.google_meet import download_from_google_drive
 
 
 @shared_task()
@@ -99,3 +103,67 @@ def send_schedule_engagement_email(self, engagement_operation_id):
         if self.request.revoked:
             raise Ignore()
         self.retry(exec=e, countdown=60)
+
+
+@shared_task
+def fetch_interview_records():
+    current_time = timezone.now()
+    before_one_and_half_an_hour = current_time - datetime.timedelta(hours=1, minutes=30)
+    interview_qs = Interview.objects.filter(
+        scheduled_time__lte=before_one_and_half_an_hour,
+        downloaded=False,
+        scheduled_service_account_event_id__isnull=False,
+    )
+    return [
+        (interview.id, interview.scheduled_service_account_event_id)
+        for interview in interview_qs
+    ]
+
+
+@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=5, max_retries=3)
+def download_recordings_from_google_drive(self, interview_info):
+    if not interview_info:
+        self.update_state(state="FAILURE", meta={"errors": "Missing interview info"})
+        raise Ignore()
+    try:
+        download_recording_info = download_from_google_drive(*interview_info)
+        return download_recording_info
+    except Exception as e:
+        raise self.retry(exc=e)
+
+
+@shared_task
+def store_recordings(recording_info):
+    interview = Interview.objects.get(pk=recording_info["interview_id"])
+
+    for file in recording_info["files"]:
+        if file["type"] == "video":
+            interview.recording.save(file["name"], ContentFile(file["data"]))
+        elif file["type"] == "transcript":
+            interview.transcription.save(file["name"], ContentFile(file["data"]))
+    interview.downloaded = True
+    interview.save(update_fields=["recording", "transcription", "downloaded"])
+    return f"Files saved for Interview {interview.id}"
+
+
+@shared_task(bind=True)
+def process_interview_recordings(self, interview_record_ids):
+    if interview_record_ids:
+        tasks = [
+            chain(
+                download_recordings_from_google_drive.s(interview_info),
+                store_recordings.s(),
+            )
+            for interview_info in interview_record_ids
+        ]
+        group(*tasks).apply_async()
+    else:
+        self.update_state(
+            state="FAILURE", meta={"errors": "Missing interview_records_ids"}
+        )
+        raise Ignore()
+
+
+@shared_task
+def trigger_interview_processing():
+    chain(fetch_interview_records.s(), process_interview_recordings.s()).apply_async()

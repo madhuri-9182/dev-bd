@@ -40,6 +40,15 @@ class Interview(CreateUpdateDateTimeAndArchivedField):
         null=True,
         help_text="Interview recording file",
     )
+    transcription = models.FileField(
+        upload_to="interview_recordings_transcription",
+        null=True,
+        blank=True,
+        help_text="recordings transcribe files",
+    )
+    downloaded = models.BooleanField(
+        default=False, help_text="signifies that video is downloaded and stored"
+    )
     feedback = models.TextField(
         blank=True, null=True, help_text="Feedback for the candidate"
     )
