@@ -136,6 +136,7 @@ class Candidate(CreateUpdateDateTimeAndArchivedField):
     designation = models.ForeignKey(
         Job, on_delete=models.SET_NULL, related_name="candidate", null=True
     )
+    current_designation = models.CharField(max_length=100, blank=True, null=True)
     source = models.CharField(
         max_length=3,
         blank=True,
