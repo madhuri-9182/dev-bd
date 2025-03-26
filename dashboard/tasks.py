@@ -124,11 +124,11 @@ def download_recordings_from_google_drive(self, interview_info):
     interview_id, event_id = interview_info
     try:
         download_recording_info = download_from_google_drive(interview_id, event_id)
-        if not download_recording_info:
-            raise Reject(f"Failed to download recordings for Interview {interview_id}")
-        return download_recording_info
     except Exception as e:
         raise self.retry(exc=e)
+    if not download_recording_info:
+        raise Reject(f"Failed to download recordings for Interview {interview_id}")
+    return download_recording_info
 
 
 @shared_task
