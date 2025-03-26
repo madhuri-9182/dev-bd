@@ -117,18 +117,20 @@ def fetch_interview_records():
     return list(interview_qs)
 
 
-@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=5, max_retries=3)
+@shared_task(bind=True, retry_backoff=5, max_retries=3)
 def download_recordings_from_google_drive(self, interview_info):
     if not interview_info or len(interview_info) != 2:
         raise Reject("Missing or invalid interview info")
     interview_id, event_id = interview_info
     try:
         download_recording_info = download_from_google_drive(interview_id, event_id)
+        if not download_recording_info:
+            raise Reject(f"Failed to download recordings for Interview {interview_id}")
+        return download_recording_info
+    except Reject:
+        raise
     except Exception as e:
         raise self.retry(exc=e)
-    if not download_recording_info:
-        raise Reject(f"Failed to download recordings for Interview {interview_id}")
-    return download_recording_info
 
 
 @shared_task
