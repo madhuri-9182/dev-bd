@@ -110,7 +110,11 @@ def download_from_google_drive(interview_id, event_id):
                 {"type": "transcript", "data": data, "name": f"{event_id}.txt"}
             )
 
-    return {"interview_id": interview_id, "files": downloaded_files}
+    return (
+        {"interview_id": interview_id, "files": downloaded_files}
+        if downloaded_files
+        else {}
+    )
 
 
 # keep below funcation for testing purpose
