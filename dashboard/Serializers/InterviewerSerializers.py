@@ -259,6 +259,8 @@ class QuestionSerializer(serializers.Serializer):
 class TopicSerializer(serializers.Serializer):
     summary = serializers.CharField(min_length=1, max_length=500)
     score = serializers.IntegerField(min_value=0, max_value=100)
+    start_time = serializers.IntegerField()
+    end_time = serializers.IntegerField()
     questions = serializers.ListSerializer(child=QuestionSerializer(), min_length=1)
 
 
@@ -284,7 +286,7 @@ class SkillBasedPerformanceSerializer(serializers.Serializer):
         for skill_name, skill_data in data.items():
             if not isinstance(skill_data, dict):
                 errors[skill_name] = (
-                    "Each skill should have summary, score, and questions."
+                    "Each skill should have summary, score, start_time, end_time and questions."
                 )
                 continue
 
@@ -413,7 +415,17 @@ class InterviewFeedbackSerializer(serializers.ModelSerializer):
     def validate(self, data):
         data = self.initial_data
         errors = validate_incoming_data(
-            data, list(self.fields.keys()), partial=self.partial
+            data,
+            [
+                "interview_id",
+                "skill_based_performance",
+                "skill_evaluation",
+                "strength",
+                "improvement_points",
+                "overall_remark",
+                "overall_score",
+            ],
+            partial=self.partial,
         )
         if errors:
             raise serializers.ValidationError({"errors": errors})
