@@ -1,4 +1,3 @@
-import datetime
 from django.core.mail import EmailMultiAlternatives, get_connection
 from django.core.files.base import ContentFile
 from django.template.loader import render_to_string
@@ -7,8 +6,12 @@ from celery import shared_task, chain, group
 from celery.exceptions import Reject
 from django.conf import settings
 from django.utils.safestring import mark_safe
-from .models import EngagementOperation, Interview
+from .models import EngagementOperation, Interview, InterviewFeedback
 from externals.google.google_meet import download_from_google_drive
+from datetime import datetime, timedelta
+from externals.feedback.interview_feedback import (
+    analyze_transcription_and_generate_feedback,
+)
 
 
 @shared_task()
@@ -108,7 +111,7 @@ def send_schedule_engagement_email(self, engagement_operation_id):
 @shared_task
 def fetch_interview_records():
     current_time = timezone.now()
-    before_one_and_half_an_hour = current_time - datetime.timedelta(hours=1, minutes=30)
+    before_one_and_half_an_hour = current_time - timedelta(hours=1, minutes=30)
     interview_qs = Interview.objects.filter(
         scheduled_time__lte=before_one_and_half_an_hour,
         downloaded=False,
@@ -169,3 +172,20 @@ def process_interview_recordings(self, interview_record_ids):
 @shared_task
 def trigger_interview_processing():
     chain(fetch_interview_records.s(), process_interview_recordings.s()).apply_async()
+
+
+def save_interview_feedback():
+    interviews = Interview.objects.filter(
+        scheduled_time__lte=datetime.now() - timedelta(hours=1, minutes=30)
+    )
+    for interview in interviews:
+        try:
+            if interview.interview_feedback:
+                print("DOES EXIST", interview.id)
+                continue
+        except Interview.interview_feedback.RelatedObjectDoesNotExist:
+            print("DOES NOT EXISTS", interview.id)
+            with open("MLDS Interview.txt", "r") as f:
+                extracted_data = analyze_transcription_and_generate_feedback(f.read())
+                print("\n\nextracted_data\n\n", extracted_data)
+                InterviewFeedback.objects.create(interview=interview, **extracted_data)
