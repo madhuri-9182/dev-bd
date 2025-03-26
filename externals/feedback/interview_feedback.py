@@ -1,13 +1,8 @@
-# import os
-from dotenv import load_dotenv
 from django.conf import settings
 import google.generativeai as genai
 import json
 
 # import assemblyai as aai
-
-# Load environment variables
-load_dotenv()
 
 # Configure APIs
 # aai.settings.api_key = os.getenv("ASSEMBLYAI_API_KEY")
@@ -99,26 +94,3 @@ def analyze_transcription_and_generate_feedback(transcription):
     except Exception as e:
         print(f"An error occurred while analyzing the transcription: {e}")
         return None
-
-
-# def fetch_candidate_details(candidate_identifier):
-#     conn = sqlite3.connect("candidate_database.db")
-#     cursor = conn.cursor()
-#     query = """
-#     SELECT Name, Email, InterviewDate, AppliedRole, VideoInterviewLink
-#     FROM candidates
-#     WHERE Email = ? OR Name = ?
-#     """
-#     cursor.execute(query, (candidate_identifier, candidate_identifier))
-#     result = cursor.fetchone()
-#     conn.close()
-#     if result:
-#         return {
-#             "Name": result[0],
-#             "Email": result[1],
-#             "InterviewDate": result[2],
-#             "AppliedRole": result[3],
-#             "VideoInterviewLink": result[4],
-#         }
-#     else:
-#         return None

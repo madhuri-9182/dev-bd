@@ -151,7 +151,7 @@ def store_recordings(recording_info):
 
     interview.downloaded = True
     interview.save(update_fields=["recording", "transcription", "downloaded"])
-    return f"Files saved for Interview {interview.id}"
+    return interview.id
 
 
 @shared_task(bind=True)
@@ -174,18 +174,24 @@ def trigger_interview_processing():
     chain(fetch_interview_records.s(), process_interview_recordings.s()).apply_async()
 
 
-def save_interview_feedback():
+@shared_task(bind=True, retry_backoff=5, max_retries=3)
+def process_interview_video_and_generate_and_store_feedback(self):
     interviews = Interview.objects.filter(
-        scheduled_time__lte=datetime.now() - timedelta(hours=1, minutes=30)
-    )
+        transcription__isnull=False, interview_feedback__isnull=True
+    ).only("id", "feedback")
+    print(interviews)
+    processed_ids = []
     for interview in interviews:
         try:
-            if interview.interview_feedback:
-                print("DOES EXIST", interview.id)
-                continue
-        except Interview.interview_feedback.RelatedObjectDoesNotExist:
-            print("DOES NOT EXISTS", interview.id)
-            with open("MLDS Interview.txt", "r") as f:
-                extracted_data = analyze_transcription_and_generate_feedback(f.read())
-                print("\n\nextracted_data\n\n", extracted_data)
-                InterviewFeedback.objects.create(interview=interview, **extracted_data)
+            with interview.transcription.open("r") as f:
+                file_content = f.read()
+            extracted_data = analyze_transcription_and_generate_feedback(file_content)
+        except Exception as e:
+            print(str(e))
+            continue
+        InterviewFeedback.objects.update_or_create(
+            interview_id=interview.id, defaults={**extracted_data}
+        )
+        processed_ids.append(interview.id)
+    print("Processed complted", processed_ids)
+    return f"Interview feedback created successfully for {processed_ids}."
