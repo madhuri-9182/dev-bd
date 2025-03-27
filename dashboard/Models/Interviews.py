@@ -101,8 +101,10 @@ class InterviewFeedback(CreateUpdateDateTimeAndArchivedField):
             MaxValueValidator(100, message="Scroe must not exceed 100"),
         ],
     )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    is_submitted = models.BooleanField(
+        default=False,
+        help_text="Signify whether the interviewer has submitted their feedback for this interview or not.",
+    )
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)

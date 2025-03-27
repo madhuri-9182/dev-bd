@@ -403,6 +403,7 @@ class InterviewFeedbackSerializer(serializers.ModelSerializer):
             "interview_date",
             "candidate",
             "interviewer",
+            "is_submitted",
             "skill_based_performance",
             "skill_evaluation",
             "strength",

@@ -523,7 +523,8 @@ class InterviewerPendingFeedbackView(APIView, LimitOffsetPagination):
 
     def get(self, request):
         pending_feedback_qs = Interview.objects.filter(
-            interviewer=request.user.interviewer, status="PENDING_EVAL"
+            interviewer=request.user.interviewer,
+            interview_feedback__is_submitted=False,
         ).select_related("candidate", "candidate__designation")
 
         paginated_queryset = self.paginate_queryset(pending_feedback_qs, request)
@@ -545,8 +546,7 @@ class InterviewerInterviewHistoryView(APIView, LimitOffsetPagination):
 
     def get(self, request):
         interview_history_qs = Interview.objects.filter(
-            interviewer=request.user.interviewer,
-            status__in=["HREC", "REC", "NREC", "SNREC"],
+            interviewer=request.user.interviewer, interview_feedback__is_submitted=True
         ).select_related("candidate", "candidate__designation")
 
         paginated_queryset = self.paginate_queryset(interview_history_qs, request)
@@ -619,7 +619,7 @@ class InterviewFeedbackView(APIView, LimitOffsetPagination):
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        serializer.save(is_submitted=True)
         return Response(
             {
                 "status": "success",
@@ -649,12 +649,20 @@ class InterviewFeedbackView(APIView, LimitOffsetPagination):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
+        interview_feedback = interview_feedback_qs.first()
+        if interview_feedback.is_submitted:
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "Invalid request. Feedback is already submitted.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         serializer = self.serializer_class(
-            interview_feedback_qs.first(), data=request.data, partial=True
+            interview_feedback, data=request.data, partial=True
         )
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        serializer.save(is_submitted=True)
         return Response(
             {
                 "status": "success",
