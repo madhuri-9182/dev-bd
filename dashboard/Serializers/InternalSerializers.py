@@ -250,7 +250,7 @@ class InternalClientSerializer(serializers.ModelSerializer):
                     temporary_password = point_of_contact.get("temporary_password")
 
                     send_mail.delay(
-                        email=email,
+                        to=email,
                         subject=WELCOME_MAIL_SUBJECT,
                         template=ONBOARD_EMAIL_TEMPLATE,
                         user_name=name_,
@@ -314,7 +314,7 @@ class InternalClientSerializer(serializers.ModelSerializer):
                     role=Role.CLIENT_ADMIN,
                 )
                 send_mail.delay(
-                    email=email,
+                    to=email,
                     subject=WELCOME_MAIL_SUBJECT,
                     template=ONBOARD_EMAIL_TEMPLATE,
                     user_name=name,
@@ -479,7 +479,7 @@ class InterviewerSerializer(serializers.ModelSerializer):
                 force_bytes(verification_data)
             )
             send_mail.delay(
-                email=email,
+                to=email,
                 user_name=name,
                 template=ONBOARD_EMAIL_TEMPLATE,
                 password=password,
@@ -524,7 +524,7 @@ class InterviewerSerializer(serializers.ModelSerializer):
                     force_bytes(verification_data)
                 )
                 send_mail.delay(
-                    email=email,
+                    to=email,
                     user_name=instance.name,
                     template=ONBOARD_EMAIL_TEMPLATE,
                     subject=WELCOME_MAIL_SUBJECT,
@@ -840,7 +840,7 @@ class InternalClientUserSerializer(serializers.ModelSerializer):
             client_user = super().create(validated_data)
 
             send_mail.delay(
-                email=email,
+                to=email,
                 subject=WELCOME_MAIL_SUBJECT,
                 template=ONBOARD_EMAIL_TEMPLATE,
                 user_name=validated_data.get("name"),
@@ -990,7 +990,7 @@ class HDIPUsersSerializer(serializers.ModelSerializer):
                     assigned_to=hdip_user
                 )
             send_mail.delay(
-                email=email,
+                to=email,
                 subject=WELCOME_MAIL_SUBJECT,
                 template=ONBOARD_EMAIL_TEMPLATE,
                 user_name=validated_data.get("name"),

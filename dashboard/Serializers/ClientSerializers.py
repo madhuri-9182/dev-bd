@@ -134,7 +134,7 @@ class ClientUserSerializer(serializers.ModelSerializer):
             data = f"user:{current_user.email};invitee-email:{email}"
             uid = urlsafe_base64_encode(force_bytes(data))
             send_mail.delay(
-                email=email,
+                to=email,
                 subject=f"You're Invited to Join {organization.name} on Hiring Dog",
                 template="invitation.html",
                 invited_name=name,

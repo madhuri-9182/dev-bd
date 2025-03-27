@@ -15,23 +15,24 @@ from externals.feedback.interview_feedback import (
 
 
 @shared_task(bind=True, max_retries=3, rate_limit="10/m")
-def send_mail(self, email, subject, template, **kwargs):
+def send_mail(
+    self, to, subject, template, reply_to=None, attachmenets=[], bcc=None, **kwargs
+):
     email_type = kwargs.get("type")
     context = {
-        "email": email,
+        "email": to,
         **kwargs,
     }
 
     try:
         content = render_to_string(template, context=context)
-        email = EmailMultiAlternatives(
-            subject,
-            "",
-            settings.EMAIL_HOST_USER,
-            [email],
+        email_message = EmailMultiAlternatives(
+            subject, "", settings.EMAIL_HOST_USER, [to], reply_to=[reply_to], bcc=[bcc]
         )
-        email.attach_alternative(content, "text/html")
-        email.send(fail_silently=True)
+        email_message.attach_alternative(content, "text/html")
+        for attachment in attachmenets:
+            email_message.attach_file(attachment)
+        email_message.send(fail_silently=True)
     except Exception as exc:
         raise self.retry(exc=exc, countdown=60, retry_jitter=True)
 
@@ -200,9 +201,10 @@ def process_interview_video_and_generate_and_store_feedback(self):
         interviewer_name = interview.interviewer.name
         candidate_name = interview.candidate.name
         send_mail.delay(
-            email=interview.interviewer.email,
+            to=interview.interviewer.email,
             subject=f"Ready to Review? Feedback for {candidate_name} is Live",
             template="interview_feedback_notification_email.html",
+            reply_to=settings.CONTACT_EMAIL,
             interviewer_name=interviewer_name,
             candidate_name=candidate_name,
             dashboard_link="https://app.hdiplatform.in/",
