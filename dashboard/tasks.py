@@ -14,22 +14,26 @@ from externals.feedback.interview_feedback import (
 )
 
 
-@shared_task()
-def send_mail(email, subject, template, **kwargs):
+@shared_task(bind=True, max_retries=3, rate_limit="10/m")
+def send_mail(self, email, subject, template, **kwargs):
+    email_type = kwargs.get("type")
     context = {
         "email": email,
         **kwargs,
     }
 
-    content = render_to_string(template, context=context)
-    email = EmailMultiAlternatives(
-        subject,
-        "",
-        settings.EMAIL_HOST_USER,
-        [email],
-    )
-    email.attach_alternative(content, "text/html")
-    email.send(fail_silently=True)
+    try:
+        content = render_to_string(template, context=context)
+        email = EmailMultiAlternatives(
+            subject,
+            "",
+            settings.EMAIL_HOST_USER,
+            [email],
+        )
+        email.attach_alternative(content, "text/html")
+        email.send(fail_silently=True)
+    except Exception as exc:
+        raise self.retry(exc=exc, countdown=60, retry_jitter=True)
 
 
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=60, retry_jitter=True)
@@ -105,7 +109,7 @@ def send_schedule_engagement_email(self, engagement_operation_id):
         engagement_operation_obj.save()
         if self.request.revoked:
             raise Ignore()
-        self.retry(exec=e, countdown=60)
+        raise self.retry(exec=e, countdown=60)
 
 
 @shared_task
@@ -193,5 +197,15 @@ def process_interview_video_and_generate_and_store_feedback(self):
             interview_id=interview.id, defaults={**extracted_data}
         )
         processed_ids.append(interview.id)
-    print("Processed complted", processed_ids)
+        interviewer_name = interview.interviewer.name
+        candidate_name = interview.candidate.name
+        send_mail.delay(
+            email=interview.interviewer.email,
+            subject=f"Ready to Review? Feedback for {candidate_name} is Live",
+            template="interview_feedback_notification_email.html",
+            interviewer_name=interviewer_name,
+            candidate_name=candidate_name,
+            dashboard_link="https://app.hdiplatform.in/",
+            type="feedback_notification",
+        )
     return f"Interview feedback created successfully for {processed_ids}."
