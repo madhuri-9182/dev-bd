@@ -92,23 +92,31 @@ def download_from_google_drive(interview_id, event_id):
     attachments = event_info.get("attachments", [])
 
     downloaded_files = []
+    video_downloaded = False
+    transcription_downloaded = False
 
     for attachment in attachments:
-        file_id, fil_type, file_name = (
+        file_id, file_type, file_name = (
             attachment["fileId"],
             attachment["mimeType"],
             attachment["title"],
         )
-        if "video" in fil_type:
+        if not video_downloaded and "video" in file_type:
             data = download_file(file_id)
             downloaded_files.append(
                 {"type": "video", "data": data, "name": f"{event_id}.mp4"}
             )
-        elif "Transcript" in file_name:
+            video_downloaded = True
+        elif not transcription_downloaded and "Transcript" in file_name:
             data = download_file(file_id, mime_type="text/plain")
             downloaded_files.append(
-                {"type": "transcript", "data": data, "name": f"{event_id}.txt"}
+                {
+                    "type": "transcript",
+                    "data": data,
+                    "name": f"{event_id}.txt",
+                }
             )
+            transcription_downloaded = True
 
     return (
         {"interview_id": interview_id, "files": downloaded_files}
