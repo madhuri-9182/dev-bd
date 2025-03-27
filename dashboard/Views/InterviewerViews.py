@@ -499,11 +499,17 @@ class InterviewerAcceptedInterviewsView(APIView, LimitOffsetPagination):
     permission_classes = (IsAuthenticated, IsInterviewer)
 
     def get(self, request):
-        accepted_interviews_qs = Interview.objects.filter(
-            interviewer=request.user.interviewer,
-            status="SCH",
-            scheduled_time__gt=timezone.now() + datetime.timedelta(hours=1),
-        ).select_related("candidate", "candidate__designation")
+        accepted_interviews_qs = (
+            Interview.objects.filter(
+                interviewer=request.user.interviewer,
+                status="SCH",
+            )
+            .filter(
+                Q(scheduled_time__lte=timezone.now() - datetime.timedelta(hours=1))
+                | Q(scheduled_time__gt=timezone.now())
+            )
+            .select_related("candidate", "candidate__designation")
+        )
         paginated_queryset = self.paginate_queryset(accepted_interviews_qs, request)
         serializer = self.serializer_class(paginated_queryset, many=True)
         paginated_data = self.get_paginated_response(serializer.data)
