@@ -187,5 +187,46 @@ class Agreement(CreateUpdateDateTimeAndArchivedField):
     )
     rate = models.DecimalField(max_digits=10, decimal_places=2, blank=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["organization", "years_of_experience"]),
+        ]
+
     def __str__(self):
-        return f"{self.organization.name} - {self.rate}"
+        return f"{self.organization.name} - ₹{self.rate}"
+
+    @classmethod
+    def get_years_of_experience(cls, year, month):
+        if month > 5:
+            year += 1
+        if year < 4:
+            return "0-4"
+        elif year < 6:
+            return "4-6"
+        elif year < 8:
+            return "6-8"
+        elif year < 10:
+            return "8-10"
+        else:
+            return "10+"
+
+
+class InterviewerPricing(CreateUpdateDateTimeAndArchivedField):
+    objects = SoftDelete()
+    object_all = models.Manager()
+
+    EXPERIENCE_LEVEL_CHOICES = [
+        ("0-4", "0 - 4 Years"),
+        ("4-6", "4 - 6 Years"),
+        ("6-8", "6 - 8 Years"),
+        ("8-10", "8 - 10 Years"),
+        ("10+", "10+ Years"),
+    ]
+
+    experience_level = models.CharField(
+        max_length=10, choices=EXPERIENCE_LEVEL_CHOICES, unique=True
+    )
+    price = models.DecimalField(max_digits=10, decimal_places=2, blank=True)
+
+    def __str__(self):
+        return f"{self.experience_level} - ₹{self.price}"

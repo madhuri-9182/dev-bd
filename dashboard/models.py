@@ -15,4 +15,6 @@ from .Models import (
     Interview,
     InterviewFeedback,
     DesignationDomain,
+    InterviewerPricing,
+    BillingRecord,
 )

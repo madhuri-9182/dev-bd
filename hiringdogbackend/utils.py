@@ -124,3 +124,18 @@ def validate_json(
     except ValidationError as e:
         errors.setdefault(field_name, []).append(f"Invalid JSON: {str(e)}")
     return errors
+
+
+def add_interviewer_prices():
+    from dashboard.models import InterviewerPricing
+
+    prices = (
+        ("0-4", "1200"),
+        ("4-6", "1600"),
+        ("6-8", "2000"),
+        ("8-10", "2500"),
+        ("10+", "2800"),
+    )
+    InterviewerPricing.objects.bulk_create(
+        [InterviewerPricing(experience_level=year, price=rate) for year, rate in prices]
+    )

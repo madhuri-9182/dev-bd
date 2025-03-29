@@ -1,7 +1,7 @@
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 from .Client import Candidate
-from .Internal import InternalInterviewer
+from .Internal import InternalInterviewer, Agreement, InterviewerPricing
 from hiringdogbackend.ModelUtils import SoftDelete, CreateUpdateDateTimeAndArchivedField
 
 
@@ -57,17 +57,38 @@ class Interview(CreateUpdateDateTimeAndArchivedField):
     scheduled_service_account_event_id = models.CharField(
         max_length=255, null=True, blank=True
     )
+    client_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    interviewer_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     meeting_link = models.URLField(null=True, blank=True)
 
     class Meta:
         unique_together = ("interviewer", "scheduled_time")
 
     def save(self, *args, **kwargs):
+        candidate = self.candidate
+        years_of_experience = Agreement.get_years_of_experience(
+            candidate.year, candidate.month
+        )
+        if not self.client_amount:
+            self.client_amount = (
+                Agreement.objects.filter(
+                    organization=candidate.organization,
+                    years_of_experience=years_of_experience,
+                )
+                .first()
+                .rate
+            )
+        if not self.interviewer_amount:
+            self.interviewer_amount = (
+                InterviewerPricing.objects.filter(experience_level=years_of_experience)
+                .first()
+                .price
+            )
         super().save(*args, **kwargs)
-        self.candidate.status = self.status
-        self.candidate.score = self.score
-        self.candidate.total_score = self.total_score
-        self.candidate.save()
+        candidate.status = self.status
+        candidate.score = self.score
+        candidate.total_score = self.total_score
+        candidate.save()
 
 
 class InterviewFeedback(CreateUpdateDateTimeAndArchivedField):
