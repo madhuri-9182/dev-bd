@@ -11,6 +11,7 @@ from .ClientViews import (
     EngagementOperationUpdateView,
     EngagementOperationStatusUpdateView,
     ClientDashboardView,
+    FinanceView,
 )
 
 from .InternalViews import (
@@ -26,7 +27,7 @@ from .InternalViews import (
     HDIPUsersViews,
     DomainDesignationView,
     InternalClientDomainView,
-    InternalEngagementView
+    InternalEngagementView,
 )
 
 from .InterviewerViews import (
@@ -36,5 +37,5 @@ from .InterviewerViews import (
     InterviewerAcceptedInterviewsView,
     InterviewerPendingFeedbackView,
     InterviewerInterviewHistoryView,
-    InterviewFeedbackView
+    InterviewFeedbackView,
 )

@@ -12,6 +12,7 @@ from ..views import (
     EngagementOperationUpdateView,
     EngagementOperationStatusUpdateView,
     ClientDashboardView,
+    FinanceView,
 )
 
 
@@ -73,4 +74,5 @@ urlpatterns = [
         ClientDashboardView.as_view(),
         name="client-dashboard",
     ),
+    path("finance/", FinanceView.as_view(), name="client-finance"),
 ]

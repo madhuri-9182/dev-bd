@@ -1,7 +1,11 @@
-from django.db import models
+import calendar
+import datetime as dt
+from django.db import models, transaction
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.utils import timezone
 from .Client import Candidate
 from .Internal import InternalInterviewer, Agreement, InterviewerPricing
+from .Finance import BillingRecord
 from hiringdogbackend.ModelUtils import SoftDelete, CreateUpdateDateTimeAndArchivedField
 
 
@@ -65,10 +69,20 @@ class Interview(CreateUpdateDateTimeAndArchivedField):
         unique_together = ("interviewer", "scheduled_time")
 
     def save(self, *args, **kwargs):
+        if transaction.get_autocommit():
+            with transaction.atomic():
+                self._perform_save(*args, **kwargs)
+        else:
+            self._perform_save(*args, **kwargs)
+
+    def _perform_save(self, *args, **kwargs):
+        # Save the Interview object after calculating the amounts for Client and Interviewer
+        # using the Agreement model and InterviewerPricing model
         candidate = self.candidate
         years_of_experience = Agreement.get_years_of_experience(
             candidate.year, candidate.month
         )
+
         if not self.client_amount:
             self.client_amount = (
                 Agreement.objects.filter(
@@ -78,17 +92,71 @@ class Interview(CreateUpdateDateTimeAndArchivedField):
                 .first()
                 .rate
             )
+
         if not self.interviewer_amount:
             self.interviewer_amount = (
                 InterviewerPricing.objects.filter(experience_level=years_of_experience)
                 .first()
                 .price
             )
+
         super().save(*args, **kwargs)
+
         candidate.status = self.status
         candidate.score = self.score
         candidate.total_score = self.total_score
         candidate.save()
+
+        if self.status == "SCH":
+            today = timezone.now()
+            first_day_of_month = today.replace(day=1)
+            due_date = today.replace(
+                day=calendar.monthrange(today.year, today.month)[1]
+            ) + dt.timedelta(days=10)
+
+            bill_record = (
+                BillingRecord.objects.filter(
+                    client=self.candidate.organization.internal_client,
+                    created_at__gte=first_day_of_month,
+                    status="PED",
+                )
+                .select_for_update()
+                .first()
+            )  # Lock the row if it exists
+
+            if not bill_record:
+                BillingRecord.objects.create(
+                    client=self.candidate.organization.internal_client,
+                    record_type="CLB",
+                    amount_due=self.client_amount,
+                    due_date=due_date,
+                    status="PED",
+                )
+            else:
+                bill_record.amount_due += self.client_amount
+                bill_record.save()
+
+            bill_record = (
+                BillingRecord.objects.filter(
+                    interviewer=self.interviewer,
+                    created_at__gte=first_day_of_month,
+                    status="PED",
+                )
+                .select_for_update()
+                .first()
+            )
+
+            if bill_record is None:
+                BillingRecord.objects.create(
+                    interviewer=self.interviewer,
+                    status="PED",
+                    record_type="INP",
+                    amount_due=self.interviewer_amount,
+                    due_date=due_date,
+                )
+            else:
+                bill_record.amount_due += self.interviewer_amount
+                bill_record.save()
 
 
 class InterviewFeedback(CreateUpdateDateTimeAndArchivedField):

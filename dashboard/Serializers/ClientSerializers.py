@@ -15,6 +15,7 @@ from ..models import (
     Engagement,
     EngagementOperation,
     EngagementTemplates,
+    Interview,
 )
 from phonenumber_field.serializerfields import PhoneNumberField
 from hiringdogbackend.utils import (
@@ -976,3 +977,20 @@ class EngagmentOperationStatusUpdateSerializer(serializers.ModelSerializer):
         if errors:
             raise serializers.ValidationError({"errors": errors})
         return data
+
+
+class FinanceCandidateSerializer(serializers.ModelSerializer):
+    role = serializers.CharField(source="designation.name")
+
+    class Meta:
+        model = Candidate
+        fields = ("name", "year", "month", "role")
+
+
+class FinanceSerializer(serializers.ModelSerializer):
+    candidate = FinanceCandidateSerializer(read_only=True)
+    scheduled_time = serializers.DateTimeField(format="%d/%m/%Y %H:%M:%S")
+
+    class Meta:
+        model = Interview
+        fields = ("candidate", "scheduled_time", "client_amount")

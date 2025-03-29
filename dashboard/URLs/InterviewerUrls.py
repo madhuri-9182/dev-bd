@@ -7,6 +7,7 @@ from ..views import (
     InterviewerPendingFeedbackView,
     InterviewerInterviewHistoryView,
     InterviewFeedbackView,
+    FinanceView,
 )
 
 urlpatterns = [
@@ -50,4 +51,5 @@ urlpatterns = [
         InterviewFeedbackView.as_view(),
         name="interview-feedback",
     ),
+    path("finance/", FinanceView.as_view(), name="interviewer-finance"),
 ]

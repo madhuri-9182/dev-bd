@@ -12,7 +12,8 @@ from ..views import (
     HDIPUsersViews,
     DomainDesignationView,
     InternalClientDomainView,
-    InternalEngagementView
+    InternalEngagementView,
+    FinanceView,
 )
 
 urlpatterns = [
@@ -66,4 +67,5 @@ urlpatterns = [
         InternalEngagementView.as_view(),
         name="engagements",
     ),
+    path("finance/", FinanceView.as_view(), name="internal-finance"),
 ]

@@ -7,6 +7,7 @@ from .ClientSerializers import (
     EngagementOperationSerializer,
     EngagementUpdateStatusSerializer,
     EngagmentOperationStatusUpdateSerializer,
+    FinanceSerializer,
 )
 from .InternalSerializers import (
     ClientPointOfContactSerializer,
@@ -25,5 +26,5 @@ from .InterviewerSerializers import (
     InterviewerAvailabilitySerializer,
     InterviewerRequestSerializer,
     InterviewerDashboardSerializer,
-    InterviewFeedbackSerializer
+    InterviewFeedbackSerializer,
 )

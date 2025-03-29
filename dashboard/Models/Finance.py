@@ -1,7 +1,6 @@
 from django.db import models
 from hiringdogbackend.ModelUtils import SoftDelete, CreateUpdateDateTimeAndArchivedField
 from .Internal import InternalClient, InternalInterviewer
-from .Interviews import Interview
 
 
 class BillingRecord(CreateUpdateDateTimeAndArchivedField):
@@ -11,7 +10,7 @@ class BillingRecord(CreateUpdateDateTimeAndArchivedField):
     )
 
     STATUS_CHOICES = (
-        ("PEN", "Pending"),
+        ("PED", "Pending"),
         ("PAI", "Paid"),
         ("OVER", "Overdue"),
         ("CAN", "Cancelled"),
@@ -25,14 +24,14 @@ class BillingRecord(CreateUpdateDateTimeAndArchivedField):
     record_type = models.CharField(
         max_length=15, choices=RECORD_TYPE_CHOICES, null=True, blank=True
     )
-    status = models.CharField(max_length=15, choices=STATUS_CHOICES, default="PEN")
+    status = models.CharField(max_length=15, choices=STATUS_CHOICES, default="PED")
 
     amount_due = models.DecimalField(max_digits=10, decimal_places=2)
 
     due_date = models.DateField()
     payment_date = models.DateTimeField(null=True, blank=True)
 
-    invoice_number = models.CharField(max_length=20, unique=True)
+    invoice_number = models.CharField(max_length=20, unique=True, null=True, blank=True)
 
     client = models.ForeignKey(
         InternalClient,

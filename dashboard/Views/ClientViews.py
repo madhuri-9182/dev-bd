@@ -1,3 +1,7 @@
+import os
+import calendar
+import tempfile
+import datetime as dt
 from celery import group
 from celery.result import AsyncResult
 from datetime import datetime, timedelta
@@ -21,6 +25,8 @@ from ..models import (
     InterviewerAvailability,
     Engagement,
     EngagementOperation,
+    Interview,
+    BillingRecord,
 )
 from ..serializer import (
     ClientUserSerializer,
@@ -31,6 +37,7 @@ from ..serializer import (
     EngagementOperationSerializer,
     EngagementUpdateStatusSerializer,
     EngagmentOperationStatusUpdateSerializer,
+    FinanceSerializer,
 )
 from ..permissions import CanDeleteUpdateUser, UserRoleDeleteUpdateClientData
 from externals.parser.resume_parser import ResumerParser
@@ -44,12 +51,10 @@ from core.permissions import (
     IsSuperAdmin,
     IsAdmin,
     IsModerator,
+    IsInterviewer,
 )
 from core.models import Role, User
 from hiringdogbackend.utils import validate_attachment
-import tempfile
-import os
-from django.core.files.storage import default_storage
 from ..tasks import send_schedule_engagement_email
 
 
@@ -1747,3 +1752,101 @@ class ClientDashboardView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+class FinanceView(APIView, LimitOffsetPagination):
+    serializer_class = FinanceSerializer
+    permission_classes = [
+        IsAuthenticated,
+        IsClientOwner | IsSuperAdmin | IsAdmin | IsModerator | IsInterviewer,
+    ]
+
+    def get(self, request):
+        organization_id = request.query_params.get("organization_id")
+        interviewer_id = request.query_params.get("interviewer_id")
+        finance_month = request.query_params.get("finance_month", "current_month")
+
+        if request.user.role not in [Role.CLIENT_OWNER, Role.INTERVIEWER] and (
+            not organization_id or not interviewer_id
+        ):
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "Either organization_id or interviewer_id are required.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        url_name = request.resolver_match.url_name
+        if (
+            (url_name == "client-finance" and request.user.role != Role.CLIENT_OWNER)
+            or (
+                url_name == "interviewer-finance"
+                and request.user.role != Role.INTERVIEWER
+            )
+            or url_name == "internal-finance"
+            and (not organization_id or not interviewer_id)
+        ):
+            return Response(
+                {"status": "failed", "message": "Invalid Request"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        today = dt.date.today()
+        if finance_month == "current_month":
+            # by default current month and it set to next month to cauclate current month finance
+            today = dt.date.today().replace(
+                day=calendar.monthrange(today.year, today.month)[1]
+            ) + dt.timedelta(days=1)
+
+        first_day_of_month = today.replace(day=1)
+
+        last_day_of_last_month = first_day_of_month - dt.timedelta(days=1)
+        last_day_of_last_month = timezone.make_aware(
+            dt.datetime.combine(last_day_of_last_month, dt.time.max)
+        )
+
+        first_day_of_last_month = last_day_of_last_month.replace(day=1)
+        first_day_of_last_month = timezone.make_aware(
+            dt.datetime.combine(first_day_of_last_month, dt.time.min)
+        )
+
+        finance_qs = Interview.objects.filter(
+            created_at__range=(first_day_of_last_month, last_day_of_last_month),
+            status__in=["REC", "NREC", "NJ", "HREC", "SNREC"],
+        ).select_related(
+            "candidate", "interviewer", "candidate__organization", "interviewer__user"
+        )
+        if request.user.role == Role.CLIENT_OWNER:
+            finance_qs = finance_qs.filter(
+                candidate__organization=request.user.clientuser.organization
+            )
+            billing_info = BillingRecord.objects.filter(
+                client__organization=request.user.clientuser.organization,
+                created_at__range=(first_day_of_last_month, last_day_of_last_month),
+            ).first()
+        elif request.user.role == Role.INTERVIEWER:
+            finance_qs = finance_qs.filter(interviewer__user=request.user)
+            billing_info = BillingRecord.objects.filter(
+                interviewer__user=request.user,
+                created_at__range=(first_day_of_last_month, last_day_of_last_month),
+            ).first()
+        else:
+            if organization_id:
+                finance_qs = finance_qs.filter(
+                    candidate__organization_id=organization_id
+                )
+            else:
+                finance_qs = finance_qs.filter(interviewer_id=interviewer_id)
+
+        paginated_queryset = self.paginate_queryset(finance_qs, request)
+        serializer = self.serializer_class(paginated_queryset, many=True)
+        paginated_data = self.get_paginated_response(serializer.data)
+        response_data = {
+            "status": "success",
+            "message": "Last month finance records retreived successfully.",
+        }
+        if request.user.role in [Role.CLIENT_OWNER, Role.INTERVIEWER]:
+            response_data["total_amount"] = billing_info
+        response_data.update(paginated_data.data)
+        return Response(response_data)
