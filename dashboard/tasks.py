@@ -204,7 +204,7 @@ def process_interview_video_and_generate_and_store_feedback(self):
             to=interview.interviewer.email,
             subject=f"Ready to Review? Feedback for {candidate_name} is Live",
             template="interview_feedback_notification_email.html",
-            reply_to=settings.CONTACT_EMAIL,
+            reply_to=settings.EMAIL_HOST_USER,
             interviewer_name=interviewer_name,
             candidate_name=candidate_name,
             dashboard_link="https://app.hdiplatform.in/",

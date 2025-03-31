@@ -59,8 +59,8 @@ class BillingRecord(CreateUpdateDateTimeAndArchivedField):
 
     def __str__(self):
         if self.record_type == "CLB":
-            return f"Client Billing - {self.client.name} - {self.amount}"
-        return f"Interviewer Payment - {self.interviewer.name} - {self.amount}"
+            return f"Client Billing - {self.client.name} - {self.amount_due}"
+        return f"Interviewer Payment - {self.interviewer.name} - {self.amount_due}"
 
     def save(self, *args, **kwargs):
         if self.record_type == "CLB" and not self.client:
