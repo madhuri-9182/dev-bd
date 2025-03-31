@@ -101,13 +101,12 @@ class Interview(CreateUpdateDateTimeAndArchivedField):
             )
 
         super().save(*args, **kwargs)
-
         candidate.status = self.status
         candidate.score = self.score
         candidate.total_score = self.total_score
         candidate.save()
 
-        if self.status == "SCH":
+        if self.status in ["REC", "NREC", "NJ", "HREC", "SNREC"]:
             today = timezone.now()
             first_day_of_month = today.replace(day=1)
             due_date = today.replace(
@@ -123,7 +122,6 @@ class Interview(CreateUpdateDateTimeAndArchivedField):
                 .select_for_update()
                 .first()
             )  # Lock the row if it exists
-
             if not bill_record:
                 BillingRecord.objects.create(
                     client=self.candidate.organization.internal_client,
@@ -197,7 +195,7 @@ class InterviewFeedback(CreateUpdateDateTimeAndArchivedField):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
-        self.interview.score = self.overall_score
         if self.is_submitted:
+            self.interview.score = self.overall_score
             self.interview.status = self.overall_remark
         self.interview.save()

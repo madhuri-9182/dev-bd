@@ -346,6 +346,7 @@ class InterviewerRequestResponseView(APIView):
                             total_score=100,
                         )
                     except IntegrityError as e:
+                        print(str(e))
                         return Response(
                             {
                                 "status": "failed",

@@ -252,7 +252,7 @@ class InterviewerCandidateSerializer(serializers.ModelSerializer):
 
 
 class QuestionSerializer(serializers.Serializer):
-    que = serializers.CharField(min_length=1, max_length=100)
+    que = serializers.CharField(min_length=1, max_length=250)
     ans = serializers.CharField(min_length=1, max_length=500)
 
 
