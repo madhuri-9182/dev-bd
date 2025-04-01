@@ -256,6 +256,7 @@ class InternalClientSerializer(serializers.ModelSerializer):
                         user_name=name_,
                         password=temporary_password,
                         login_url=settings.LOGIN_URL,
+                        org_name=organization_name,
                     )
 
             # Queue the email sending after the transaction is committed
@@ -320,6 +321,7 @@ class InternalClientSerializer(serializers.ModelSerializer):
                     user_name=name,
                     password=password,
                     login_url=settings.LOGIN_URL,
+                    org_name=instance.name,
                 )
                 user.profile.name = name
                 user.profile.save()
@@ -846,6 +848,7 @@ class InternalClientUserSerializer(serializers.ModelSerializer):
                 user_name=validated_data.get("name"),
                 password=password,
                 login_url=settings.LOGIN_URL,
+                org_name=internal_client.organization.name,
             )
         return client_user
 
