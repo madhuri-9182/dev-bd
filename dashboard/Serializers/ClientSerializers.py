@@ -1,5 +1,6 @@
 import json
 from datetime import datetime
+from celery import group
 from rest_framework import serializers
 from celery import group
 from django.conf import settings
@@ -134,7 +135,7 @@ class ClientUserSerializer(serializers.ModelSerializer):
 
             data = f"user:{current_user.email};invitee-email:{email}"
             uid = urlsafe_base64_encode(force_bytes(data))
-            send_mail.delay(
+            send_mail_to_clientuser = send_mail.si(
                 to=email,
                 subject=f"You're Invited to Join {organization.name} on Hiring Dog",
                 template="invitation.html",
@@ -147,6 +148,21 @@ class ClientUserSerializer(serializers.ModelSerializer):
                 activation_url=f"/client/client-user-activate/{uid}/",
                 site_domain=settings.SITE_DOMAIN,
             )
+
+            send_mail_to_internal = send_mail.si(
+                to=organization.internal_client.assigned_to.user.email,
+                subject=f"Confirmation: Invitation Sent to {name} for {organization.name}",
+                template="internal_client_clientuser_invitation_confirmation.html",
+                internal_user_name=organization.internal_client.assigned_to.name,
+                client_user_name=name,
+                invitation_date=datetime.today().strftime("%d/%m/%Y"),
+                client_name=organization.name,
+            )
+
+            transaction.on_commit(
+                lambda: (send_mail_to_clientuser | send_mail_to_internal).apply_async()
+            )
+
         return client_user
 
     def update(self, instance, validated_data):

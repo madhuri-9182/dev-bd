@@ -2,6 +2,7 @@ import datetime
 from rest_framework import serializers
 from organizations.utils import create_organization
 from organizations.models import Organization
+from celery import group
 from django.conf import settings
 from django.db import transaction
 from django.utils.encoding import force_bytes
@@ -178,6 +179,7 @@ class InternalClientSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
+        request = self.context.get("request")
         points_of_contact_data = validated_data.pop("points_of_contact")
         organization_name = validated_data.get("name")
 
@@ -204,13 +206,18 @@ class InternalClientSerializer(serializers.ModelSerializer):
                         user, organization_name, is_active=False
                     )
 
-                    agreement_rates = [{"years_of_experience": "0-4", "rate": 2800},
-                                       {"years_of_experience": "4-6", "rate": 3500},
-                                       {"years_of_experience": "6-8", "rate": 4500},
-                                       {"years_of_experience": "8-10", "rate": 6000},
-                                       {"years_of_experience": "10+", "rate": 6500}]
-                    
-                    agreements = [Agreement(organization=organization, **agreement_rate) for agreement_rate in agreement_rates]
+                    agreement_rates = [
+                        {"years_of_experience": "0-4", "rate": 2800},
+                        {"years_of_experience": "4-6", "rate": 3500},
+                        {"years_of_experience": "6-8", "rate": 4500},
+                        {"years_of_experience": "8-10", "rate": 6000},
+                        {"years_of_experience": "10+", "rate": 6500},
+                    ]
+
+                    agreements = [
+                        Agreement(organization=organization, **agreement_rate)
+                        for agreement_rate in agreement_rates
+                    ]
                     Agreement.objects.bulk_create(agreements)
                 """ 
                 else:
@@ -243,24 +250,35 @@ class InternalClientSerializer(serializers.ModelSerializer):
             ClientPointOfContact.objects.bulk_create(points_of_contact_objs)
             ClientUser.objects.bulk_create(client_user_objs)
 
-            def send_email_for_pocs():
-                for point_of_contact in points_of_contact_data:
-                    email = point_of_contact.get("email")
-                    name_ = point_of_contact.get("name")
-                    temporary_password = point_of_contact.get("temporary_password")
-
-                    send_mail.delay(
-                        to=email,
-                        subject=WELCOME_MAIL_SUBJECT,
-                        template=ONBOARD_EMAIL_TEMPLATE,
-                        user_name=name_,
-                        password=temporary_password,
-                        login_url=settings.LOGIN_URL,
-                        org_name=organization_name,
-                    )
+            send_mail_to_poc_and_internal = group(
+                *(
+                    [
+                        send_mail.si(
+                            to=point_of_contact["email"],
+                            subject=WELCOME_MAIL_SUBJECT,
+                            template=ONBOARD_EMAIL_TEMPLATE,
+                            user_name=point_of_contact["name"],
+                            password=point_of_contact["temporary_password"],
+                            login_url=settings.LOGIN_URL,
+                            org_name=organization_name,
+                        )
+                        for point_of_contact in points_of_contact_data
+                    ]
+                    + [
+                        send_mail.si(
+                            to=request.user.email,
+                            subject=f"{organization.name} Client Onboarded Successfully.",
+                            template="internal_client_onboarding_confirmation.html",
+                            internal_user_name=request.user.hdipuser.name,
+                            client_name=organization.name,
+                            onboarding_date=datetime.date.today().strftime("%d/%m/%Y"),
+                        )
+                    ]
+                )
+            )
 
             # Queue the email sending after the transaction is committed
-            transaction.on_commit(send_email_for_pocs)
+            transaction.on_commit(lambda: send_mail_to_poc_and_internal.apply_async())
 
         return client
 

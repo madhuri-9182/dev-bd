@@ -176,7 +176,7 @@ class InternalClientView(APIView, LimitOffsetPagination):
         )
 
     def post(self, request):
-        serializer = self.serializer_class(data=request.data)
+        serializer = self.serializer_class(data=request.data, context={"request":request})
         if serializer.is_valid():
             serializer.save()
             return Response(
