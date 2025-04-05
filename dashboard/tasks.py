@@ -137,7 +137,9 @@ def download_recordings_from_google_drive(self, interview_info):
     try:
         download_recording_info = download_from_google_drive(interview_id, event_id)
         if not download_recording_info:
-            Interview.objects.filter(pk=interview_id).update(no_of_time_processed=F('no_of_time_processed')+1)
+            Interview.objects.filter(pk=interview_id).update(
+                no_of_time_processed=F("no_of_time_processed") + 1
+            )
             raise Reject(f"Failed to download recordings for Interview {interview_id}")
         return download_recording_info
     except Reject:
@@ -208,9 +210,13 @@ def trigger_interview_processing():
 
 @shared_task(bind=True, retry_backoff=5, max_retries=3)
 def process_interview_video_and_generate_and_store_feedback(self):
-    interviews = Interview.objects.filter(
-        transcription__isnull=False, interview_feedback__isnull=True
-    ).exclude(transcription="").only("id", "feedback")
+    interviews = (
+        Interview.objects.filter(
+            transcription__isnull=False, interview_feedback__isnull=True
+        )
+        .exclude(transcription="")
+        .only("id", "feedback")
+    )
     print(interviews)
     processed_ids = []
     for interview in interviews:
@@ -229,7 +235,7 @@ def process_interview_video_and_generate_and_store_feedback(self):
                 to=interview.interviewer.email,
                 subject=f"Ready to Review? Feedback for {candidate_name} is Live",
                 template="interview_feedback_notification_email.html",
-                reply_to=settings.CONTACT_EMAIL,
+                reply_to=settings.EMAIL_HOST_USER,
                 interviewer_name=interviewer_name,
                 candidate_name=candidate_name,
                 dashboard_link="https://app.hdiplatform.in/",
