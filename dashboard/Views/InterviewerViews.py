@@ -212,7 +212,7 @@ class InterviewerReqeustView(APIView):
             return Response(
                 {
                     "status": "success",
-                    "message": "Interviewers notified successfully progress.",
+                    "message": "Scheduling initiated successfully. Interviewers will be notified shortly.",
                 },
                 status=status.HTTP_200_OK,
             )
@@ -436,7 +436,7 @@ class InterviewerRequestResponseView(APIView):
                     contexts = [
                         {
                             "name": candidate.name,
-                            "position": candidate.designation.name,
+                            "position": candidate.designation.get_name_display(),
                             "company_name": candidate.organization.name,
                             "interview_date": interview_date,
                             "interview_time": interview_time,
@@ -449,7 +449,7 @@ class InterviewerRequestResponseView(APIView):
                         },
                         {
                             "name": interviewer_availability.interviewer.name,
-                            "position": candidate.designation.name,
+                            "position": candidate.designation.get_name_display(),
                             "interview_date": interview_date,
                             "interview_time": interview_time,
                             "candidate": candidate.name,
@@ -461,11 +461,15 @@ class InterviewerRequestResponseView(APIView):
                         },
                         {
                             "name": candidate.organization.name,
-                            "position": candidate.designation.name,
+                            "position": candidate.designation.get_name_display(),
                             "interview_date": interview_date,
                             "interview_time": interview_time,
                             "candidate": candidate.name,
-                            "email": candidate.designation.hiring_manager.user.email,
+                            "email": getattr(
+                                getattr(candidate.added_by, "user", None),
+                                "email",
+                                candidate.designation.hiring_manager.user.email,
+                            ),
                             "template": "interview_confirmation_client_notification.html",
                             "subject": f"Interview Scheduled - {candidate.name}",
                             "meeting_link": meeting_link,

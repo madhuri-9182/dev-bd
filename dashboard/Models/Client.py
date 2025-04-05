@@ -170,6 +170,13 @@ class Candidate(CreateUpdateDateTimeAndArchivedField):
     final_selection_status = models.CharField(
         max_length=20, choices=FINAL_SELECTION_STATUS_CHOICES, null=True, blank=True
     )
+    added_by = models.ForeignKey(
+        ClientUser,
+        on_delete=models.SET_NULL,
+        related_name="candidates",
+        blank=True,
+        null=True,
+    )
 
 
 class Engagement(CreateUpdateDateTimeAndArchivedField):

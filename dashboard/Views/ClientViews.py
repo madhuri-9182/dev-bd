@@ -696,6 +696,7 @@ class CandidateView(APIView, LimitOffsetPagination):
             serializer.save(
                 organization=request.user.clientuser.organization,
                 designation_id=serializer.validated_data.pop("job_id"),
+                added_by=request.user.clientuser
             )
             return Response(
                 {
