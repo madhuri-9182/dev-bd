@@ -1,5 +1,8 @@
+import os
 from django.core.mail import EmailMultiAlternatives, get_connection
 from django.core.files.base import ContentFile
+from django.db import transaction
+from django.db.models import F
 from django.template.loader import render_to_string
 from django.utils import timezone
 from celery import shared_task, chain, group
@@ -116,16 +119,17 @@ def send_schedule_engagement_email(self, engagement_operation_id):
 @shared_task
 def fetch_interview_records():
     current_time = timezone.now()
-    before_one_and_half_an_hour = current_time - timedelta(hours=1, minutes=30)
+    before_one_and_half_an_hour = current_time - timedelta(hours=2, minutes=30)
     interview_qs = Interview.objects.filter(
         scheduled_time__lte=before_one_and_half_an_hour,
         downloaded=False,
         scheduled_service_account_event_id__isnull=False,
+        no_of_time_processed__lte=3,
     ).values_list("id", "scheduled_service_account_event_id")
     return list(interview_qs)
 
 
-@shared_task(bind=True, retry_backoff=5, max_retries=3)
+@shared_task(bind=True, retry_backoff=10, max_retries=3)
 def download_recordings_from_google_drive(self, interview_info):
     if not interview_info or len(interview_info) != 2:
         raise Reject("Missing or invalid interview info")
@@ -133,11 +137,15 @@ def download_recordings_from_google_drive(self, interview_info):
     try:
         download_recording_info = download_from_google_drive(interview_id, event_id)
         if not download_recording_info:
+            Interview.objects.filter(pk=interview_id).update(no_of_time_processed=F('no_of_time_processed')+1)
             raise Reject(f"Failed to download recordings for Interview {interview_id}")
         return download_recording_info
     except Reject:
         raise
     except Exception as e:
+        print(
+            f"Exception occured in download_recordings_from_google_drive:{interview_id} - {str(e)}"
+        )
         raise self.retry(exc=e)
 
 
@@ -147,15 +155,34 @@ def store_recordings(recording_info):
         interview = Interview.objects.get(pk=recording_info["interview_id"])
     except Interview.DoesNotExist:
         raise Reject(f"Interview {recording_info['interview_id']} not found")
+    files_to_delete = []
+    with transaction.atomic():
+        for file_type, file in recording_info["files"].items():
+            try:
+                with open(file["path"], "rb") as f:
+                    if file_type == "video":
+                        interview.recording.save(file["name"], f)
+                    elif file_type == "transcript":
+                        interview.transcription.save(file["name"], f)
+            except Exception as e:
+                raise Reject(f"Error processing file {file['path']}: {str(e)}")
+            files_to_delete.append(file["path"])
 
-    for file in recording_info["files"]:
-        if file["type"] == "video":
-            interview.recording.save(file["name"], ContentFile(file["data"]))
-        elif file["type"] == "transcript":
-            interview.transcription.save(file["name"], ContentFile(file["data"]))
+        interview.downloaded = True
+        interview.no_of_time_processed += 1
+        interview.save(
+            update_fields=[
+                "recording",
+                "transcription",
+                "downloaded",
+                "no_of_time_processed",
+            ]
+        )
 
-    interview.downloaded = True
-    interview.save(update_fields=["recording", "transcription", "downloaded"])
+    for file_path in files_to_delete:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
     return interview.id
 
 
@@ -183,7 +210,7 @@ def trigger_interview_processing():
 def process_interview_video_and_generate_and_store_feedback(self):
     interviews = Interview.objects.filter(
         transcription__isnull=False, interview_feedback__isnull=True
-    ).only("id", "feedback")
+    ).exclude(transcription="").only("id", "feedback")
     print(interviews)
     processed_ids = []
     for interview in interviews:
@@ -191,23 +218,23 @@ def process_interview_video_and_generate_and_store_feedback(self):
             with interview.transcription.open("r") as f:
                 file_content = f.read()
             extracted_data = analyze_transcription_and_generate_feedback(file_content)
+
+            InterviewFeedback.objects.update_or_create(
+                interview_id=interview.id, defaults={**extracted_data}
+            )
+            processed_ids.append(interview.id)
+            interviewer_name = interview.interviewer.name
+            candidate_name = interview.candidate.name
+            send_mail.delay(
+                to=interview.interviewer.email,
+                subject=f"Ready to Review? Feedback for {candidate_name} is Live",
+                template="interview_feedback_notification_email.html",
+                reply_to=settings.CONTACT_EMAIL,
+                interviewer_name=interviewer_name,
+                candidate_name=candidate_name,
+                dashboard_link="https://app.hdiplatform.in/",
+                type="feedback_notification",
+            )
         except Exception as e:
             print(str(e))
-            continue
-        InterviewFeedback.objects.update_or_create(
-            interview_id=interview.id, defaults={**extracted_data}
-        )
-        processed_ids.append(interview.id)
-        interviewer_name = interview.interviewer.name
-        candidate_name = interview.candidate.name
-        send_mail.delay(
-            to=interview.interviewer.email,
-            subject=f"Ready to Review? Feedback for {candidate_name} is Live",
-            template="interview_feedback_notification_email.html",
-            reply_to=settings.EMAIL_HOST_USER,
-            interviewer_name=interviewer_name,
-            candidate_name=candidate_name,
-            dashboard_link="https://app.hdiplatform.in/",
-            type="feedback_notification",
-        )
     return f"Interview feedback created successfully for {processed_ids}."

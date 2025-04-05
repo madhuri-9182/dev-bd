@@ -23,6 +23,10 @@ class Interview(CreateUpdateDateTimeAndArchivedField):
         blank=True,
         null=True,
     )
+    no_of_time_processed = models.IntegerField(
+        default=0,
+        help_text="Signifying the number of times that task is processed. if the task process more that 3 times then the interview doesn't happen.",
+    )
     status = models.CharField(
         max_length=15,
         choices=Candidate.STATUS_CHOICES,

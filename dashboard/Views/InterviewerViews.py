@@ -292,7 +292,7 @@ class InterviewerRequestResponseView(APIView):
                     return Response(
                         {
                             "status": "failed",
-                            "message": "Candidate already has a scheduled interview.",
+                            "message": "The candidate is currently occupied and has already been assigned to an interviewer.",
                         },
                         status=status.HTTP_400_BAD_REQUEST,
                     )

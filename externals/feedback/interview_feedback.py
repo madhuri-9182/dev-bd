@@ -74,7 +74,7 @@ def analyze_transcription_and_generate_feedback(transcription):
     """
 
     try:
-        model = genai.GenerativeModel("gemini-1.5-pro-latest")
+        model = genai.GenerativeModel("gemini-2.0-flash-thinking-exp-01-21")
         response = model.generate_content(prompt)
 
         # Clean the response text

@@ -1,6 +1,7 @@
-import datetime
+import time
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload
 from django.conf import settings
 
 SCOPES = [
@@ -79,50 +80,73 @@ def get_meeting_info(event_id):
     return event
 
 
-def download_file(file_id, mime_type=None):
+def download_file(file_id, mime_type=None, save_path=None):
     if mime_type:
         request = drive_service.files().export_media(fileId=file_id, mimeType=mime_type)
     else:
         request = drive_service.files().get_media(fileId=file_id)
-    return request.execute()
+
+    # instead of lading the cotent directly to ram we save it in temp file by reading chunk of data size 1MB using resumable download which help to resume if download fails in the middle
+    with open(save_path, "ab") as file:
+        downloader = MediaIoBaseDownload(
+            fd=file, request=request, chunksize=4 * 1024 * 1024
+        )
+        done = False
+        while not done:
+            try:
+                status, done = downloader.next_chunk()  # Resume if interrupted
+                print(f"Download {int(status.progress() * 100)}% complete.")
+            except Exception as e:
+                print(f"Chunk download failed: {e}")
+                time.sleep(5)
+                continue
+
+    return save_path
 
 
 def download_from_google_drive(interview_id, event_id):
     event_info = get_meeting_info(event_id)
     attachments = event_info.get("attachments", [])
 
-    downloaded_files = []
-    video_downloaded = False
-    transcription_downloaded = False
+    if not attachments:
+        return {}
+
+    required_files = {
+        "video": None,
+        "transcript": None,
+    }
 
     for attachment in attachments:
-        file_id, file_type, file_name = (
+        file_id, mime_type, file_name = (
             attachment["fileId"],
             attachment["mimeType"],
             attachment["title"],
         )
-        if not video_downloaded and "video" in file_type:
-            data = download_file(file_id)
-            downloaded_files.append(
-                {"type": "video", "data": data, "name": f"{event_id}.mp4"}
-            )
-            video_downloaded = True
-        elif not transcription_downloaded and "Transcript" in file_name:
-            data = download_file(file_id, mime_type="text/plain")
-            downloaded_files.append(
-                {
-                    "type": "transcript",
-                    "data": data,
-                    "name": f"{event_id}.txt",
-                }
-            )
-            transcription_downloaded = True
+        if "video" in mime_type:
+            required_files["video"] = file_id
+        elif "Transcript" in file_name:
+            required_files["transcript"] = file_id
 
-    return (
-        {"interview_id": interview_id, "files": downloaded_files}
-        if downloaded_files
-        else {}
-    )
+    if None in required_files.values():
+        return {}
+
+    downloaded_files = {}
+    file_configs = {
+        "video": {"ext": "mp4", "mime_type": None},
+        "transcript": {"ext": "txt", "mime_type": "text/plain"},
+    }
+
+    for file_type, file_id in required_files.items():
+        save_path = f"/tmp/{event_id}.{file_configs[file_type]['ext']}"
+        download_file(
+            file_id, mime_type=file_configs[file_type]["mime_type"], save_path=save_path
+        )
+        downloaded_files[file_type] = {
+            "path": save_path,
+            "name": f"{event_id}.{file_configs[file_type]['ext']}",
+        }
+
+    return {"interview_id": interview_id, "files": downloaded_files}
 
 
 # keep below funcation for testing purpose

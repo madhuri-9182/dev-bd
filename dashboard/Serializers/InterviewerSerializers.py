@@ -252,12 +252,12 @@ class InterviewerCandidateSerializer(serializers.ModelSerializer):
 
 
 class QuestionSerializer(serializers.Serializer):
-    que = serializers.CharField(min_length=1, max_length=250)
-    ans = serializers.CharField(min_length=1, max_length=500)
+    que = serializers.CharField(min_length=1, max_length=1500)
+    ans = serializers.CharField(min_length=1, max_length=1500)
 
 
 class TopicSerializer(serializers.Serializer):
-    summary = serializers.CharField(min_length=1, max_length=500)
+    summary = serializers.CharField(min_length=1, max_length=1500)
     score = serializers.IntegerField(min_value=0, max_value=100)
     start_time = serializers.IntegerField(required=False)
     end_time = serializers.IntegerField(required=False)
