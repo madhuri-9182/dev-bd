@@ -433,6 +433,8 @@ class InterviewerRequestResponseView(APIView):
                     interview.meeting_link = meeting_link
                     interview.save()
 
+                    internal_user = candidate.organization.internal_client.assigned_to
+
                     contexts = [
                         {
                             "name": candidate.name,
@@ -443,7 +445,7 @@ class InterviewerRequestResponseView(APIView):
                             "interviewer": interviewer_availability.interviewer.name,
                             "email": candidate.email,
                             "template": "interview_confirmation_candidate_notification.html",
-                            "subject": f"Interview Scheduled - {candidate.designation.name}",
+                            "subject": f"Interview Scheduled - {candidate.designation.get_name_display()}",
                             "meeting_link": meeting_link,
                             "from_email": settings.EMAIL_HOST_USER,
                         },
@@ -471,6 +473,19 @@ class InterviewerRequestResponseView(APIView):
                                 candidate.designation.hiring_manager.user.email,
                             ),
                             "template": "interview_confirmation_client_notification.html",
+                            "subject": f"Interview Scheduled - {candidate.name}",
+                            "meeting_link": meeting_link,
+                            "from_email": settings.EMAIL_HOST_USER,
+                        },
+                        {
+                            "organization_name": candidate.organization.name,
+                            "internal_user_name": internal_user.name,
+                            "position": candidate.designation.get_name_display(),
+                            "interview_date": interview_date,
+                            "interview_time": interview_time,
+                            "candidate_name": candidate.name,
+                            "email": internal_user.user.email,
+                            "template": "internal_interview_scheduling_confirmation.html",
                             "subject": f"Interview Scheduled - {candidate.name}",
                             "meeting_link": meeting_link,
                             "from_email": settings.EMAIL_HOST_USER,
@@ -668,6 +683,39 @@ class InterviewFeedbackView(APIView, LimitOffsetPagination):
         )
         serializer.is_valid(raise_exception=True)
         serializer.save(is_submitted=True)
+        internal_user = (
+            interview_feedback.interview.candidate.organization.internal_client.assigned_to
+        )
+        interviewer_name = interview_feedback.interview.interviewer.name
+        candidate_name = interview_feedback.interview.candidate.name
+        position = interview_feedback.interview.candidate.designation.get_name_display()
+        recruiter = interview_feedback.interview.candidate.added_by
+        contexts = [
+            {
+                "internal_user_name": internal_user.name,
+                "from_email": settings.EMAIL_HOST_USER,
+                "email": internal_user.user.email,
+                "organization_name": interview_feedback.interview.candidate.organization.name,
+                "candidate_name": candidate_name,
+                "interviewer_name": interviewer_name,
+                "position": position,
+                "interview_date": interview_feedback.interview.scheduled_time.strftime(
+                    "%d/%m/%Y %H:%M"
+                ),
+                "subject": f"Feedback Submitted: Insights from {interviewer_name} on {candidate_name}",
+                "template": "internal_interview_submitted_feedback_notification.html",
+            },
+            {
+                "client_name": recruiter.name,
+                "candidate_name": candidate_name,
+                "subject": f"📝 Feedback Alert: SDE1 Interview Feedback for {candidate_name} is Now Available",
+                "interviewer_name": interviewer_name,
+                "from_email": settings.EMAIL_HOST_USER,
+                "email": recruiter.user.email,
+                "template": "client_interview_feedback_submitted_notification.html",
+            },
+        ]
+        send_email_to_multiple_recipients.delay(contexts, "", "")
         return Response(
             {
                 "status": "success",

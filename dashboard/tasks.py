@@ -19,7 +19,14 @@ from externals.feedback.interview_feedback import (
 
 @shared_task(bind=True, max_retries=3, rate_limit="10/m")
 def send_mail(
-    self, to, subject, template, reply_to=None, attachmenets=[], bcc=None, **kwargs
+    self,
+    to,
+    subject,
+    template,
+    reply_to=settings.EMAIL_HOST_USER,
+    attachmenets=[],
+    bcc=None,
+    **kwargs,
 ):
     email_type = kwargs.get("type")
     context = {
@@ -41,7 +48,16 @@ def send_mail(
 
 
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=60, retry_jitter=True)
-def send_email_to_multiple_recipients(self, contexts, subject, template, **kwargs):
+def send_email_to_multiple_recipients(
+    self,
+    contexts,
+    subject,
+    template,
+    reply_to=settings.EMAIL_HOST_USER,
+    attachments=[],
+    bcc=None,
+    **kwargs,
+):
     emails = []
 
     with get_connection() as connection:
@@ -64,8 +80,12 @@ def send_email_to_multiple_recipients(self, contexts, subject, template, **kwarg
                 body="This is an HTML email. Please view it in an HTML-compatible email client.",
                 from_email=from_email if from_email else settings.EMAIL_HOST_USER,
                 to=[email_address],
+                reply_to=[reply_to],
+                bcc=[bcc],
                 connection=connection,
             )
+            for attachment in attachments:
+                email.attach_file(attachment)
             email.attach_alternative(html_content, "text/html")
             emails.append(email)
 
@@ -231,16 +251,33 @@ def process_interview_video_and_generate_and_store_feedback(self):
             processed_ids.append(interview.id)
             interviewer_name = interview.interviewer.name
             candidate_name = interview.candidate.name
-            send_mail.delay(
-                to=interview.interviewer.email,
-                subject=f"Ready to Review? Feedback for {candidate_name} is Live",
-                template="interview_feedback_notification_email.html",
-                reply_to=settings.EMAIL_HOST_USER,
-                interviewer_name=interviewer_name,
-                candidate_name=candidate_name,
-                dashboard_link="https://app.hdiplatform.in/",
-                type="feedback_notification",
-            )
+            contexts = [
+                {
+                    "interviewer_name": interviewer_name,
+                    "candidate_name": candidate_name,
+                    "dashboard_link": "https://app.hdiplatform.in/",
+                    "type": "feedback_notification",
+                    "email": interview.interviewer.email,
+                    "from_email": settings.EMAIL_HOST_USER,
+                    "subject": f"Ready to Review? Feedback for {candidate_name} is Live",
+                    "template": "interview_feedback_notification_email.html",
+                },
+                {
+                    "internal_user_name": interview.candidate.organization.internal_client.assigned_to.name,
+                    "organization_name": interview.candidate.organization.name,
+                    "position": interview.candidate.designation.get_name_display(),
+                    "interviewer_name": interview.interviewer.name,
+                    "interview_date": interview.scheduled_time.strftime(
+                        "%d/%m/%Y %H:%M"
+                    ),
+                    "candidate_name": candidate_name,
+                    "email": interview.candidate.organization.internal_client.assigned_to.user.email,
+                    "from_email": settings.EMAIL_HOST_USER,
+                    "subject": f"Feedback Report Generated: Insights from {interviewer_name}'s Interview with {candidate_name}",
+                    "template": "internal_interview_feedback_report_generated_conformation.html",
+                },
+            ]
+            send_email_to_multiple_recipients.delay(contexts, "", "")
         except Exception as e:
             print(str(e))
     return f"Interview feedback created successfully for {processed_ids}."

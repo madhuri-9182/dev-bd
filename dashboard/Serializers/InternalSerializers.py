@@ -26,7 +26,7 @@ from hiringdogbackend.utils import (
     get_boolean,
     check_for_email_and_phone_uniqueness,
 )
-from ..tasks import send_mail
+from ..tasks import send_mail, send_email_to_multiple_recipients
 
 ONBOARD_EMAIL_TEMPLATE = "onboard.html"
 WELCOME_MAIL_SUBJECT = "Welcome to Hiring Dog"
@@ -498,16 +498,29 @@ class InterviewerSerializer(serializers.ModelSerializer):
             verification_data_uid = urlsafe_base64_encode(
                 force_bytes(verification_data)
             )
-            send_mail.delay(
-                to=email,
-                user_name=name,
-                template=ONBOARD_EMAIL_TEMPLATE,
-                password=password,
-                subject=WELCOME_MAIL_SUBJECT,
-                login_url=settings.LOGIN_URL,
-                site_domain=settings.SITE_DOMAIN,
-                verification_link=f"/verification/{verification_data_uid}/",
-            )
+            contexts = [
+                {
+                    "subject": WELCOME_MAIL_SUBJECT,
+                    "from_email": settings.EMAIL_HOST_USER,
+                    "email": email,
+                    "template": ONBOARD_EMAIL_TEMPLATE,
+                    "user_name": name,
+                    "password": password,
+                    "login_url": settings.LOGIN_URL,
+                    "site_domain": settings.SITE_DOMAIN,
+                    "verification_link": f"/verification/{verification_data_uid}/",
+                },
+                {
+                    "subject": f"Confirmation: {interviewer_obj.name} Successfully Onboarded as Interviewer",
+                    "from_email": settings.EMAIL_HOST_USER,
+                    "email": "ashok@mailsac.com",
+                    "template": "internal_interviewer_onboarded_confirmation_notification.html",
+                    "internal_user_name": "Admin",
+                    "interviewer_name": interviewer_obj.name,
+                    "onboarding_date": datetime.date.today().strftime("%d/%m/%Y"),
+                },
+            ]
+            send_email_to_multiple_recipients.delay(contexts, "", "")
             user.profile.name = name
             user.profile.save()
         return interviewer_obj
