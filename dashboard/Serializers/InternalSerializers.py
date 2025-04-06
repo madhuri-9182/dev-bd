@@ -123,6 +123,17 @@ class InternalClientSerializer(serializers.ModelSerializer):
                 "A maximum of 3 points of contact are allowed."
             )
 
+        assigned_to = data.get("assigned_to")
+        if assigned_to is None:
+            errors.setdefault("assigned_to", []).append(
+                "assigned_to is a required field."
+            )
+        elif (
+            not isinstance(assigned_to, int)
+            or not HDIPUsers.objects.filter(pk=assigned_to).exists()
+        ):
+            errors.setdefault("assigned_to", []).append("Invalid assigned to value.")
+
         if errors:
             raise serializers.ValidationError(errors)
 
@@ -140,6 +151,7 @@ class InternalClientSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(errors)
 
         self.context["contact_ids"] = contact_ids
+        self.context["assigned_to"] = assigned_to
 
         return super().to_internal_value(data)
 
@@ -182,6 +194,7 @@ class InternalClientSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         points_of_contact_data = validated_data.pop("points_of_contact")
         organization_name = validated_data.get("name")
+        assigned_to = self.context["assigned_to"]
 
         with transaction.atomic():
             organization = None
@@ -241,7 +254,7 @@ class InternalClientSerializer(serializers.ModelSerializer):
                 point_of_contact["temporary_password"] = password
 
             client = InternalClient.objects.create(
-                organization=organization, **validated_data
+                organization=organization, assigned_to_id=assigned_to, **validated_data
             )
 
             for poc in points_of_contact_objs:
@@ -269,7 +282,11 @@ class InternalClientSerializer(serializers.ModelSerializer):
                             to=request.user.email,
                             subject=f"{organization.name} Client Onboarded Successfully.",
                             template="internal_client_onboarding_confirmation.html",
-                            internal_user_name=request.user.hdipuser.name,
+                            internal_user_name=getattr(
+                                getattr(request.user, "hdipuser", None),
+                                "name",
+                                request.user.email,
+                            ),
                             client_name=organization.name,
                             onboarding_date=datetime.date.today().strftime("%d/%m/%Y"),
                         )
