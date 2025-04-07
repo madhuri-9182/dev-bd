@@ -100,6 +100,7 @@ class InternalClientSerializer(serializers.ModelSerializer):
             "is_signed",
             "assigned_to",
             "address",
+            "client_level",
             "points_of_contact",
             "onboarded_at",
         )
@@ -172,6 +173,7 @@ class InternalClientSerializer(serializers.ModelSerializer):
                 "is_signed",
                 "assigned_to",
                 "address",
+                "client_level",
                 "points_of_contact",
             ],
             partial=self.partial,
@@ -184,6 +186,10 @@ class InternalClientSerializer(serializers.ModelSerializer):
 
         if data.get("pan") and not is_valid_pan(data.get("pan")):
             errors.setdefault("pan", []).append("Invalid PAN.")
+
+        client_level = data.get("client_level")
+        if client_level is not None and not 0 < client_level < 4:
+            errors.setdefault("client_level", []).append("Invalid client_level value")
 
         if errors:
             raise serializers.ValidationError({"errors": errors})
@@ -410,6 +416,7 @@ class InterviewerSerializer(serializers.ModelSerializer):
             "assigned_domain_ids",
             "skills",
             "strength",
+            "interviewer_level",
             "cv",
         )
 
@@ -439,6 +446,7 @@ class InterviewerSerializer(serializers.ModelSerializer):
                 "assigned_domain_ids",
                 "skills",
                 "strength",
+                "interviewer_level",
                 "cv",
             ],
             partial=self.partial,
@@ -486,6 +494,12 @@ class InterviewerSerializer(serializers.ModelSerializer):
         if invalid_domain_ids:
             errors.setdefault("assigned_domain_ids", []).append(
                 f"Invalid domain IDs: {', '.join(map(str, invalid_domain_ids))}"
+            )
+
+        interviewer_level = data.get("interviewer_level")
+        if interviewer_level is not None and not 0 < interviewer_level < 4:
+            errors.setdefault("interviewer_level", []).append(
+                "Invalid interviewer_level value."
             )
 
         if errors:

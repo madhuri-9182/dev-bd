@@ -36,6 +36,7 @@ class InternalClient(CreateUpdateDateTimeAndArchivedField):
     gstin = models.CharField(max_length=15, blank=True)
     pan = models.CharField(max_length=10, blank=True)
     is_signed = models.BooleanField(default=False)
+    client_level = models.IntegerField(default=0)
     assigned_to = models.ForeignKey(
         HDIPUsers,
         on_delete=models.SET_NULL,
@@ -151,6 +152,7 @@ class InternalInterviewer(CreateUpdateDateTimeAndArchivedField):
         max_length=50, blank=True, choices=STRENGTH_CHOICES
     )  # e.g., Backend
     cv = models.FileField(upload_to="interviewer_cvs", blank=True)
+    interviewer_level = models.IntegerField(default=0)
 
     def __str__(self):
         return f"{self.name} - {self.organization}"
