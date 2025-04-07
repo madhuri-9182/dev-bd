@@ -411,7 +411,9 @@ class InterviewFeedbackSerializer(serializers.ModelSerializer):
             "overall_remark",
             "overall_score",
             "recording_link",
+            "pdf_file",
         )
+        read_only_field = ("pdf_file",)
 
     def validate(self, data):
         data = self.initial_data

@@ -1,4 +1,5 @@
 import os
+import requests
 from django.core.mail import EmailMultiAlternatives, get_connection
 from django.core.files.base import ContentFile
 from django.db import transaction
@@ -248,6 +249,7 @@ def process_interview_video_and_generate_and_store_feedback(self):
             InterviewFeedback.objects.update_or_create(
                 interview_id=interview.id, defaults={**extracted_data}
             )
+            download_feedback_pdf.delay(interview.id)
             processed_ids.append(interview.id)
             interviewer_name = interview.interviewer.name
             candidate_name = interview.candidate.name
@@ -281,3 +283,39 @@ def process_interview_video_and_generate_and_store_feedback(self):
         except Exception as e:
             print(str(e))
     return f"Interview feedback created successfully for {processed_ids}."
+
+
+@shared_task(bind=True, retry_backoff=5, max_retries=3)
+def download_feedback_pdf(self, interview_id):
+    from dashboard.Serializers.InterviewerSerializers import InterviewFeedbackSerializer
+
+    interview_feedback = (
+        InterviewFeedback.objects.filter(interview_id=interview_id)
+        .select_related(
+            "interview",
+            "interview__candidate",
+            "interview__candidate__designation",
+            "interview__interviewer",
+        )
+        .first()
+    )
+    serializer = InterviewFeedbackSerializer(interview_feedback)
+    response = requests.post(
+        "http://localhost:3000/generate-pdf", json=serializer.data, stream=True
+    )
+    if response.status_code == 200:
+        save_path = f"/tmp/{interview_feedback.interview.candidate.name}-Feedback.pdf"
+        with open(save_path, "wb") as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+        with open(save_path, "rb") as f:
+            interview_feedback.pdf_file.save(
+                f"{interview_feedback.interview.candidate.name}-Feedback.pdf", f
+            )
+        if os.path.exists(save_path):
+            os.remove(save_path)
+        return "Successfully Saved"
+    else:
+        error_message = response.content.decode("utf-8")
+        print(f"Failed to generate PDF: {error_message}")
+        self.retry(exc=Exception("Failed to generate PDF"))

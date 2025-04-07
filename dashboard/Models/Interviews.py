@@ -196,6 +196,7 @@ class InterviewFeedback(CreateUpdateDateTimeAndArchivedField):
         default=False,
         help_text="Signify whether the interviewer has submitted their feedback for this interview or not.",
     )
+    pdf_file = models.FileField(upload_to="feedback_report", null=True, blank=True)
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
