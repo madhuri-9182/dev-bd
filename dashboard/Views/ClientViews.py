@@ -627,11 +627,6 @@ class CandidateView(APIView, LimitOffsetPagination):
             .order_by("-id")
         )
 
-        if not status_:
-            candidates = candidates.filter(
-                Q(final_selection_status="HD") | Q(final_selection_status__isnull=True)
-            )
-
         if request.user.role in [Role.CLIENT_USER, Role.AGENCY]:
             candidates = candidates.filter(designation__clients=request.user.clientuser)
 
