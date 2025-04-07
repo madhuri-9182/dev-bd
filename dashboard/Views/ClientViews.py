@@ -353,7 +353,7 @@ class JobView(APIView, LimitOffsetPagination):
                 hiring_manager__organization=org_id
                 or request.user.clientuser.organization,
             )
-            .prefetch_related("clients")
+            .prefetch_related("clients", "candidate")
             .order_by("-id")
         )
 
