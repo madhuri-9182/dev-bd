@@ -238,6 +238,7 @@ class JobSerializer(serializers.ModelSerializer):
             "reason_for_archived",
             "specialization",
             "active_candidates",
+            "is_diversity_hiring",
         )
 
     def run_validation(self, data=...):
@@ -271,6 +272,7 @@ class JobSerializer(serializers.ModelSerializer):
             "reason_for_archived",
             "other_details",
             "interview_time",
+            "is_diversity_hiring",
         ]
 
         errors = validate_incoming_data(
@@ -479,12 +481,12 @@ class CandidateSerializer(serializers.ModelSerializer):
             "source",
             "cv",
             "specialization",
-            "gender",
         ]
         allowed_keys = [
             "status",
             "reason_for_dropping",
             "remark",
+            "gender",
         ]
 
         if self.partial:
@@ -508,14 +510,17 @@ class CandidateSerializer(serializers.ModelSerializer):
         if errors:
             raise serializers.ValidationError({"errors": errors})
 
-        if (
-            data.get("job_id")
-            and not Job.objects.filter(
-                pk=data.get("job_id"),
-                hiring_manager__organization=request.user.clientuser.organization,
-            ).exists()
-        ):
+        job = Job.objects.filter(
+            pk=data.get("job_id"),
+            hiring_manager__organization=request.user.clientuser.organization,
+        ).first()
+        if data.get("job_id") and not job:
             errors.setdefault("job_id", []).append("Invalid job_id")
+
+        if job and job.is_diversity_hiring and not data.get("gender"):
+            errors.setdefault("gender", []).append(
+                "This is required field for diversity hiring."
+            )
 
         if data.get("cv"):
             errors.update(validate_attachment("cv", data.get("cv"), ["pdf", "docx"], 5))

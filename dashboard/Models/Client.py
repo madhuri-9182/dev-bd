@@ -76,6 +76,7 @@ class Job(CreateUpdateDateTimeAndArchivedField):
     reason_for_archived = models.CharField(
         max_length=15, choices=REASON_FOR_ARCHIVED_CHOICES, blank=True, null=True
     )
+    is_diversity_hiring = models.BooleanField(default=False)
 
 
 class Candidate(CreateUpdateDateTimeAndArchivedField):
@@ -143,7 +144,9 @@ class Candidate(CreateUpdateDateTimeAndArchivedField):
         choices=SOURCE_CHOICES,
         help_text="From Which side this candidate is ?",
     )
-    gender = models.CharField(max_length=2, choices=GENDER_CHOICES, blank=True)
+    gender = models.CharField(
+        max_length=2, choices=GENDER_CHOICES, blank=True, null=True
+    )
     cv = models.FileField(upload_to="candidate_cvs", blank=True)
     remark = models.TextField(max_length=255, blank=True, null=True)
     specialization = models.CharField(
