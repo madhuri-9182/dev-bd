@@ -218,7 +218,7 @@ class JobSerializer(serializers.ModelSerializer):
         },
         required=False,
     )
-    total_candidate = serializers.SerializerMethodField()
+    active_candidates = serializers.SerializerMethodField()
 
     class Meta:
         model = Job
@@ -237,7 +237,7 @@ class JobSerializer(serializers.ModelSerializer):
             "other_details",
             "reason_for_archived",
             "specialization",
-            "total_candidate",
+            "active_candidates",
         )
 
     def run_validation(self, data=...):
@@ -371,7 +371,7 @@ class JobSerializer(serializers.ModelSerializer):
         data["recruiter_ids"] = recruiter_ids
         return data
 
-    def get_total_candidate(self, obj):
+    def get_active_candidates(self, obj):
         return obj.candidate.count()
 
     def create(self, validated_data):
