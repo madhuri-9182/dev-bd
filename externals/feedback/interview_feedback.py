@@ -30,7 +30,7 @@ def analyze_transcription_and_generate_feedback(transcription):
     prompt = f"""
     Below is a transcription of an interview. Perform the following tasks:
     1. Extract the interviewer's questions and the candidate's answers.
-    2. Categorize each question (e.g., EDA, AI, JavaScript, etc.).
+    2. Categorize each question with generalize skill (e.g., Python, AI, JavaScript, ML etc.).
     3. For each skill pair generate feedback including:
        - A summary of the candidate's performance.
        - A score (0-100 scale) for the skill.
@@ -44,13 +44,14 @@ def analyze_transcription_and_generate_feedback(transcription):
     Return the data in STRICT JSON format as follows:
     {{
         "skill_based_performance": {{
-            "skill_name eg.(python, JS, etc.)": {{
+            "skill_name eg.(generalize skills such as python, Javascript, etc.)": {{
                 "summary": "Overall performance summary for current skill",
-                "score": "0-100 based on performance",
                 "questions": [
                     {{
                         "que": "Interviewer's question?",
-                        "ans": "Candidate's answer"
+                        "ans": "Candidate's answer",
+                        "start_time": "Start time of the question in seconds (relative to video start)",
+                        "end_time": "End time of the answer in seconds (relative to video start)"
                     }}
                     ...
                 ]
@@ -63,14 +64,13 @@ def analyze_transcription_and_generate_feedback(transcription):
         }},
         "strength": "overall candidate strengths",
         "improvement_points": "overall candidate improvement points",
-        "overall_remark": "Overall recommendation for candidate according to interview performance, can be HREC for Highly recommended, REC for Recommended, NREC for Not Recommended and SNREC for Strongly Not Recommended and NJ for Not Joined",
-        "overall_score": "0-100 based on performance"
     }}
 
     IMPORTANT:
     - Return ONLY valid JSON. Do not include any additional text or explanations.
     - Ensure the JSON is properly formatted and can be parsed by a JSON parser.
-    - Try to summarize the feedback for each question-answer pair, it don't have to be same worrd to word as in the transcript but must conatain the main points not too short or too long and write question in understandable way even though some has not attended the interview they must able to understand.
+    - Ensure all timestamps are relative to the start of the video.
+    - Try to summarize the feedback for each question-answer pair, it don't have to be same word to word as in the transcript but must conatain the main points not too short or too long and write question in understandable way even though some has not attended the interview they must able to understand.
     """
 
     try:
