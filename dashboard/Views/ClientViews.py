@@ -696,7 +696,7 @@ class CandidateView(APIView, LimitOffsetPagination):
             serializer.save(
                 organization=request.user.clientuser.organization,
                 designation_id=serializer.validated_data.pop("job_id"),
-                added_by=request.user.clientuser
+                added_by=request.user.clientuser,
             )
             return Response(
                 {
@@ -929,6 +929,7 @@ class PotentialInterviewerAvailabilityForCandidateView(APIView):
             interviewer__assigned_domains__name=job.name,
             interviewer__strength=specialization,
             interviewer__total_experience_years__gte=experience + 2,
+            interviewer__interviewer_level=request.user.clientuser.organization.internal_client.client_level,
             booked_by__isnull=True,
         )
 
