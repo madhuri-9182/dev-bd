@@ -208,6 +208,7 @@ class InterviewerReqeustView(APIView):
                 "interviewer_interview_notification.html",
             )
             candidate.last_scheduled_initiate_time = timezone.now()
+            candidate.status = "SCH"
             candidate.save()
             return Response(
                 {
@@ -282,18 +283,18 @@ class InterviewerRequestResponseView(APIView):
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 
-                if candidate.status not in ["SCH", "NSCH"]:
-                    return Response(
-                        {"status": "failed", "message": "Invalid request"},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-
-                if candidate.status == "SCH":
+                if candidate.status == "CSCH":
                     return Response(
                         {
                             "status": "failed",
                             "message": "The candidate is currently occupied and has already been assigned to an interviewer.",
                         },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                if candidate.status not in ["SCH", "NSCH"]:
+                    return Response(
+                        {"status": "failed", "message": "Invalid request"},
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 
@@ -313,7 +314,7 @@ class InterviewerRequestResponseView(APIView):
                     Interview.objects.select_for_update()
                     .filter(
                         interviewer=interviewer_availability.interviewer,
-                        status="SCH",
+                        status="CSCH",
                     )
                     .filter(
                         Q(scheduled_time=schedule_time)
@@ -341,7 +342,7 @@ class InterviewerRequestResponseView(APIView):
                         interview = Interview.objects.create(
                             candidate=candidate,
                             interviewer=interviewer_availability.interviewer,
-                            status="SCH",
+                            status="CSCH",
                             scheduled_time=schedule_time,
                             total_score=100,
                         )
@@ -521,7 +522,7 @@ class InterviewerAcceptedInterviewsView(APIView, LimitOffsetPagination):
     def get(self, request):
         accepted_interviews_qs = Interview.objects.filter(
             interviewer=request.user.interviewer,
-            status="SCH",
+            status="CSCH",
             scheduled_time__gte=timezone.now() - datetime.timedelta(hours=1),
         ).select_related("candidate", "candidate__designation")
         paginated_queryset = self.paginate_queryset(accepted_interviews_qs, request)

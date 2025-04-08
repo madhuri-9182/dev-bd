@@ -82,7 +82,10 @@ class Job(CreateUpdateDateTimeAndArchivedField):
 class Candidate(CreateUpdateDateTimeAndArchivedField):
     STATUS_CHOICES = (
         # Scheduling Statuses
+        # Scheduled is only use for the client candidate when client initiate the scheduling
         ("SCH", "Scheduled"),
+        # Complete Scheduled is basically represent that interviewer accepted it.
+        ("CSCH", "Compete Scheduled"),
         ("NSCH", "Not Scheduled"),
         ("RESCH", "Rescheduled"),
         ("NJ", "Not Joined"),
