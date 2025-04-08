@@ -11,8 +11,22 @@ from .models import (
     Job,
     ClientUser,
     EngagementTemplates,
-    Candidate
+    Candidate,
+    InternalInterviewer,
 )
+
+
+@admin.register(InternalInterviewer)
+class InternalInterviewer(admin.ModelAdmin):
+    list_display = (
+        "name",
+        "email",
+        "phone",
+        "total_experience_years",
+        "total_experience_months",
+    )
+    search_fields = ("name", "email", "phone")
+    list_filter = ("strength",)
 
 
 @admin.register(InternalClient)
@@ -59,9 +73,9 @@ class EnagagementTeamplteAdmin(admin.ModelAdmin):
     def get_queryset(self, request: HttpRequest) -> QuerySet[Any]:
         return EngagementTemplates.object_all.select_related("organization")
 
+
 @admin.register(Candidate)
 class CandidateAdmin(admin.ModelAdmin):
     list_display = ("id", "name", "specialization", "organization__name")
     search_fields = ("organization__name",)
     readonly_fields = ["created_at", "updated_at"]
-    
