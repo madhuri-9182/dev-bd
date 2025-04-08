@@ -640,9 +640,14 @@ class CandidateView(APIView, LimitOffsetPagination):
             candidates = candidates.filter(designation__id=job_id)
 
         if status_:
-            candidates = candidates.filter(
-                Q(status=status_) | Q(final_selection_status=status_)
-            )
+            if status_ == "SCH":
+                candidates = candidates.filter(
+                    Q(status__in=["SCH", "CSCH"]) | Q(final_selection_status=status_)
+                )
+            else:
+                candidates = candidates.filter(
+                    Q(status=status_) | Q(final_selection_status=status_)
+                )
 
         if search_term:
             candidates = candidates.filter(
