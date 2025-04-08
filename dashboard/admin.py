@@ -13,19 +13,21 @@ from .models import (
     EngagementTemplates,
     Candidate,
     InternalInterviewer,
+    Interview
 )
 
+admin.site.register(Interview)
 
 @admin.register(InternalInterviewer)
 class InternalInterviewer(admin.ModelAdmin):
     list_display = (
         "name",
         "email",
-        "phone",
+        "phone_number",
         "total_experience_years",
         "total_experience_months",
     )
-    search_fields = ("name", "email", "phone")
+    search_fields = ("name", "email", "phone_number")
     list_filter = ("strength",)
 
 
