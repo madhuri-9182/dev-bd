@@ -247,7 +247,6 @@ class InterviewerCandidateSerializer(serializers.ModelSerializer):
             "year",
             "month",
             "company",
-            "cv",
         )
 
 
