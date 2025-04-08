@@ -1134,11 +1134,20 @@ class EngagementView(APIView, LimitOffsetPagination):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-        if status_ and status_ not in dict(Engagement.STATUS_CHOICE).keys():
-            return Response(
-                {"status": "failed", "message": "Invalid Status."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        if status_:
+            invalid_statuses = [
+                s
+                for s in status_.split(",")
+                if s not in dict(Engagement.STATUS_CHOICE).keys()
+            ]
+            if invalid_statuses:
+                return Response(
+                    {
+                        "status": "failed",
+                        "message": f"Invalid Status(es): {', '.join(invalid_statuses)}.",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         if (
             search_filter
@@ -1159,7 +1168,7 @@ class EngagementView(APIView, LimitOffsetPagination):
         if notice_period:
             filters["notice_period__in"] = notice_period.split(",")
         if status_:
-            filters["status"] = status_
+            filters["status__in"] = status_.split(",")
 
         engagement_summary = Engagement.objects.filter(
             organization=org or request.user.clientuser.organization
