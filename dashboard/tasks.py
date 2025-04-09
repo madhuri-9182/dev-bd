@@ -249,7 +249,6 @@ def process_interview_video_and_generate_and_store_feedback(self):
             InterviewFeedback.objects.update_or_create(
                 interview_id=interview.id, defaults={**extracted_data}
             )
-            download_feedback_pdf.delay(interview.id)
             processed_ids.append(interview.id)
             interviewer_name = interview.interviewer.name
             candidate_name = interview.candidate.name

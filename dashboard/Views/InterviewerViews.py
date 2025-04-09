@@ -19,7 +19,7 @@ from ..serializer import (
     InterviewFeedbackSerializer,
 )
 from ..models import InterviewerAvailability, Candidate, Interview, InterviewFeedback
-from ..tasks import send_email_to_multiple_recipients
+from ..tasks import send_email_to_multiple_recipients, download_feedback_pdf
 from core.permissions import (
     IsInterviewer,
     IsClientAdmin,
@@ -684,6 +684,7 @@ class InterviewFeedbackView(APIView, LimitOffsetPagination):
         )
         serializer.is_valid(raise_exception=True)
         serializer.save(is_submitted=True)
+        download_feedback_pdf.delay(interview_feedback.interview.id)
         internal_user = (
             interview_feedback.interview.candidate.organization.internal_client.assigned_to
         )
@@ -705,17 +706,20 @@ class InterviewFeedbackView(APIView, LimitOffsetPagination):
                 ),
                 "subject": f"Feedback Submitted: Insights from {interviewer_name} on {candidate_name}",
                 "template": "internal_interview_submitted_feedback_notification.html",
-            },
-            {
-                "client_name": recruiter.name,
-                "candidate_name": candidate_name,
-                "subject": f"📝 Feedback Alert: SDE1 Interview Feedback for {candidate_name} is Now Available",
-                "interviewer_name": interviewer_name,
-                "from_email": settings.EMAIL_HOST_USER,
-                "email": recruiter.user.email,
-                "template": "client_interview_feedback_submitted_notification.html",
-            },
+            }
         ]
+        if recruiter:
+            contexts.append(
+                {
+                    "client_name": recruiter.name,
+                    "candidate_name": candidate_name,
+                    "subject": f"📝 Feedback Alert: SDE1 Interview Feedback for {candidate_name} is Now Available",
+                    "interviewer_name": interviewer_name,
+                    "from_email": settings.EMAIL_HOST_USER,
+                    "email": recruiter.user.email,
+                    "template": "client_interview_feedback_submitted_notification.html",
+                }
+            )
         send_email_to_multiple_recipients.delay(contexts, "", "")
         return Response(
             {

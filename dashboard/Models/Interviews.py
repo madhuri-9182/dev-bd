@@ -201,6 +201,7 @@ class InterviewFeedback(CreateUpdateDateTimeAndArchivedField):
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
         if self.is_submitted:
-            self.interview.score = self.overall_score
-            self.interview.status = self.overall_remark
-        self.interview.save()
+            interview = self.interview
+            interview.status = self.overall_remark
+            interview.score = self.overall_score
+            interview.save(update_fields=["status", "score"])
