@@ -11,6 +11,7 @@ from .views import (
     GoogleAuthCallbackView,
     GoogleCalenderGetEventView,
     VerifyEmailView,
+    ChangePasswordView,
 )
 
 urlpatterns = [
@@ -41,4 +42,5 @@ urlpatterns = [
         name="google_call_back",
     ),
     path("events/", GoogleCalenderGetEventView.as_view(), name="google_events"),
+    path("change-password/", ChangePasswordView.as_view(), name="change_password"),
 ]

@@ -25,6 +25,7 @@ from .serializer import (
     CookieTokenRefreshSerializer,
     ResetPasswordConfirmSerailizer,
     GoogleAuthCallbackSerializer,
+    ChangePasswordSerializer,
 )
 from rest_framework.request import Request
 from drf_spectacular.utils import extend_schema
@@ -553,4 +554,32 @@ class VerifyEmailView(APIView):
         return Response(
             {"status": "failed", "message": "User not found."},
             status=status.HTTP_404_NOT_FOUND,
+        )
+
+
+class ChangePasswordView(APIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = ChangePasswordSerializer
+
+    def post(self, request):
+        serializer = self.serializer_class(
+            data=request.data, context={"request": request}
+        )
+        if not serializer.is_valid():
+            custom_error = serializer.errors.pop("errors", None)
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "Invalid data.",
+                    "errors": serializer.errors or custom_error,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user = request.user
+        user.set_password(serializer.validated_data["password"])
+        user.save()
+        return Response(
+            {"status": "success", "message": "Password changed successfully."},
+            status=status.HTTP_200_OK,
         )

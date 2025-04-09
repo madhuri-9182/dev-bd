@@ -63,6 +63,9 @@ class User(AbstractBaseUser):
     email_verified = models.BooleanField(default=True)
     email_verified_date = models.DateTimeField(null=True, blank=True)
     phone_verified = models.BooleanField(default=True)
+    login_count = models.IntegerField(default=0)
+    is_password_change = models.BooleanField(default=False)
+    is_policy_and_tnc_accepted = models.BooleanField(default=False)
 
     objects = UserManager()
 

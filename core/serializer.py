@@ -1,5 +1,6 @@
 from django.core.exceptions import ValidationError
 from django.http import Http404
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django.contrib.auth import password_validation, authenticate
 from django.contrib.auth.hashers import check_password
@@ -25,6 +26,7 @@ def get_tokens_for_user(user):
         "id": user.id,
         "role": user.role,
         "name": user.profile.name,
+        "count": user.login_count,
     }
 
 
@@ -72,7 +74,9 @@ class UserLoginSerializer(serializers.ModelSerializer):
     def validate(self, data):
         request = self.context["request"]
         errors = validate_incoming_data(
-            self.initial_data, ["email", "password"], ["csrfmiddlewaretoken"]
+            self.initial_data,
+            ["email", "password"],
+            ["csrfmiddlewaretoken", "is_policy_and_tnc_accepted"],
         )
 
         if errors:
@@ -83,6 +87,19 @@ class UserLoginSerializer(serializers.ModelSerializer):
             errors.setdefault("credentials", []).append(
                 "Invalid email or password. Please check your credentials and try again."
             )
+
+        is_accepted = data.get("is_policy_and_tnc_accepted")
+        if user.login_count > 0 and is_accepted is not None:
+            errors.setdefault("is_policy_and_tnc_accepted", []).append("Invalid key.")
+        elif user.login_count == 0:
+            if is_accepted is None:
+                errors.setdefault("is_policy_and_tnc_accepted", []).append(
+                    "This is a required key."
+                )
+            elif not is_accepted:
+                errors.setdefault("is_policy_and_tnc_accepted", []).append(
+                    "You need to accept the terms and conditions before proceeding further."
+                )
 
         if user and hasattr(user, "clientuser"):
             client_user = user.clientuser
@@ -103,6 +120,14 @@ class UserLoginSerializer(serializers.ModelSerializer):
         if errors:
             raise serializers.ValidationError({"errors": errors})
 
+        user.login_count += 1
+        user.last_login = timezone.now()
+        if is_accepted:
+            user.is_policy_and_tnc_accepted = is_accepted
+        user.save(
+            update_fields=["login_count", "last_login", "is_policy_and_tnc_accepted"]
+        )
+
         tokens = get_tokens_for_user(user)
         data["tokens"] = tokens
 
@@ -110,10 +135,11 @@ class UserLoginSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ("email", "password")
+        fields = ("email", "password", "is_policy_and_tnc_accepted")
         extra_kwargs = {
             "email": {"required": False},
             "password": {"write_only": True, "required": False},
+            "is_policy_and_tnc_accepted": {"write_only": True, "required": False},
         }
 
 
@@ -168,6 +194,32 @@ class ResetPasswordConfirmSerailizer(PasswordTokenSerializer):
 
         return super().validate(data)
 
+
 class GoogleAuthCallbackSerializer(serializers.Serializer):
     state = serializers.CharField(max_length=255)
     authorization_response = serializers.URLField()
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    password = serializers.CharField(write_only=True, style={"input_type": "password"})
+    confirm_password = serializers.CharField(write_only=True)
+
+    def validate(self, data):
+        request = self.context.get("request")
+
+        if request.user.login_count > 1:
+            raise serializers.ValidationError({"request": "Invalid Request"})
+
+        if data["password"] != data["confirm_password"]:
+            raise serializers.ValidationError({"password": ["passwords are not same."]})
+
+        if check_password(data["password"], request.user.password):
+            raise serializers.ValidationError(
+                {
+                    "password": [
+                        "The new password cannot be the same as your current password."
+                    ]
+                }
+            )
+
+        return data
