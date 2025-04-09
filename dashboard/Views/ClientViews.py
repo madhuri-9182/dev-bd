@@ -256,10 +256,11 @@ class JobView(APIView, LimitOffsetPagination):
             Role.ADMIN,
             Role.SUPER_ADMIN,
             Role.MODERATOR,
+            Role.AGENCY,
         ],
         "POST": [Role.CLIENT_ADMIN, Role.CLIENT_OWNER],
-        "PATCH": [Role.CLIENT_ADMIN, Role.CLIENT_OWNER, Role.CLIENT_USER],
-        "DELETE": [Role.CLIENT_ADMIN, Role.CLIENT_OWNER, Role.CLIENT_USER],
+        "PATCH": [Role.CLIENT_ADMIN, Role.CLIENT_OWNER, Role.CLIENT_USER, Role.AGENCY],
+        "DELETE": [Role.CLIENT_ADMIN, Role.CLIENT_OWNER, Role.CLIENT_USER, Role.AGENCY],
     }
 
     def post(self, request):
@@ -367,7 +368,7 @@ class JobView(APIView, LimitOffsetPagination):
             )
 
         if (
-            request.user.role == "client_user"
+            request.user.role in [Role.CLIENT_USER, Role.AGENCY]
             and request.user.clientuser.accessibility == "AGJ"
         ):
             jobs = jobs.filter(clients=request.user.clientuser)
@@ -1707,7 +1708,10 @@ class EngagementOperationStatusUpdateView(APIView):
 
 
 class ClientDashboardView(APIView):
-    permission_classes = (IsAuthenticated, IsClientAdmin | IsClientOwner | IsClientUser)
+    permission_classes = (
+        IsAuthenticated,
+        IsClientAdmin | IsClientOwner | IsClientUser | IsAgency,
+    )
     serializer_class = None
 
     def get(self, request):
@@ -1715,7 +1719,7 @@ class ClientDashboardView(APIView):
 
         all_jobs = Job.objects.filter(hiring_manager__organization=organization)
         candidates = Candidate.objects.filter(organization=organization)
-        if request.user.role == Role.CLIENT_USER:
+        if request.user.role in [Role.CLIENT_USER, Role.AGENCY]:
             all_jobs = all_jobs.filter(clients=request.user.clientuser)
             candidates = candidates.filter(designation__clients=request.user.clientuser)
 
