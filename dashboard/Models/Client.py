@@ -108,7 +108,7 @@ class Candidate(CreateUpdateDateTimeAndArchivedField):
         ("SLD", "Selected"),
         ("HD", "Hold"),
     )
-    SOURCE_CHOICES = (("INT", "Internal"), ("AGN", "Agency"), ("CLT", "Client"))
+    SOURCE_CHOICES = (("INT", "Internal"), ("AGN", "Agency"))
     GENDER_CHOICES = (("M", "Male"), ("F", "Female"), ("TG", "Transgender"))
     SPECIALIZATION_CHOICES = (
         ("frontend", "Frontend"),
