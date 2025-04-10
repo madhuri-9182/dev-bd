@@ -154,6 +154,7 @@ class CookieTokenRefreshSerializer(TokenRefreshSerializer):
             data["email"] = user_obj.email
             data["role"] = user_obj.role
             data["name"] = user_obj.profile.name
+            data["is_policy_and_tnc_accepted"] = user_obj.is_policy_and_tnc_accepted
             return data
 
         raise ValidationError({"errors": "No valid token found in cookie"})
