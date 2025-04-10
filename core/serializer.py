@@ -154,6 +154,7 @@ class CookieTokenRefreshSerializer(TokenRefreshSerializer):
             data["email"] = user_obj.email
             data["role"] = user_obj.role
             data["name"] = user_obj.profile.name
+            data["count"] = user_obj.login_count
             data["is_policy_and_tnc_accepted"] = user_obj.is_policy_and_tnc_accepted
             return data
 
