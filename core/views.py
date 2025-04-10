@@ -583,3 +583,16 @@ class ChangePasswordView(APIView):
             {"status": "success", "message": "Password changed successfully."},
             status=status.HTTP_200_OK,
         )
+
+
+class AcceptTNCView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        user.is_policy_and_tnc_accepted = True
+        user.save(update_fields=["is_policy_and_tnc_accepted"])
+        return Response(
+            {"status": "success", "message": "TNC Accepted successfully."},
+            status=status.HTTP_200_OK,
+        )

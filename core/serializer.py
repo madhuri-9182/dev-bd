@@ -27,6 +27,7 @@ def get_tokens_for_user(user):
         "role": user.role,
         "name": user.profile.name,
         "count": user.login_count,
+        "is_policy_and_tnc_accepted": user.is_policy_and_tnc_accepted,
     }
 
 
@@ -89,17 +90,8 @@ class UserLoginSerializer(serializers.ModelSerializer):
             )
 
         is_accepted = data.get("is_policy_and_tnc_accepted")
-        if user.login_count > 0 and is_accepted is not None:
+        if user and user.login_count > 0 and is_accepted is not None:
             errors.setdefault("is_policy_and_tnc_accepted", []).append("Invalid key.")
-        elif user.login_count == 0:
-            if is_accepted is None:
-                errors.setdefault("is_policy_and_tnc_accepted", []).append(
-                    "This is a required key."
-                )
-            elif not is_accepted:
-                errors.setdefault("is_policy_and_tnc_accepted", []).append(
-                    "You need to accept the terms and conditions before proceeding further."
-                )
 
         if user and hasattr(user, "clientuser"):
             client_user = user.clientuser
@@ -135,11 +127,10 @@ class UserLoginSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ("email", "password", "is_policy_and_tnc_accepted")
+        fields = ("email", "password")
         extra_kwargs = {
             "email": {"required": False},
             "password": {"write_only": True, "required": False},
-            "is_policy_and_tnc_accepted": {"write_only": True, "required": False},
         }
 
 

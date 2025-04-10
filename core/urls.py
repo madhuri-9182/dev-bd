@@ -12,6 +12,7 @@ from .views import (
     GoogleCalenderGetEventView,
     VerifyEmailView,
     ChangePasswordView,
+    AcceptTNCView,
 )
 
 urlpatterns = [
@@ -43,4 +44,5 @@ urlpatterns = [
     ),
     path("events/", GoogleCalenderGetEventView.as_view(), name="google_events"),
     path("change-password/", ChangePasswordView.as_view(), name="change_password"),
+    path("tnc-accepted/", AcceptTNCView.as_view(), name="tnc_accepted"),
 ]
