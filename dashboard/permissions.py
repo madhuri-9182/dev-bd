@@ -23,11 +23,19 @@ class UserRoleDeleteUpdateClientData(BasePermission):
 
         view_name = view.__class__.__name__
         if view_name == "JobView" and user_role == Role.CLIENT_USER:
-            return request.user.clientuser in obj.clients.all()
+            return obj.clients.filter(id=request.user.clientuser.id).exists()
         elif view_name == "CandidateView" and user_role in (
             Role.CLIENT_USER,
             Role.AGENCY,
         ):
-            return request.user.clientuser in obj.designation.clients.all()
+            if (
+                user_role == Role.AGENCY
+                and request.method == "DELETE"
+                and request.user.clientuser.accessibility == "AJ"
+            ):
+                return True
+            return obj.designation.clients.filter(
+                id=request.user.clientuser.id
+            ).exists()
 
         return False
