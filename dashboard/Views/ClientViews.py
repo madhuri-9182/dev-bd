@@ -1722,7 +1722,10 @@ class ClientDashboardView(APIView):
 
         all_jobs = Job.objects.filter(hiring_manager__organization=organization)
         candidates = Candidate.objects.filter(organization=organization)
-        if request.user.role in [Role.CLIENT_USER, Role.AGENCY]:
+        if (
+            request.user.role in [Role.CLIENT_USER, Role.AGENCY]
+            and request.user.clientuser.accessibility == "AGJ"
+        ):
             all_jobs = all_jobs.filter(clients=request.user.clientuser)
             candidates = candidates.filter(designation__clients=request.user.clientuser)
 
