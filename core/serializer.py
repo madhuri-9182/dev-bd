@@ -200,9 +200,6 @@ class ChangePasswordSerializer(serializers.Serializer):
     def validate(self, data):
         request = self.context.get("request")
 
-        if request.user.login_count > 1:
-            raise serializers.ValidationError({"request": "Invalid Request"})
-
         if data["password"] != data["confirm_password"]:
             raise serializers.ValidationError({"password": ["passwords are not same."]})
 
