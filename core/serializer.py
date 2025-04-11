@@ -26,7 +26,7 @@ def get_tokens_for_user(user):
         "id": user.id,
         "role": user.role,
         "name": user.profile.name,
-        "count": user.login_count,
+        "is_password_change": user.is_password_change,
         "is_policy_and_tnc_accepted": user.is_policy_and_tnc_accepted,
     }
 
@@ -154,7 +154,7 @@ class CookieTokenRefreshSerializer(TokenRefreshSerializer):
             data["email"] = user_obj.email
             data["role"] = user_obj.role
             data["name"] = user_obj.profile.name
-            data["count"] = user_obj.login_count
+            data["is_password_change"] = user_obj.is_password_change
             data["is_policy_and_tnc_accepted"] = user_obj.is_policy_and_tnc_accepted
             return data
 
