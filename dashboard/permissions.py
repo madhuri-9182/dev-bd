@@ -28,11 +28,7 @@ class UserRoleDeleteUpdateClientData(BasePermission):
             Role.CLIENT_USER,
             Role.AGENCY,
         ):
-            if (
-                user_role == Role.AGENCY
-                and request.method == "DELETE"
-                and request.user.clientuser.accessibility == "AJ"
-            ):
+            if user_role == Role.AGENCY and request.method == "DELETE":
                 return True
             return obj.designation.clients.filter(
                 id=request.user.clientuser.id
