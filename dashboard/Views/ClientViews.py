@@ -259,8 +259,8 @@ class JobView(APIView, LimitOffsetPagination):
             Role.AGENCY,
         ],
         "POST": [Role.CLIENT_ADMIN, Role.CLIENT_OWNER],
-        "PATCH": [Role.CLIENT_ADMIN, Role.CLIENT_OWNER, Role.CLIENT_USER, Role.AGENCY],
-        "DELETE": [Role.CLIENT_ADMIN, Role.CLIENT_OWNER, Role.CLIENT_USER, Role.AGENCY],
+        "PATCH": [Role.CLIENT_ADMIN, Role.CLIENT_OWNER, Role.CLIENT_USER],
+        "DELETE": [Role.CLIENT_ADMIN, Role.CLIENT_OWNER, Role.CLIENT_USER],
     }
 
     def post(self, request):
@@ -628,7 +628,10 @@ class CandidateView(APIView, LimitOffsetPagination):
             .order_by("-id")
         )
 
-        if request.user.role in [Role.CLIENT_USER, Role.AGENCY]:
+        if (
+            request.user.role in [Role.CLIENT_USER, Role.AGENCY]
+            and request.user.clientuser.accessibility == "AGJ"
+        ):
             candidates = candidates.filter(designation__clients=request.user.clientuser)
 
         total_candidates = candidates.count()
