@@ -1779,7 +1779,7 @@ class FinanceView(APIView, LimitOffsetPagination):
     serializer_class = FinanceSerializer
     permission_classes = [
         IsAuthenticated,
-        IsClientOwner | IsSuperAdmin | IsAdmin | IsModerator | IsInterviewer | IsAgency,
+        IsClientOwner | IsSuperAdmin | IsAdmin | IsModerator | IsInterviewer,
     ]
 
     def get(self, request):

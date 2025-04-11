@@ -592,6 +592,7 @@ class InterviewFeedbackView(APIView, LimitOffsetPagination):
             Role.CLIENT_ADMIN,
             Role.CLIENT_OWNER,
             Role.CLIENT_USER,
+            Role.AGENCY,
         ],
         "PATCH": [Role.INTERVIEWER],
         "POST": [Role.INTERVIEWER],
