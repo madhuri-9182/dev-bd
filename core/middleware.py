@@ -13,7 +13,7 @@ class VerificationMiddleWare:
 
     def __call__(self, request):
 
-        if request.user.is_authenticated:
+        if getattr(request.user, 'is_authenticated', None):
             if not request.user.email_verified or not request.user.phone_verified:
                 return JsonResponse(
                     {

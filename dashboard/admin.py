@@ -13,7 +13,8 @@ from .models import (
     EngagementTemplates,
     Candidate,
     InternalInterviewer,
-    Interview
+    Interview,
+    InterviewerAvailability
 )
 
 admin.site.register(Interview)
@@ -49,7 +50,7 @@ class ClientPointOfContactAdmin(admin.ModelAdmin):
 
 @admin.register(Job)
 class JobAdmin(admin.ModelAdmin):
-    list_display = ("name", "job_id")
+    list_display = ("pk", "name", "job_id")
     search_fields = ("name", "job_id")
 
     def get_queryset(self, request):
@@ -81,3 +82,6 @@ class CandidateAdmin(admin.ModelAdmin):
     list_display = ("id", "name", "specialization", "organization__name")
     search_fields = ("organization__name",)
     readonly_fields = ["created_at", "updated_at"]
+
+
+admin.site.register(InterviewerAvailability)
