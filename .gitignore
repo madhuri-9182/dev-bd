@@ -166,3 +166,4 @@ static/
 resources/
 *.txt
 *.sqlite3
+hiringdogbackend/settings/prod.py
