@@ -8,6 +8,7 @@ from django.db import transaction
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from core.models import User, Role
+from datetime import date
 from ..models import (
     ClientUser,
     Job,
@@ -1020,3 +1021,23 @@ class FinanceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Interview
         fields = ("candidate", "scheduled_time", "client_amount")
+
+class AnalyticsQuerySerializer(serializers.Serializer):
+    job_id = serializers.IntegerField(required=False)
+    job_title = serializers.CharField(required=False)
+    from_date = serializers.DateField(required=False)
+    to_date = serializers.DateField(required=False)
+
+    def validate(self, data):
+        from_date = data.get("from_date")
+        to_date = data.get("to_date")
+
+        if (from_date and not to_date) or (to_date and not from_date):
+            raise serializers.ValidationError("Both 'from_date' and 'to_date' must be provided together.")
+
+        today = date.today()
+        if from_date and to_date:
+            if from_date > today or to_date > today:
+                raise serializers.ValidationError("Dates cannot be in the future.")
+
+        return data

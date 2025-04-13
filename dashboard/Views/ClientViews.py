@@ -38,10 +38,12 @@ from ..serializer import (
     EngagementUpdateStatusSerializer,
     EngagmentOperationStatusUpdateSerializer,
     FinanceSerializer,
+    AnalyticsQuerySerializer,
 )
 from ..permissions import CanDeleteUpdateUser, UserRoleDeleteUpdateClientData
 from externals.parser.resume_parser import ResumerParser
 from externals.parser.resumeparser2 import process_resume
+from externals.analytics import get_candidate_analytics
 from core.permissions import (
     IsClientAdmin,
     IsClientOwner,
@@ -1871,3 +1873,120 @@ class FinanceView(APIView, LimitOffsetPagination):
             response_data["total_amount"] = billing_info.amount_due
         response_data.update(paginated_data.data)
         return Response(response_data)
+
+
+class CandidateAnalysisView(APIView):
+    serializer_class = AnalyticsQuerySerializer
+    permission_classes = [
+        IsAuthenticated,
+        IsClientOwner | IsSuperAdmin | IsAdmin | IsModerator | IsInterviewer,
+    ]
+
+    def get(self, request):
+        user = request.user
+        organization = getattr(user.clientuser, "organization", None)
+
+        # Validate role-based org access
+        if user.role in [
+            Role.CLIENT_OWNER,
+            Role.CLIENT_ADMIN,
+            Role.CLIENT_USER,
+        ] and not organization:
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "organization_id is required.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Validate query params via serializer
+        serializer = self.serializer_class(
+            data=request.query_params,
+            context={"request": request}
+        )
+        if not serializer.is_valid():
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "Validation failed.",
+                    "errors": serializer.errors,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        validated_data = serializer.validated_data
+        job_id = validated_data.get("job_id")
+        job_title = validated_data.get("job_title")
+        from_date = validated_data.get("from_date")
+        to_date = validated_data.get("to_date")
+
+        # Build job_ids list if job_title is given
+        job_ids = None
+        if job_title:
+            job_ids = list(
+                Job.objects.filter(name__icontains=job_title, organization=organization)
+                .values_list("id", flat=True)
+            )
+            if not job_ids:
+                return Response(
+                    {
+                        "status": "failed",
+                        "message": f"No jobs found matching title '{job_title}' in this organization.",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        # Validate job_id belongs to org
+        if job_id and not Job.objects.filter(id=job_id, organization=organization).exists():
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "Invalid job_id for this organization.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Validate from_date vs org creation
+        if from_date and to_date:
+            client_created_at = organization.created_at.date()
+            if from_date < client_created_at:
+                return Response(
+                    {
+                        "status": "failed",
+                        "message": "Start date can't be earlier than the organization's creation date.",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        # No filters — return job list
+        if not job_id and not job_ids and not (from_date and to_date):
+            jobs = Job.objects.filter(organization=organization).values(
+                "id", "name", "specialization", "total_positions"
+            )
+            return Response(
+                {
+                    "status": "success",
+                    "message": "Job list fetched successfully.",
+                    "jobs": list(jobs),
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        # Filters provided — return analytics
+        analytics_data = get_candidate_analytics(
+            job_id=job_id,
+            job_ids=job_ids,
+            from_date=from_date,
+            to_date=to_date,
+            organization=organization,
+        )
+
+        return Response(
+            {
+                "status": "success",
+                "message": "Analytics data retrieved successfully.",
+                "data": analytics_data,
+            },
+            status=status.HTTP_200_OK,
+        )
