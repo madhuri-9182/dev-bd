@@ -219,7 +219,7 @@ class Engagement(CreateUpdateDateTimeAndArchivedField):
     candidate_cv = models.FileField(
         upload_to="engagement-candidate-cv", blank=True, null=True
     )
-    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name="engagements")
+    job = models.CharField(max_length=255, blank=True, null=True)
     organization = models.ForeignKey(
         Organization, on_delete=models.CASCADE, related_name="engagements"
     )

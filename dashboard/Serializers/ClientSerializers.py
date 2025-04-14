@@ -826,8 +826,6 @@ class EngagementClientUserSerializer(serializers.ModelSerializer):
 
 class EngagementSerializer(serializers.ModelSerializer):
     candidate = EngagementCandidateSerializer(read_only=True)
-    job = EngagementJobSerializer(read_only=True)
-    job_id = serializers.IntegerField(required=False, write_only=True)
     candidate_id = serializers.IntegerField(required=False, write_only=True)
     offer_date = serializers.DateField(
         input_formats=["%d/%m/%Y"], format="%d/%m/%Y", required=False
@@ -856,7 +854,6 @@ class EngagementSerializer(serializers.ModelSerializer):
             "candidate_name",
             "candidate_email",
             "candidate_phone",
-            "job_id",
             "candidate_id",
             "job",
             "candidate",
@@ -872,7 +869,6 @@ class EngagementSerializer(serializers.ModelSerializer):
             "engagementoperations",
         )
         extra_kwargs = {
-            "job_id": {"write_only": True},
             "candidate_id": {"write_only": True},
         }
 
@@ -881,7 +877,7 @@ class EngagementSerializer(serializers.ModelSerializer):
         errors = {}
 
         required_keys = [
-            "job_id",
+            "job",
             "gtp_name",
             "gtp_email",
             "notice_period",
@@ -919,17 +915,6 @@ class EngagementSerializer(serializers.ModelSerializer):
                 form=True,
             )
         )
-
-        job_id = data.pop("job_id", None)
-        if job_id:
-            job = Job.objects.filter(
-                hiring_manager__organization=request.user.clientuser.organization,
-                pk=job_id,
-            ).first()
-            if not job:
-                errors.setdefault("job_id", []).append("Invalid job_id")
-            else:
-                data["job"] = job
 
         candidate_id = data.pop("candidate_id", None)
         if candidate_id:
