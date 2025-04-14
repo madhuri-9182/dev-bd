@@ -635,7 +635,7 @@ class CandidateView(APIView, LimitOffsetPagination):
             candidates = candidates.filter(designation__clients=request.user.clientuser)
 
         total_candidates = candidates.count()
-        scheduled = candidates.filter(status="SCH").count()
+        scheduled = candidates.filter(status__in=["SCH", "CSCH"]).count()
         inprocess = candidates.filter(status="NSCH").count()
         recommended = candidates.filter(Q(status="REC") | Q(status="HREC")).count()
         rejected = candidates.filter(Q(status="SNREC") | Q(status="NREC")).count()
