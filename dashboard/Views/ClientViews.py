@@ -926,6 +926,9 @@ class PotentialInterviewerAvailabilityForCandidateView(APIView):
         for skill in skills:
             query |= Q(interviewer__skills__icontains=f'"{skill}"')
 
+        client_level = request.user.clientuser.organization.internal_client.client_level
+        interviewer_level = list(range(client_level - 1, client_level + 1)) if client_level in [2, 3] else [client_level]
+
         interviewer_availability = InterviewerAvailability.objects.select_related(
             "interviewer"
         ).filter(
@@ -933,7 +936,7 @@ class PotentialInterviewerAvailabilityForCandidateView(APIView):
             interviewer__assigned_domains__name=job.name,
             interviewer__strength=specialization,
             interviewer__total_experience_years__gte=experience + 2,
-            interviewer__interviewer_level=request.user.clientuser.organization.internal_client.client_level,
+            interviewer__interviewer_level__in=interviewer_level,
             booked_by__isnull=True,
         )
 
