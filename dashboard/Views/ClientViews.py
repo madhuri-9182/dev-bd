@@ -601,6 +601,7 @@ class CandidateView(APIView, LimitOffsetPagination):
         job_id = request.query_params.get("job_id")
         status_ = request.query_params.get("status")
         search_term = request.query_params.get("q")
+        specialization = request.query_params.get("specialization")
 
         if (
             search_term
@@ -652,6 +653,9 @@ class CandidateView(APIView, LimitOffsetPagination):
                 candidates = candidates.filter(
                     Q(status=status_) | Q(final_selection_status=status_)
                 )
+
+        if specialization:
+            candidates = candidates.filter(specialization=specialization)
 
         if search_term:
             candidates = candidates.filter(
@@ -927,7 +931,11 @@ class PotentialInterviewerAvailabilityForCandidateView(APIView):
             query |= Q(interviewer__skills__icontains=f'"{skill}"')
 
         client_level = request.user.clientuser.organization.internal_client.client_level
-        interviewer_level = list(range(client_level - 1, client_level + 1)) if client_level in [2, 3] else [client_level]
+        interviewer_level = (
+            list(range(client_level - 1, client_level + 1))
+            if client_level in [2, 3]
+            else [client_level]
+        )
 
         interviewer_availability = InterviewerAvailability.objects.select_related(
             "interviewer"
