@@ -1797,6 +1797,29 @@ class FinanceView(APIView, LimitOffsetPagination):
         organization_id = request.query_params.get("organization_id")
         interviewer_id = request.query_params.get("interviewer_id")
         finance_month = request.query_params.get("finance_month", "current_month")
+        start_date = request.query_params.get("start_date")
+        try:
+            start_date = timezone.make_aware(datetime.strptime(start_date, "%d/%m/%Y"))
+        except ValueError:
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "Invalid start_date. It should be in %d/%m/%Y format.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        end_date = request.query_params.get("end_date")
+        try:
+            end_date = timezone.make_aware(datetime.strptime(end_date, "%d/%m/%Y"))
+        except ValueError:
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "Invalid end_date. It should be in %d/%m/%Y format.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         if request.user.role not in [Role.CLIENT_OWNER, Role.INTERVIEWER] and (
             not organization_id or not interviewer_id
@@ -1870,6 +1893,11 @@ class FinanceView(APIView, LimitOffsetPagination):
                 )
             else:
                 finance_qs = finance_qs.filter(interviewer_id=interviewer_id)
+
+        if start_date and end_date:
+            finance_qs = finance_qs.filter(
+                created_at__gte=start_date, created_at__lte=end_date
+            )
 
         paginated_queryset = self.paginate_queryset(finance_qs, request)
         serializer = self.serializer_class(paginated_queryset, many=True)
