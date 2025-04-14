@@ -212,10 +212,8 @@ class Engagement(CreateUpdateDateTimeAndArchivedField):
         blank=True,
     )
     candidate_name = models.CharField(max_length=50, blank=True, null=True)
-    candidate_email = models.EmailField(
-        max_length=255, blank=True, null=True, unique=True
-    )
-    candidate_phone = PhoneNumberField(region="IN", blank=True, null=True, unique=True)
+    candidate_email = models.EmailField(max_length=255, blank=True, null=True)
+    candidate_phone = PhoneNumberField(region="IN", blank=True, null=True)
     candidate_cv = models.FileField(
         upload_to="engagement-candidate-cv", blank=True, null=True
     )
@@ -237,13 +235,6 @@ class Engagement(CreateUpdateDateTimeAndArchivedField):
 
     def __str__(self):
         return f"{self.candidate_name if self.candidate_name else self.candidate.name} - {self.status}"
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["candidate", "job"], name="unique_engagement"
-            )
-        ]
 
 
 class EngagementTemplates(CreateUpdateDateTimeAndArchivedField):
