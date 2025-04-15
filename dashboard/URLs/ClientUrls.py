@@ -13,6 +13,7 @@ from ..views import (
     EngagementOperationStatusUpdateView,
     ClientDashboardView,
     FinanceView,
+    CandidateAnalysisView,
 )
 
 
@@ -75,4 +76,9 @@ urlpatterns = [
         name="client-dashboard",
     ),
     path("finance/", FinanceView.as_view(), name="client-finance"),
+    path(
+        "candidate-analysis/",
+        CandidateAnalysisView.as_view(),
+        name="candidate-analysis",
+    ),
 ]
