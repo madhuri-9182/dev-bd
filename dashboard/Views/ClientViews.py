@@ -1200,7 +1200,7 @@ class EngagementView(APIView, LimitOffsetPagination):
         )
 
         engagements = (
-            Engagement.objects.select_related("job", "candidate")
+            Engagement.objects.select_related("candidate")
             .prefetch_related("engagementoperations")
             .filter(**filters)
         )
