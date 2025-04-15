@@ -143,14 +143,12 @@ class InterviewerAvailabilityView(APIView, LimitOffsetPagination):
             interviewer=request.user.interviewer, date__gte=today_date
         )
 
-        paginated_queryset = self.paginate_queryset(interviewer_avi_qs, request, self)
-        serializer = self.serializer_class(paginated_queryset, many=True)
-        paginated_response = self.get_paginated_response(serializer.data)
+        serializer = self.serializer_class(interviewer_avi_qs, many=True)
 
         return_response = {
             "status": "success",
             "message": "Successfully retrieve the availability.",
-            **paginated_response.data,
+            **serializer.data,
         }
 
         return Response(
