@@ -373,11 +373,7 @@ class CandidateFeedbackSerializer(serializers.ModelSerializer):
             "month",
             "company",
             "role",
-            "current_designation",
-            "source",
-            "specialization",
-            "cv",
-            "remark",
+            "current_designation"
         )
 
 
