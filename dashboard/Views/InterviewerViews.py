@@ -639,6 +639,16 @@ class InterviewFeedbackView(APIView, LimitOffsetPagination):
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
+        interview_id = serializer.validated_data.get("interview_id")
+        if interview_id:
+            if InterviewFeedback.objects.filter(interview_id=interview_id).exists():
+                return Response(
+                    {
+                        "status": "failed",
+                        "message": "Interview feedback for this interview already exists",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
         serializer.save(is_submitted=True)
         return Response(
             {
