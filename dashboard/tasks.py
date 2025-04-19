@@ -1,5 +1,6 @@
 import os
 import requests
+from django.conf import settings
 from django.core.mail import EmailMultiAlternatives, get_connection
 from django.core.files.base import ContentFile
 from django.db import transaction
@@ -10,6 +11,8 @@ from celery import shared_task, chain, group
 from celery.exceptions import Reject
 from django.conf import settings
 from django.utils.safestring import mark_safe
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
 from .models import EngagementOperation, Interview, InterviewFeedback
 from externals.google.google_meet import download_from_google_drive
 from datetime import datetime, timedelta
@@ -285,11 +288,11 @@ def process_interview_video_and_generate_and_store_feedback(self):
 
 
 @shared_task(bind=True, retry_backoff=5, max_retries=3)
-def download_feedback_pdf(self, interview_id):
+def download_feedback_pdf(self, interview_uid):
     from dashboard.Serializers.InterviewerSerializers import InterviewFeedbackSerializer
 
     interview_feedback = (
-        InterviewFeedback.objects.filter(interview_id=interview_id)
+        InterviewFeedback.objects.filter(interview_id=interview_uid)
         .select_related(
             "interview",
             "interview__candidate",
@@ -299,6 +302,12 @@ def download_feedback_pdf(self, interview_id):
         .first()
     )
     serializer = InterviewFeedbackSerializer(interview_feedback)
+    interview_uid = urlsafe_base64_encode(
+        force_bytes(f"interview_id:{interview_feedback.interview.id}")
+    )
+    print(interview_uid)
+    data = serializer.data
+    data["url"] = f"{interview_uid}"
     response = requests.post(
         "http://localhost:3000/generate-pdf", json=serializer.data, stream=True
     )

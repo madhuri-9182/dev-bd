@@ -1005,3 +1005,9 @@ class FinanceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Interview
         fields = ("candidate", "scheduled_time", "client_amount")
+
+
+class FeedbackPDFVideoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Interview
+        fields = ("id", "recording")
