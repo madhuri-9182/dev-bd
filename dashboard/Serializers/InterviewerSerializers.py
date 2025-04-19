@@ -1,3 +1,4 @@
+import json
 import datetime
 from django.utils import timezone
 from rest_framework import serializers
@@ -9,7 +10,7 @@ from ..models import (
     InternalInterviewer,
     Job,
 )
-from hiringdogbackend.utils import validate_incoming_data
+from hiringdogbackend.utils import validate_incoming_data, validate_attachment
 
 
 class RecurrenceSerializer(serializers.Serializer):
@@ -251,12 +252,12 @@ class InterviewerCandidateSerializer(serializers.ModelSerializer):
 
 
 class QuestionSerializer(serializers.Serializer):
-    que = serializers.CharField(min_length=50, max_length=1000)
-    ans = serializers.CharField(min_length=50, max_length=5000)
+    que = serializers.CharField(min_length=10, max_length=1000)
+    ans = serializers.CharField(min_length=10, max_length=5000)
 
 
 class TopicSerializer(serializers.Serializer):
-    summary = serializers.CharField(min_length=50, max_length=1000)
+    summary = serializers.CharField(min_length=10, max_length=1000)
     score = serializers.IntegerField(min_value=0, max_value=100)
     start_time = serializers.IntegerField(required=False)
     end_time = serializers.IntegerField(required=False)
@@ -374,16 +375,12 @@ class CandidateFeedbackSerializer(serializers.ModelSerializer):
             "company",
             "role",
             "current_designation",
-            "source",
-            "specialization",
-            "cv",
-            "remark",
         )
 
 
 class InterviewFeedbackSerializer(serializers.ModelSerializer):
-    skill_based_performance = SkillBasedPerformanceSerializer()
-    skill_evaluation = SkillEvaluationSerializer()
+    skill_based_performance = serializers.DictField()
+    skill_evaluation = serializers.DictField()
     interview_date = serializers.DateTimeField(
         source="interview.scheduled_time", format="%d/%m/%Y %H:%M:%S", read_only=True
     )
@@ -391,6 +388,7 @@ class InterviewFeedbackSerializer(serializers.ModelSerializer):
     candidate = CandidateFeedbackSerializer(
         source="interview.candidate", read_only=True
     )
+    interview_id = serializers.IntegerField()
     interviewer = InterviewerFeedbackSerializer(
         source="interview.interviewer", read_only=True
     )
@@ -411,13 +409,47 @@ class InterviewFeedbackSerializer(serializers.ModelSerializer):
             "overall_score",
             "recording_link",
             "pdf_file",
+            "attachment",
+            "link",
         )
-        read_only_field = ("pdf_file",)
+        read_only_fields = ("pdf_file",)
+
+    def to_internal_value(self, data):
+        data = data.copy()
+
+        for field in ["skill_based_performance", "skill_evaluation"]:
+            value = data.get(field)
+            if isinstance(value, str):
+                try:
+                    data[field] = json.loads(value)
+                except json.JSONDecodeError:
+                    raise serializers.ValidationError({field: ["Invalid JSON format."]})
+
+        skill_based_performance = data.get("skill_based_performance")
+        if skill_based_performance:
+            serializer = SkillBasedPerformanceSerializer(data=skill_based_performance)
+            if not serializer.is_valid():
+                raise serializers.ValidationError(
+                    {"skill_based_performance": serializer.errors}
+                )
+
+        skill_evaluation = data.get("skill_evaluation")
+        if skill_evaluation:
+            serializer = SkillEvaluationSerializer(data=skill_evaluation)
+            if not serializer.is_valid():
+                raise serializers.ValidationError(
+                    {"skill_evaluation": serializer.errors}
+                )
+        data = super().to_internal_value(data)
+        if skill_based_performance:
+            data["skill_based_performance"] = skill_based_performance
+        if skill_evaluation:
+            data["skill_evaluation"] = skill_evaluation
+        return data
 
     def validate(self, data):
-        data = self.initial_data
         errors = validate_incoming_data(
-            data,
+            self.initial_data,
             [
                 "interview_id",
                 "skill_based_performance",
@@ -427,7 +459,10 @@ class InterviewFeedbackSerializer(serializers.ModelSerializer):
                 "overall_remark",
                 "overall_score",
             ],
+            ["attachment", "link"],
             partial=self.partial,
+            original_data=data,
+            form=True,
         )
         if errors:
             raise serializers.ValidationError({"errors": errors})
@@ -443,6 +478,17 @@ class InterviewFeedbackSerializer(serializers.ModelSerializer):
                     errors.setdefault("interview_id", []).append(
                         "No interview found for this interview_id"
                     )
+
+        attachment = data.get("attachment")
+        if attachment:
+            errors.update(
+                validate_attachment(
+                    "attachment",
+                    attachment,
+                    ["docx", "doc", "pdf", "txt", "zip"],
+                    5,
+                )
+            )
 
         if errors:
             raise serializers.ValidationError({"errors": errors})

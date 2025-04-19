@@ -38,6 +38,7 @@ from ..serializer import (
     EngagementUpdateStatusSerializer,
     EngagmentOperationStatusUpdateSerializer,
     FinanceSerializer,
+    FeedbackPDFVideoSerializer,
 )
 from ..permissions import CanDeleteUpdateUser, UserRoleDeleteUpdateClientData
 from externals.parser.resume_parser import ResumerParser
@@ -1910,3 +1911,35 @@ class FinanceView(APIView, LimitOffsetPagination):
             response_data["total_amount"] = billing_info.amount_due
         response_data.update(paginated_data.data)
         return Response(response_data)
+
+
+class FeedbackPDFVideoView(APIView):
+    serializer_class = FeedbackPDFVideoSerializer
+    permission_classes = [IsAuthenticated, IsClientAdmin | IsClientOwner | IsClientUser]
+
+    def get(self, request, interview_uid):
+        try:
+            _, interview_id = force_str(urlsafe_base64_decode(interview_uid)).split(":")
+        except (ValueError, TypeError):
+            return Response(
+                {"status": "failed", "message": "Invalid feedback_uid format."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        interview = (
+            Interview.objects.filter(pk=interview_id).only("id", "recording").first()
+        )
+        if not interview:
+            return Response(
+                {"status": "failed", "message": "Invalid feedback_uid format"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not interview.recording:
+            return Response(
+                {"status": "failed", "message": "Recording Not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        serializer = self.serializer_class(interview)
+        return Response(
+            {"status": "success", "message": "Recording found", "data": serializer.data}
+        )
