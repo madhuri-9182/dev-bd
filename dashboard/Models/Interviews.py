@@ -200,6 +200,9 @@ class InterviewFeedback(CreateUpdateDateTimeAndArchivedField):
     attachment = models.FileField(
         upload_to="feedback_attachments", null=True, blank=True
     )
+    link = models.URLField(
+        null=True, blank=True, help_text="interview_answer_link_if_any"
+    )
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)

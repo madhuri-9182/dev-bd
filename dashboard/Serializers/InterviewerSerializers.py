@@ -410,6 +410,7 @@ class InterviewFeedbackSerializer(serializers.ModelSerializer):
             "recording_link",
             "pdf_file",
             "attachment",
+            "link",
         )
         read_only_fields = ("pdf_file",)
 
@@ -458,7 +459,7 @@ class InterviewFeedbackSerializer(serializers.ModelSerializer):
                 "overall_remark",
                 "overall_score",
             ],
-            ["attachment"],
+            ["attachment", "link"],
             partial=self.partial,
             original_data=data,
             form=True,
