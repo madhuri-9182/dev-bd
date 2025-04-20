@@ -305,11 +305,10 @@ def download_feedback_pdf(self, interview_uid):
     interview_uid = urlsafe_base64_encode(
         force_bytes(f"interview_id:{interview_feedback.interview.id}")
     )
-    print(interview_uid)
     data = serializer.data
     data["url"] = f"{interview_uid}"
     response = requests.post(
-        "http://localhost:3000/generate-pdf", json=serializer.data, stream=True
+        "http://localhost:3000/generate-pdf", json=data, stream=True
     )
     if response.status_code == 200:
         save_path = f"/tmp/{interview_feedback.interview.candidate.name}-Feedback.pdf"
