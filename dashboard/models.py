@@ -17,4 +17,5 @@ from .Models import (
     DesignationDomain,
     InterviewerPricing,
     BillingRecord,
+    InterviewScheduleAttempt,
 )

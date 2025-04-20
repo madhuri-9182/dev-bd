@@ -146,6 +146,7 @@ def fetch_interview_records():
     before_one_and_half_an_hour = current_time - timedelta(hours=2, minutes=30)
     interview_qs = Interview.objects.filter(
         scheduled_time__lte=before_one_and_half_an_hour,
+        status="CSCH",
         downloaded=False,
         scheduled_service_account_event_id__isnull=False,
         no_of_time_processed__lte=3,

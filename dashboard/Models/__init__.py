@@ -5,6 +5,7 @@ from .Client import (
     Engagement,
     EngagementTemplates,
     EngagementOperation,
+    InterviewScheduleAttempt,
 )
 from .Internal import (
     ClientPointOfContact,
