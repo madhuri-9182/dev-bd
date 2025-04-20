@@ -1915,7 +1915,10 @@ class FinanceView(APIView, LimitOffsetPagination):
 
 class FeedbackPDFVideoView(APIView):
     serializer_class = FeedbackPDFVideoSerializer
-    permission_classes = [IsAuthenticated, IsClientAdmin | IsClientOwner | IsClientUser]
+    permission_classes = [
+        IsAuthenticated,
+        IsClientAdmin | IsClientOwner | IsClientUser | IsAgency,
+    ]
 
     def get(self, request, interview_uid):
         try:
