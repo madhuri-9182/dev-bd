@@ -60,7 +60,7 @@ class InterviewerAvailability(CreateUpdateDateTimeAndArchivedField):
     def is_recurrence(self):
         return self.recurrence_rule is not None
 
-
+# currently model is in not used
 class InterviewerRequest(CreateUpdateDateTimeAndArchivedField):
     STATUS_CHOICES = (
         ("pending", "Pending"),

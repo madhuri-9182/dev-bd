@@ -190,36 +190,44 @@ class InterviewerRequestSerializer(serializers.Serializer):
         request = self.context.get("request")
         errors = {}
 
-        candidate = Candidate.objects.filter(
-            organization=request.user.clientuser.organization,
-            pk=data.get("candidate_id"),
-        ).first()
+        candidate = (
+            Candidate.objects.select_for_update()
+            .filter(
+                organization=request.user.clientuser.organization,
+                pk=data.get("candidate_id"),
+            )
+            .first()
+        )
         if not candidate:
             errors.setdefault("candidate_id", []).append("Invalid candidate_id")
 
-        if candidate.status != "NSCH":
+        if candidate.status not in ["NSCH", "SCH", "CSCH"]:
             errors.setdefault("candidate_id", []).append(
-                "Candidate is already scheduled and processed"
+                "Candidate is already scheduled and processed. Rescheduling can't be done."
             )
-        if (
-            candidate.last_scheduled_initiate_time
-            and timezone.now()
-            < candidate.last_scheduled_initiate_time + datetime.timedelta(hours=1)
-        ):
-            errors.setdefault("candidate_id", []).append(
-                "Can't reinitiate the scheduling for 1 hour. Previous scheduling is in progress"
-            )
+
+        # after rescheduling implementation commented out the below thing
+        # if (
+        #     candidate.last_scheduled_initiate_time
+        #     and timezone.now()
+        #     < candidate.last_scheduled_initiate_time + datetime.timedelta(hours=1)
+        # ):
+        #     errors.setdefault("candidate_id", []).append(
+        #         "Can't reinitiate the scheduling for 1 hour. Previous scheduling is in progress"
+        #     )
 
         valid_interviewer_ids = set(
             InterviewerAvailability.objects.filter(
                 pk__in=data.get("interviewer_ids")
             ).values_list("id", flat=True)
         )
-        for index, interviewer_id in enumerate(data.get("interviewer_ids", [])):
-            if interviewer_id not in valid_interviewer_ids:
-                errors.setdefault("interviewer_ids", []).append(
-                    {index: ["interviewer_id is invalid"]}
-                )
+        invalid_interviewer_ids = (
+            set(data.get("interviewer_ids", [])) - valid_interviewer_ids
+        )
+        if invalid_interviewer_ids:
+            errors.setdefault("interviewer_ids", []).append(
+                f"Invalid interviewers ids: {', '.join(map(str, invalid_interviewer_ids))}"
+            )
 
         if errors:
             raise serializers.ValidationError({"errors": errors})
