@@ -375,6 +375,7 @@ class CandidateFeedbackSerializer(serializers.ModelSerializer):
             "company",
             "role",
             "current_designation",
+            "specialization",
         )
 
 
