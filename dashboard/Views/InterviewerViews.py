@@ -208,8 +208,25 @@ class InterviewerReqeustView(APIView):
                         template="client_interview_cancelled_notification.html",
                         candidate_name=candidate.name,
                         interviewer_name=interviewer.name,
-                        interview_date=scheduled_time.strftime("%d/%m/%Y"),
-                        interview_time=scheduled_time.strftime("%H:%M"),
+                        interview_date=timezone.localtime(scheduled_time)
+                        .date()
+                        .strftime("%d/%m/%Y"),
+                        interview_time=timezone.localtime(scheduled_time)
+                        .time()
+                        .strftime("%I:%M %p"),
+                    )
+
+                    send_mail.delay(
+                        to=candidate.email,
+                        subject=f"{candidate.name}, Your Interview Has Been Cancelled",
+                        template="client_candidate_cancelled_notification.html",
+                        candidate_name=candidate.name,
+                        interview_date=timezone.localtime(scheduled_time)
+                        .date()
+                        .strftime("%d/%m/%Y"),
+                        interview_time=timezone.localtime(scheduled_time)
+                        .time()
+                        .strftime("%I:%M %p"),
                     )
 
                 for interviewer_obj in InterviewerAvailability.objects.filter(
@@ -310,24 +327,23 @@ class InterviewerRequestResponseView(APIView):
                     .first()
                 )
 
-                try:
-                    scheduling_attempts = candidate.scheduling_attempts.latest(
-                        "created_at"
-                    )
-                except ObjectDoesNotExist:
-                    scheduling_attempts = None
-                if (
-                    candidate.status == "SCH"
-                    and scheduling_attempts
-                    and scheduling_id != str(scheduling_attempts.id)
-                ):
-                    return Response(
-                        {
-                            "status": "failed",
-                            "message": "This interview schedule has expired or was cancelled.",
-                        },
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
+                if candidate.status == "SCH":
+                    try:
+                        scheduling_attempts = candidate.scheduling_attempts.latest(
+                            "created_at"
+                        )
+                    except ObjectDoesNotExist:
+                        scheduling_attempts = None
+                    if scheduling_attempts and scheduling_id != str(
+                        scheduling_attempts.id
+                    ):
+                        return Response(
+                            {
+                                "status": "failed",
+                                "message": "This interview schedule has expired or was cancelled.",
+                            },
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
 
                 if not interviewer_availability or not candidate:
                     return Response(
