@@ -78,7 +78,7 @@ urlpatterns = [
     ),
     path("finance/", FinanceView.as_view(), name="client-finance"),
     path(
-        "candidate-analysis/",
+        "candidate-analysis/<int:job_id>/",
         CandidateAnalysisView.as_view(),
         name="candidate-analysis",
     ),

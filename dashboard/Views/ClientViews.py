@@ -5,11 +5,12 @@ import datetime as dt
 from celery import group
 from celery.result import AsyncResult
 from datetime import datetime, timedelta
+from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from django.db import transaction
-from django.db.models import Q, F, ExpressionWrapper, DurationField, Count
+from django.db.models import Q, Count
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -1923,10 +1924,15 @@ class CandidateAnalysisView(APIView):
     serializer_class = AnalyticsQuerySerializer
     permission_classes = [
         IsAuthenticated,
-        IsClientOwner | IsSuperAdmin | IsAdmin | IsModerator | IsInterviewer,
+        IsClientOwner
+        | IsClientAdmin
+        | IsClientUser
+        | IsSuperAdmin
+        | IsAdmin
+        | IsModerator,
     ]
 
-    def get(self, request):
+    def get(self, request, job_id):
         user = request.user
         organization = getattr(user.clientuser, "organization", None)
 
@@ -1949,9 +1955,7 @@ class CandidateAnalysisView(APIView):
             )
 
         # Validate query params via serializer
-        serializer = self.serializer_class(
-            data=request.query_params, context={"request": request}
-        )
+        serializer = self.serializer_class(data=request.query_params)
         if not serializer.is_valid():
             return Response(
                 {
@@ -1963,75 +1967,38 @@ class CandidateAnalysisView(APIView):
             )
 
         validated_data = serializer.validated_data
-        job_id = validated_data.get("job_id")
-        job_title = validated_data.get("job_title")
-        from_date = validated_data.get("from_date")
-        to_date = validated_data.get("to_date")
+        from_date = timezone.make_aware(
+            dt.datetime.combine(validated_data.get("from_date"), dt.datetime.min.time())
+        )
+        to_date = timezone.make_aware(
+            dt.datetime.combine(validated_data.get("to_date"), dt.datetime.max.time())
+        )
 
-        # Build job_ids list if job_title is given
-        job_ids = None
-        if job_title:
-            job_ids = list(
-                Job.objects.filter(
-                    name__icontains=job_title, organization=organization
-                ).values_list("id", flat=True)
-            )
-            if not job_ids:
+        if organization_id := validated_data.get("organization_id"):
+            try:
+                organization = Organization.objects.get(pk=organization_id)
+            except ObjectDoesNotExist:
                 return Response(
-                    {
-                        "status": "failed",
-                        "message": f"No jobs found matching title '{job_title}' in this organization.",
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
+                    {"status": "failed", "message": "Invalid organization_id"}
                 )
 
-        # Validate job_id belongs to org
-        if (
-            job_id
-            and not Job.objects.filter(id=job_id, organization=organization).exists()
-        ):
+        if not Job.objects.filter(
+            hiring_manager__organization=organization, pk=job_id
+        ).exists():
             return Response(
-                {
-                    "status": "failed",
-                    "message": "Invalid job_id for this organization.",
-                },
-                status=status.HTTP_400_BAD_REQUEST,
+                {"status": "failed", "message": "Invalid job_id in url"},
+                status=status.HTTP_404_NOT_FOUND,
             )
 
-        # Validate from_date vs org creation
-        if from_date and to_date:
-            client_created_at = organization.created_at.date()
-            if from_date < client_created_at:
-                return Response(
-                    {
-                        "status": "failed",
-                        "message": "Start date can't be earlier than the organization's creation date.",
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-        # No filters — return job list
-        if not job_id and not job_ids and not (from_date and to_date):
-            jobs = Job.objects.filter(organization=organization).values(
-                "id", "name", "specialization", "total_positions"
-            )
-            return Response(
-                {
-                    "status": "success",
-                    "message": "Job list fetched successfully.",
-                    "jobs": list(jobs),
-                },
-                status=status.HTTP_200_OK,
-            )
+        # making the candidate queryset
+        candidate = Candidate.objects.filter(
+            organization=organization,
+            designation__id=job_id,
+            created_at__range=(from_date, to_date),
+        )
 
         # Filters provided — return analytics
-        analytics_data = get_candidate_analytics(
-            job_id=job_id,
-            job_ids=job_ids,
-            from_date=from_date,
-            to_date=to_date,
-            organization=organization,
-        )
+        analytics_data = get_candidate_analytics(candidate)
 
         return Response(
             {

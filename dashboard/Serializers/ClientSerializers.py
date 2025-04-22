@@ -1009,24 +1009,24 @@ class FinanceSerializer(serializers.ModelSerializer):
 
 
 class AnalyticsQuerySerializer(serializers.Serializer):
-    job_id = serializers.IntegerField(required=False)
-    job_title = serializers.CharField(required=False)
-    from_date = serializers.DateField(required=False)
-    to_date = serializers.DateField(required=False)
+    from_date = serializers.DateField(required=False, input_formats=["%d/%m/%Y"])
+    to_date = serializers.DateField(required=False, input_formats=["%d/%m/%Y"])
+    organization_id = serializers.IntegerField(required=False)
 
     def validate(self, data):
         from_date = data.get("from_date")
         to_date = data.get("to_date")
+        errors = {}
 
-        if (from_date and not to_date) or (to_date and not from_date):
-            raise serializers.ValidationError(
-                "Both 'from_date' and 'to_date' must be provided together."
-            )
+        if not from_date or not to_date:
+            errors["date"] = "Both 'from_date' and 'to_date' must be provided together."
 
         today = date.today()
-        if from_date and to_date:
-            if from_date > today or to_date > today:
-                raise serializers.ValidationError("Dates cannot be in the future.")
+        if from_date and to_date and (from_date > today or to_date > today):
+            errors["date"] = "Dates cannot be in the future."
+
+        if errors:
+            raise serializers.ValidationError(errors)
 
         return data
 
