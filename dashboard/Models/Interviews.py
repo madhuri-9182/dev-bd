@@ -119,7 +119,7 @@ class Interview(CreateUpdateDateTimeAndArchivedField):
         candidate.total_score = self.total_score
         candidate.save()
 
-        if self.status in ["REC", "NREC", "NJ", "HREC", "SNREC"]:
+        if hasattr(self, "interview_feedback") and self.interview_feedback.is_submitted:
             today = timezone.now()
             first_day_of_month = today.replace(day=1)
             due_date = today.replace(

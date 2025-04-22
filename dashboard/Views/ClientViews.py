@@ -1801,6 +1801,7 @@ class FinanceView(APIView, LimitOffsetPagination):
         organization_id = request.query_params.get("organization_id")
         interviewer_id = request.query_params.get("interviewer_id")
         finance_month = request.query_params.get("finance_month", "current_month")
+
         start_date = request.query_params.get("start_date")
         if start_date:
             try:

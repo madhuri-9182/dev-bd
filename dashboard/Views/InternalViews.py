@@ -960,11 +960,3 @@ class HDIPUsersViews(APIView, LimitOffsetPagination):
             },
             status=status.HTTP_400_BAD_REQUEST,
         )
-
-
-class InternalEngagementViews(APIView, LimitOffsetPagination):
-    permission_classes = (IsAuthenticated, IsModerator | IsSuperAdmin | IsAdmin)
-
-    def get(self, request):
-        client_ids = request.query_params.get("client_ids")
-        Engagement.objects.filter()
