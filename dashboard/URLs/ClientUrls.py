@@ -14,6 +14,7 @@ from ..views import (
     ClientDashboardView,
     FinanceView,
     CandidateAnalysisView,
+    FeedbackPDFVideoView,
 )
 
 
@@ -80,5 +81,10 @@ urlpatterns = [
         "candidate-analysis/",
         CandidateAnalysisView.as_view(),
         name="candidate-analysis",
+    ),
+    path(
+        "feedback-pdf-video/<str:interview_uid>/",
+        FeedbackPDFVideoView.as_view(),
+        name="feedback-pdf-video",
     ),
 ]

@@ -1,3 +1,4 @@
+import uuid
 from organizations.models import Organization
 from django.db import models
 from phonenumber_field.modelfields import PhoneNumberField
@@ -289,3 +290,10 @@ class EngagementOperation(CreateUpdateDateTimeAndArchivedField):
 
     def __str__(self):
         return f"{self.template.template_name} - {self.delivery_status}"
+
+
+class InterviewScheduleAttempt(CreateUpdateDateTimeAndArchivedField):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    candidate = models.ForeignKey(
+        Candidate, on_delete=models.CASCADE, related_name="scheduling_attempts"
+    )

@@ -1007,6 +1007,7 @@ class FinanceSerializer(serializers.ModelSerializer):
         model = Interview
         fields = ("candidate", "scheduled_time", "client_amount")
 
+
 class AnalyticsQuerySerializer(serializers.Serializer):
     job_id = serializers.IntegerField(required=False)
     job_title = serializers.CharField(required=False)
@@ -1018,7 +1019,9 @@ class AnalyticsQuerySerializer(serializers.Serializer):
         to_date = data.get("to_date")
 
         if (from_date and not to_date) or (to_date and not from_date):
-            raise serializers.ValidationError("Both 'from_date' and 'to_date' must be provided together.")
+            raise serializers.ValidationError(
+                "Both 'from_date' and 'to_date' must be provided together."
+            )
 
         today = date.today()
         if from_date and to_date:
@@ -1026,3 +1029,9 @@ class AnalyticsQuerySerializer(serializers.Serializer):
                 raise serializers.ValidationError("Dates cannot be in the future.")
 
         return data
+
+
+class FeedbackPDFVideoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Interview
+        fields = ("id", "recording")

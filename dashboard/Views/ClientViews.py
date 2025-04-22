@@ -39,6 +39,7 @@ from ..serializer import (
     EngagmentOperationStatusUpdateSerializer,
     FinanceSerializer,
     AnalyticsQuerySerializer,
+    FeedbackPDFVideoSerializer,
 )
 from ..permissions import CanDeleteUpdateUser, UserRoleDeleteUpdateClientData
 from externals.parser.resume_parser import ResumerParser
@@ -1800,28 +1801,32 @@ class FinanceView(APIView, LimitOffsetPagination):
         interviewer_id = request.query_params.get("interviewer_id")
         finance_month = request.query_params.get("finance_month", "current_month")
         start_date = request.query_params.get("start_date")
-        try:
-            start_date = timezone.make_aware(datetime.strptime(start_date, "%d/%m/%Y"))
-        except ValueError:
-            return Response(
-                {
-                    "status": "failed",
-                    "message": "Invalid start_date. It should be in %d/%m/%Y format.",
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        if start_date:
+            try:
+                start_date = timezone.make_aware(
+                    datetime.strptime(start_date, "%d/%m/%Y")
+                )
+            except ValueError:
+                return Response(
+                    {
+                        "status": "failed",
+                        "message": "Invalid start_date. It should be in %d/%m/%Y format.",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         end_date = request.query_params.get("end_date")
-        try:
-            end_date = timezone.make_aware(datetime.strptime(end_date, "%d/%m/%Y"))
-        except ValueError:
-            return Response(
-                {
-                    "status": "failed",
-                    "message": "Invalid end_date. It should be in %d/%m/%Y format.",
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        if end_date:
+            try:
+                end_date = timezone.make_aware(datetime.strptime(end_date, "%d/%m/%Y"))
+            except ValueError:
+                return Response(
+                    {
+                        "status": "failed",
+                        "message": "Invalid end_date. It should be in %d/%m/%Y format.",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         if request.user.role not in [Role.CLIENT_OWNER, Role.INTERVIEWER] and (
             not organization_id or not interviewer_id
@@ -1926,11 +1931,15 @@ class CandidateAnalysisView(APIView):
         organization = getattr(user.clientuser, "organization", None)
 
         # Validate role-based org access
-        if user.role in [
-            Role.CLIENT_OWNER,
-            Role.CLIENT_ADMIN,
-            Role.CLIENT_USER,
-        ] and not organization:
+        if (
+            user.role
+            in [
+                Role.CLIENT_OWNER,
+                Role.CLIENT_ADMIN,
+                Role.CLIENT_USER,
+            ]
+            and not organization
+        ):
             return Response(
                 {
                     "status": "failed",
@@ -1941,8 +1950,7 @@ class CandidateAnalysisView(APIView):
 
         # Validate query params via serializer
         serializer = self.serializer_class(
-            data=request.query_params,
-            context={"request": request}
+            data=request.query_params, context={"request": request}
         )
         if not serializer.is_valid():
             return Response(
@@ -1964,8 +1972,9 @@ class CandidateAnalysisView(APIView):
         job_ids = None
         if job_title:
             job_ids = list(
-                Job.objects.filter(name__icontains=job_title, organization=organization)
-                .values_list("id", flat=True)
+                Job.objects.filter(
+                    name__icontains=job_title, organization=organization
+                ).values_list("id", flat=True)
             )
             if not job_ids:
                 return Response(
@@ -1977,7 +1986,10 @@ class CandidateAnalysisView(APIView):
                 )
 
         # Validate job_id belongs to org
-        if job_id and not Job.objects.filter(id=job_id, organization=organization).exists():
+        if (
+            job_id
+            and not Job.objects.filter(id=job_id, organization=organization).exists()
+        ):
             return Response(
                 {
                     "status": "failed",
@@ -2028,4 +2040,39 @@ class CandidateAnalysisView(APIView):
                 "data": analytics_data,
             },
             status=status.HTTP_200_OK,
+        )
+
+
+class FeedbackPDFVideoView(APIView):
+    serializer_class = FeedbackPDFVideoSerializer
+    permission_classes = [
+        IsAuthenticated,
+        IsClientAdmin | IsClientOwner | IsClientUser | IsAgency,
+    ]
+
+    def get(self, request, interview_uid):
+        try:
+            _, interview_id = force_str(urlsafe_base64_decode(interview_uid)).split(":")
+        except (ValueError, TypeError):
+            return Response(
+                {"status": "failed", "message": "Invalid feedback_uid format."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        interview = (
+            Interview.objects.filter(pk=interview_id).only("id", "recording").first()
+        )
+        if not interview:
+            return Response(
+                {"status": "failed", "message": "Invalid feedback_uid format"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not interview.recording:
+            return Response(
+                {"status": "failed", "message": "Recording Not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        serializer = self.serializer_class(interview)
+        return Response(
+            {"status": "success", "message": "Recording found", "data": serializer.data}
         )

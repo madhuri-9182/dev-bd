@@ -6,6 +6,7 @@ from django.conf import settings
 from django.utils import timezone
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.core.exceptions import ObjectDoesNotExist
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.response import Response
@@ -18,8 +19,14 @@ from ..serializer import (
     InterviewerDashboardSerializer,
     InterviewFeedbackSerializer,
 )
-from ..models import InterviewerAvailability, Candidate, Interview, InterviewFeedback
-from ..tasks import send_email_to_multiple_recipients, download_feedback_pdf
+from ..models import (
+    InterviewerAvailability,
+    Candidate,
+    Interview,
+    InterviewFeedback,
+    InterviewScheduleAttempt,
+)
+from ..tasks import send_email_to_multiple_recipients, download_feedback_pdf, send_mail
 from core.permissions import (
     IsInterviewer,
     IsClientAdmin,
@@ -166,57 +173,104 @@ class InterviewerReqeustView(APIView):
     ]
 
     def post(self, request):
-        serializer = self.serializer_class(
-            data=request.data, context={"request": request}
-        )
-        if serializer.is_valid():
-            candidate_id = serializer.validated_data["candidate_id"]
-            interviewer_ids = serializer.validated_data["interviewer_ids"]
-            candidate = serializer.validated_data.pop("candidate_obj")
-            contexts = []
+        with transaction.atomic():
+            serializer = self.serializer_class(
+                data=request.data, context={"request": request}
+            )
+            if serializer.is_valid():
+                candidate_id = serializer.validated_data["candidate_id"]
+                interviewer_ids = serializer.validated_data["interviewer_ids"]
+                candidate = serializer.validated_data.pop("candidate_obj")
+                contexts = []
 
-            for interviewer_obj in InterviewerAvailability.objects.filter(
-                pk__in=interviewer_ids, booked_by__isnull=True
-            ).select_related("interviewer"):
-                schedule_datetime = datetime.datetime.combine(
-                    serializer.validated_data.get("date"),
-                    serializer.validated_data.get("time"),
+                scheduling_attempt = InterviewScheduleAttempt.objects.create(
+                    candidate=candidate
                 )
-                data = f"interviewer_avialability_id:{interviewer_obj.id};candidate_id:{candidate_id};schedule_time:{schedule_datetime};booked_by:{request.user.id};expired_time:{datetime.datetime.now()+datetime.timedelta(hours=1)}"
-                accept_data = data + ";action:accept"
-                reject_data = data + ";action:reject"
-                accept_uid = urlsafe_base64_encode(force_bytes(accept_data))
-                reject_uid = urlsafe_base64_encode(force_bytes(reject_data))
-                context = {
-                    "name": interviewer_obj.interviewer.name,
-                    "email": interviewer_obj.interviewer.email,
-                    "interview_date": serializer.validated_data["date"],
-                    "interview_time": serializer.validated_data["time"],
-                    "position": candidate.designation.get_name_display(),
-                    "site_domain": settings.SITE_DOMAIN,
-                    "accept_link": "/confirmation/{}/".format(accept_uid),
-                    "reject_link": "/confirmation/{}/".format(reject_uid),
-                    "from_email": settings.EMAIL_HOST_USER,
-                }
-                contexts.append(context)
 
-            send_email_to_multiple_recipients.delay(
-                contexts,
-                "Interview Opportunity Available - Confirm Your Availability",
-                "interviewer_interview_notification.html",
-            )
-            candidate.last_scheduled_initiate_time = timezone.now()
-            candidate.status = "SCH"
-            candidate.save()
-            return Response(
-                {
-                    "status": "success",
-                    "message": "Scheduling initiated successfully. Interviewers will be notified shortly.",
-                },
-                status=status.HTTP_200_OK,
-            )
+                # rescheduling when candidate is scheduled already to an interviewer
+                if candidate.status == "CSCH":
+                    candidate.status = "NSCH"
+                    interview_obj = candidate.interviews.last()
+                    interview_obj.status = "RSCH"
+                    scheduled_time = interview_obj.scheduled_time
+                    interview_obj.scheduled_time = None
+                    interviewer = interview_obj.interviewer
+                    if hasattr(interview_obj, "availability"):
+                        interview_obj.availability.booked_by = None
+                        interview_obj.availability.is_scheduled = False
+                        interview_obj.availability.save()
+                    interview_obj.save()
+                    candidate.save()
 
-        custom_error = serializer.errors.pop("errors", None)
+                    send_mail.delay(
+                        to=interviewer.email,
+                        subject=f"Interview with {candidate.name} has been cancelled",
+                        template="client_interview_cancelled_notification.html",
+                        candidate_name=candidate.name,
+                        interviewer_name=interviewer.name,
+                        interview_date=timezone.localtime(scheduled_time)
+                        .date()
+                        .strftime("%d/%m/%Y"),
+                        interview_time=timezone.localtime(scheduled_time)
+                        .time()
+                        .strftime("%I:%M %p"),
+                    )
+
+                    send_mail.delay(
+                        to=candidate.email,
+                        subject=f"{candidate.name}, Your Interview Has Been Cancelled",
+                        template="client_candidate_cancelled_notification.html",
+                        candidate_name=candidate.name,
+                        interview_date=timezone.localtime(scheduled_time)
+                        .date()
+                        .strftime("%d/%m/%Y"),
+                        interview_time=timezone.localtime(scheduled_time)
+                        .time()
+                        .strftime("%I:%M %p"),
+                    )
+
+                for interviewer_obj in InterviewerAvailability.objects.filter(
+                    pk__in=interviewer_ids, booked_by__isnull=True
+                ).select_related("interviewer"):
+                    schedule_datetime = datetime.datetime.combine(
+                        serializer.validated_data.get("date"),
+                        serializer.validated_data.get("time"),
+                    )
+                    data = f"interviewer_avialability_id:{interviewer_obj.id};candidate_id:{candidate_id};schedule_time:{schedule_datetime};booked_by:{request.user.id};expired_time:{datetime.datetime.now()+datetime.timedelta(hours=1)};scheduling_id:{scheduling_attempt.id}"
+                    accept_data = data + ";action:accept"
+                    reject_data = data + ";action:reject"
+                    accept_uid = urlsafe_base64_encode(force_bytes(accept_data))
+                    reject_uid = urlsafe_base64_encode(force_bytes(reject_data))
+                    context = {
+                        "name": interviewer_obj.interviewer.name,
+                        "email": interviewer_obj.interviewer.email,
+                        "interview_date": serializer.validated_data["date"],
+                        "interview_time": serializer.validated_data["time"],
+                        "position": candidate.designation.get_name_display(),
+                        "site_domain": settings.SITE_DOMAIN,
+                        "accept_link": "/confirmation/{}/".format(accept_uid),
+                        "reject_link": "/confirmation/{}/".format(reject_uid),
+                        "from_email": settings.EMAIL_HOST_USER,
+                    }
+                    contexts.append(context)
+
+                send_email_to_multiple_recipients.delay(
+                    contexts,
+                    "Interview Opportunity Available - Confirm Your Availability",
+                    "interviewer_interview_notification.html",
+                )
+                candidate.last_scheduled_initiate_time = timezone.now()
+                candidate.status = "SCH"
+                candidate.save()
+                return Response(
+                    {
+                        "status": "success",
+                        "message": "Scheduling initiated successfully. Interviewers will be notified shortly.",
+                    },
+                    status=status.HTTP_200_OK,
+                )
+
+            custom_error = serializer.errors.pop("errors", None)
         return Response(
             {
                 "status": "failed",
@@ -237,7 +291,7 @@ class InterviewerRequestResponseView(APIView):
                 try:
                     decode_data = force_str(urlsafe_base64_decode(request_id))
                     data_parts = decode_data.split(";")
-                    if len(data_parts) != 6:
+                    if len(data_parts) != 7:
                         raise ValueError("Invalid data format")
 
                     (
@@ -246,6 +300,7 @@ class InterviewerRequestResponseView(APIView):
                         schedule_time,
                         booked_by,
                         expired_time,
+                        scheduling_id,
                         action,
                     ) = [item.split(":", 1)[1] for item in data_parts]
                 except Exception:
@@ -271,6 +326,24 @@ class InterviewerRequestResponseView(APIView):
                     .filter(pk=candidate_id)
                     .first()
                 )
+
+                if candidate.status == "SCH":
+                    try:
+                        scheduling_attempts = candidate.scheduling_attempts.latest(
+                            "created_at"
+                        )
+                    except ObjectDoesNotExist:
+                        scheduling_attempts = None
+                    if scheduling_attempts and scheduling_id != str(
+                        scheduling_attempts.id
+                    ):
+                        return Response(
+                            {
+                                "status": "failed",
+                                "message": "This interview schedule has expired or was cancelled.",
+                            },
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
 
                 if not interviewer_availability or not candidate:
                     return Response(
@@ -337,12 +410,20 @@ class InterviewerRequestResponseView(APIView):
 
                 if action == "accept":
                     try:
+                        interview_obj = (
+                            candidate.interviews.last()
+                            if hasattr(candidate, "interviews")
+                            else None
+                        )
+
                         interview = Interview.objects.create(
                             candidate=candidate,
                             interviewer=interviewer_availability.interviewer,
                             status="CSCH",
                             scheduled_time=schedule_time,
                             total_score=100,
+                            previous_interview=interview_obj,
+                            availability=interviewer_availability,
                         )
                     except IntegrityError as e:
                         print(str(e))
@@ -639,6 +720,16 @@ class InterviewFeedbackView(APIView, LimitOffsetPagination):
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
+        interview_id = serializer.validated_data.get("interview_id")
+        if interview_id:
+            if InterviewFeedback.objects.filter(interview_id=interview_id).exists():
+                return Response(
+                    {
+                        "status": "failed",
+                        "message": "Interview feedback for this interview already exists",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
         serializer.save(is_submitted=True)
         return Response(
             {

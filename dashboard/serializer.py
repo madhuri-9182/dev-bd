@@ -25,4 +25,5 @@ from .Serializers import (
     InterviewFeedbackSerializer,
     FinanceSerializer,
     AnalyticsQuerySerializer,
+    FeedbackPDFVideoSerializer,
 )

@@ -9,6 +9,7 @@ from .ClientSerializers import (
     EngagmentOperationStatusUpdateSerializer,
     FinanceSerializer,
     AnalyticsQuerySerializer,
+    FeedbackPDFVideoSerializer,
 )
 from .InternalSerializers import (
     ClientPointOfContactSerializer,
