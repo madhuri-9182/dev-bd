@@ -1830,8 +1830,8 @@ class FinanceView(APIView, LimitOffsetPagination):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-        if request.user.role not in [Role.CLIENT_OWNER, Role.INTERVIEWER] and (
-            not organization_id or not interviewer_id
+        if request.user.role not in [Role.CLIENT_OWNER, Role.INTERVIEWER] and not (
+            organization_id or interviewer_id
         ):
             return Response(
                 {
@@ -1849,7 +1849,7 @@ class FinanceView(APIView, LimitOffsetPagination):
                 and request.user.role != Role.INTERVIEWER
             )
             or url_name == "internal-finance"
-            and (not organization_id or not interviewer_id)
+            and not (organization_id or interviewer_id)
         ):
             return Response(
                 {"status": "failed", "message": "Invalid Request"},
@@ -1913,7 +1913,7 @@ class FinanceView(APIView, LimitOffsetPagination):
         paginated_data = self.get_paginated_response(serializer.data)
         response_data = {
             "status": "success",
-            "message": "Last month finance records retreived successfully.",
+            "message": "Finance records retreived successfully.",
         }
         if request.user.role in [Role.CLIENT_OWNER, Role.INTERVIEWER] and billing_info:
             response_data["total_amount"] = billing_info.amount_due
