@@ -23,6 +23,13 @@ class Interview(CreateUpdateDateTimeAndArchivedField):
         blank=True,
         null=True,
     )
+    availability = models.ForeignKey(
+        "InterviewerAvailability",
+        on_delete=models.SET_NULL,
+        related_name="interview_availablity",
+        null=True,
+        blank=True,
+    )
     no_of_time_processed = models.IntegerField(
         default=0,
         help_text="Signifying the number of times that task is processed. if the task process more that 3 times then the interview doesn't happen.",
@@ -33,7 +40,9 @@ class Interview(CreateUpdateDateTimeAndArchivedField):
         blank=True,
         help_text="Interview status",
     )
-    scheduled_time = models.DateTimeField(help_text="Scheduled interview date and time")
+    scheduled_time = models.DateTimeField(
+        help_text="Scheduled interview date and time", null=True
+    )
     previous_interview = models.ForeignKey(
         "self",
         on_delete=models.SET_NULL,
@@ -110,7 +119,7 @@ class Interview(CreateUpdateDateTimeAndArchivedField):
         candidate.total_score = self.total_score
         candidate.save()
 
-        if self.status in ["REC", "NREC", "NJ", "HREC", "SNREC"]:
+        if hasattr(self, "interview_feedback") and self.interview_feedback.is_submitted:
             today = timezone.now()
             first_day_of_month = today.replace(day=1)
             due_date = today.replace(
@@ -197,6 +206,12 @@ class InterviewFeedback(CreateUpdateDateTimeAndArchivedField):
         help_text="Signify whether the interviewer has submitted their feedback for this interview or not.",
     )
     pdf_file = models.FileField(upload_to="feedback_report", null=True, blank=True)
+    attachment = models.FileField(
+        upload_to="feedback_attachments", null=True, blank=True
+    )
+    link = models.URLField(
+        null=True, blank=True, help_text="interview_answer_link_if_any"
+    )
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)

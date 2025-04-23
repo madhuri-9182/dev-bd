@@ -42,4 +42,4 @@ GOOGLE_API_KEY = "AIzaSyBIi5-B03yNolwRaQeWzy4n-XFpSUdzJBo"
 
 LOGIN_URL = "https://hdip.vercel.app/auth/signin/loginmail"
 BASE_URL = "https://hdip.vercel.app/api"
-SITE_DOMAIN = "hdip.vercel.app"
+SITE_DOMAIN = "localhost:5173"

@@ -32,4 +32,6 @@ from dashboard.Views import (
     InterviewerInterviewHistoryView,
     InterviewFeedbackView,
     FinanceView,
+    CandidateAnalysisView,
+    FeedbackPDFVideoView,
 )

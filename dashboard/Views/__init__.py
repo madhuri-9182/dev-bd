@@ -12,6 +12,8 @@ from .ClientViews import (
     EngagementOperationStatusUpdateView,
     ClientDashboardView,
     FinanceView,
+    CandidateAnalysisView,
+    FeedbackPDFVideoView,
 )
 
 from .InternalViews import (

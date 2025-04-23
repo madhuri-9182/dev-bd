@@ -1,3 +1,4 @@
+import uuid
 from organizations.models import Organization
 from django.db import models
 from phonenumber_field.modelfields import PhoneNumberField
@@ -212,14 +213,12 @@ class Engagement(CreateUpdateDateTimeAndArchivedField):
         blank=True,
     )
     candidate_name = models.CharField(max_length=50, blank=True, null=True)
-    candidate_email = models.EmailField(
-        max_length=255, blank=True, null=True, unique=True
-    )
-    candidate_phone = PhoneNumberField(region="IN", blank=True, null=True, unique=True)
+    candidate_email = models.EmailField(max_length=255, blank=True, null=True)
+    candidate_phone = PhoneNumberField(region="IN", blank=True, null=True)
     candidate_cv = models.FileField(
         upload_to="engagement-candidate-cv", blank=True, null=True
     )
-    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name="engagements")
+    job = models.CharField(max_length=255, blank=True, null=True)
     organization = models.ForeignKey(
         Organization, on_delete=models.CASCADE, related_name="engagements"
     )
@@ -237,13 +236,6 @@ class Engagement(CreateUpdateDateTimeAndArchivedField):
 
     def __str__(self):
         return f"{self.candidate_name if self.candidate_name else self.candidate.name} - {self.status}"
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["candidate", "job"], name="unique_engagement"
-            )
-        ]
 
 
 class EngagementTemplates(CreateUpdateDateTimeAndArchivedField):
@@ -298,3 +290,10 @@ class EngagementOperation(CreateUpdateDateTimeAndArchivedField):
 
     def __str__(self):
         return f"{self.template.template_name} - {self.delivery_status}"
+
+
+class InterviewScheduleAttempt(CreateUpdateDateTimeAndArchivedField):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    candidate = models.ForeignKey(
+        Candidate, on_delete=models.CASCADE, related_name="scheduling_attempts"
+    )

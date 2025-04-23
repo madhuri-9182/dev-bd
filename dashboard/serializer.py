@@ -24,4 +24,6 @@ from .Serializers import (
     InterviewerDashboardSerializer,
     InterviewFeedbackSerializer,
     FinanceSerializer,
+    AnalyticsQuerySerializer,
+    FeedbackPDFVideoSerializer,
 )

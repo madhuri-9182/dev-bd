@@ -8,6 +8,7 @@ from django.db import transaction
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from core.models import User, Role
+from datetime import date
 from ..models import (
     ClientUser,
     Job,
@@ -826,8 +827,6 @@ class EngagementClientUserSerializer(serializers.ModelSerializer):
 
 class EngagementSerializer(serializers.ModelSerializer):
     candidate = EngagementCandidateSerializer(read_only=True)
-    job = EngagementJobSerializer(read_only=True)
-    job_id = serializers.IntegerField(required=False, write_only=True)
     candidate_id = serializers.IntegerField(required=False, write_only=True)
     offer_date = serializers.DateField(
         input_formats=["%d/%m/%Y"], format="%d/%m/%Y", required=False
@@ -856,7 +855,6 @@ class EngagementSerializer(serializers.ModelSerializer):
             "candidate_name",
             "candidate_email",
             "candidate_phone",
-            "job_id",
             "candidate_id",
             "job",
             "candidate",
@@ -872,7 +870,6 @@ class EngagementSerializer(serializers.ModelSerializer):
             "engagementoperations",
         )
         extra_kwargs = {
-            "job_id": {"write_only": True},
             "candidate_id": {"write_only": True},
         }
 
@@ -881,7 +878,7 @@ class EngagementSerializer(serializers.ModelSerializer):
         errors = {}
 
         required_keys = [
-            "job_id",
+            "job",
             "gtp_name",
             "gtp_email",
             "notice_period",
@@ -919,17 +916,6 @@ class EngagementSerializer(serializers.ModelSerializer):
                 form=True,
             )
         )
-
-        job_id = data.pop("job_id", None)
-        if job_id:
-            job = Job.objects.filter(
-                hiring_manager__organization=request.user.clientuser.organization,
-                pk=job_id,
-            ).first()
-            if not job:
-                errors.setdefault("job_id", []).append("Invalid job_id")
-            else:
-                data["job"] = job
 
         candidate_id = data.pop("candidate_id", None)
         if candidate_id:
@@ -1020,3 +1006,32 @@ class FinanceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Interview
         fields = ("candidate", "scheduled_time", "client_amount")
+
+
+class AnalyticsQuerySerializer(serializers.Serializer):
+    from_date = serializers.DateField(required=False, input_formats=["%d/%m/%Y"])
+    to_date = serializers.DateField(required=False, input_formats=["%d/%m/%Y"])
+    organization_id = serializers.IntegerField(required=False)
+
+    def validate(self, data):
+        from_date = data.get("from_date")
+        to_date = data.get("to_date")
+        errors = {}
+
+        if not from_date or not to_date:
+            errors["date"] = "Both 'from_date' and 'to_date' must be provided together."
+
+        today = date.today()
+        if from_date and to_date and (from_date > today or to_date > today):
+            errors["date"] = "Dates cannot be in the future."
+
+        if errors:
+            raise serializers.ValidationError(errors)
+
+        return data
+
+
+class FeedbackPDFVideoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Interview
+        fields = ("id", "recording")

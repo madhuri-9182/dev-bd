@@ -5,11 +5,12 @@ import datetime as dt
 from celery import group
 from celery.result import AsyncResult
 from datetime import datetime, timedelta
+from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from django.db import transaction
-from django.db.models import Q, F, ExpressionWrapper, DurationField, Count
+from django.db.models import Q, Count
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
@@ -38,10 +39,13 @@ from ..serializer import (
     EngagementUpdateStatusSerializer,
     EngagmentOperationStatusUpdateSerializer,
     FinanceSerializer,
+    AnalyticsQuerySerializer,
+    FeedbackPDFVideoSerializer,
 )
 from ..permissions import CanDeleteUpdateUser, UserRoleDeleteUpdateClientData
 from externals.parser.resume_parser import ResumerParser
 from externals.parser.resumeparser2 import process_resume
+from externals.analytics import get_candidate_analytics
 from core.permissions import (
     IsClientAdmin,
     IsClientOwner,
@@ -601,6 +605,7 @@ class CandidateView(APIView, LimitOffsetPagination):
         job_id = request.query_params.get("job_id")
         status_ = request.query_params.get("status")
         search_term = request.query_params.get("q")
+        specialization = request.query_params.get("specialization")
 
         if (
             search_term
@@ -635,7 +640,7 @@ class CandidateView(APIView, LimitOffsetPagination):
             candidates = candidates.filter(designation__clients=request.user.clientuser)
 
         total_candidates = candidates.count()
-        scheduled = candidates.filter(status="SCH").count()
+        scheduled = candidates.filter(status__in=["SCH", "CSCH"]).count()
         inprocess = candidates.filter(status="NSCH").count()
         recommended = candidates.filter(Q(status="REC") | Q(status="HREC")).count()
         rejected = candidates.filter(Q(status="SNREC") | Q(status="NREC")).count()
@@ -652,6 +657,9 @@ class CandidateView(APIView, LimitOffsetPagination):
                 candidates = candidates.filter(
                     Q(status=status_) | Q(final_selection_status=status_)
                 )
+
+        if specialization:
+            candidates = candidates.filter(specialization=specialization)
 
         if search_term:
             candidates = candidates.filter(
@@ -926,6 +934,13 @@ class PotentialInterviewerAvailabilityForCandidateView(APIView):
         for skill in skills:
             query |= Q(interviewer__skills__icontains=f'"{skill}"')
 
+        client_level = request.user.clientuser.organization.internal_client.client_level
+        interviewer_level = (
+            list(range(client_level - 1, client_level + 1))
+            if client_level in [2, 3]
+            else [client_level]
+        )
+
         interviewer_availability = InterviewerAvailability.objects.select_related(
             "interviewer"
         ).filter(
@@ -933,7 +948,7 @@ class PotentialInterviewerAvailabilityForCandidateView(APIView):
             interviewer__assigned_domains__name=job.name,
             interviewer__strength=specialization,
             interviewer__total_experience_years__gte=experience + 2,
-            interviewer__interviewer_level=request.user.clientuser.organization.internal_client.client_level,
+            interviewer__interviewer_level__in=interviewer_level,
             booked_by__isnull=True,
         )
 
@@ -1189,7 +1204,7 @@ class EngagementView(APIView, LimitOffsetPagination):
         )
 
         engagements = (
-            Engagement.objects.select_related("job", "candidate")
+            Engagement.objects.select_related("candidate")
             .prefetch_related("engagementoperations")
             .filter(**filters)
         )
@@ -1787,8 +1802,36 @@ class FinanceView(APIView, LimitOffsetPagination):
         interviewer_id = request.query_params.get("interviewer_id")
         finance_month = request.query_params.get("finance_month", "current_month")
 
-        if request.user.role not in [Role.CLIENT_OWNER, Role.INTERVIEWER] and (
-            not organization_id or not interviewer_id
+        start_date = request.query_params.get("start_date")
+        if start_date:
+            try:
+                start_date = timezone.make_aware(
+                    datetime.strptime(start_date, "%d/%m/%Y")
+                )
+            except ValueError:
+                return Response(
+                    {
+                        "status": "failed",
+                        "message": "Invalid start_date. It should be in %d/%m/%Y format.",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        end_date = request.query_params.get("end_date")
+        if end_date:
+            try:
+                end_date = timezone.make_aware(datetime.strptime(end_date, "%d/%m/%Y"))
+            except ValueError:
+                return Response(
+                    {
+                        "status": "failed",
+                        "message": "Invalid end_date. It should be in %d/%m/%Y format.",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        if request.user.role not in [Role.CLIENT_OWNER, Role.INTERVIEWER] and not (
+            organization_id or interviewer_id
         ):
             return Response(
                 {
@@ -1806,7 +1849,7 @@ class FinanceView(APIView, LimitOffsetPagination):
                 and request.user.role != Role.INTERVIEWER
             )
             or url_name == "internal-finance"
-            and (not organization_id or not interviewer_id)
+            and not (organization_id or interviewer_id)
         ):
             return Response(
                 {"status": "failed", "message": "Invalid Request"},
@@ -1860,14 +1903,144 @@ class FinanceView(APIView, LimitOffsetPagination):
             else:
                 finance_qs = finance_qs.filter(interviewer_id=interviewer_id)
 
+        if start_date and end_date:
+            finance_qs = finance_qs.filter(
+                created_at__gte=start_date, created_at__lte=end_date
+            )
+
         paginated_queryset = self.paginate_queryset(finance_qs, request)
         serializer = self.serializer_class(paginated_queryset, many=True)
         paginated_data = self.get_paginated_response(serializer.data)
         response_data = {
             "status": "success",
-            "message": "Last month finance records retreived successfully.",
+            "message": "Finance records retreived successfully.",
         }
         if request.user.role in [Role.CLIENT_OWNER, Role.INTERVIEWER] and billing_info:
             response_data["total_amount"] = billing_info.amount_due
         response_data.update(paginated_data.data)
         return Response(response_data)
+
+
+class CandidateAnalysisView(APIView):
+    serializer_class = AnalyticsQuerySerializer
+    permission_classes = [
+        IsAuthenticated,
+        IsClientOwner
+        | IsClientAdmin
+        | IsClientUser
+        | IsSuperAdmin
+        | IsAdmin
+        | IsModerator,
+    ]
+
+    def get(self, request, job_id):
+        user = request.user
+        organization = getattr(user.clientuser, "organization", None)
+
+        # Validate role-based org access
+        if (
+            user.role
+            in [
+                Role.CLIENT_OWNER,
+                Role.CLIENT_ADMIN,
+                Role.CLIENT_USER,
+            ]
+            and not organization
+        ):
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "organization_id is required.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Validate query params via serializer
+        serializer = self.serializer_class(data=request.query_params)
+        if not serializer.is_valid():
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "Validation failed.",
+                    "errors": serializer.errors,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        validated_data = serializer.validated_data
+        from_date = timezone.make_aware(
+            dt.datetime.combine(validated_data.get("from_date"), dt.datetime.min.time())
+        )
+        to_date = timezone.make_aware(
+            dt.datetime.combine(validated_data.get("to_date"), dt.datetime.max.time())
+        )
+
+        if organization_id := validated_data.get("organization_id"):
+            try:
+                organization = Organization.objects.get(pk=organization_id)
+            except ObjectDoesNotExist:
+                return Response(
+                    {"status": "failed", "message": "Invalid organization_id"}
+                )
+
+        if not Job.objects.filter(
+            hiring_manager__organization=organization, pk=job_id
+        ).exists():
+            return Response(
+                {"status": "failed", "message": "Invalid job_id in url"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # making the candidate queryset
+        candidate = Candidate.objects.filter(
+            organization=organization,
+            designation__id=job_id,
+            created_at__range=(from_date, to_date),
+        )
+
+        # Filters provided — return analytics
+        analytics_data = get_candidate_analytics(candidate)
+
+        return Response(
+            {
+                "status": "success",
+                "message": "Analytics data retrieved successfully.",
+                "data": analytics_data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class FeedbackPDFVideoView(APIView):
+    serializer_class = FeedbackPDFVideoSerializer
+    permission_classes = [
+        IsAuthenticated,
+        IsClientAdmin | IsClientOwner | IsClientUser | IsAgency,
+    ]
+
+    def get(self, request, interview_uid):
+        try:
+            _, interview_id = force_str(urlsafe_base64_decode(interview_uid)).split(":")
+        except (ValueError, TypeError):
+            return Response(
+                {"status": "failed", "message": "Invalid feedback_uid format."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        interview = (
+            Interview.objects.filter(pk=interview_id).only("id", "recording").first()
+        )
+        if not interview:
+            return Response(
+                {"status": "failed", "message": "Invalid feedback_uid format"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not interview.recording:
+            return Response(
+                {"status": "failed", "message": "Recording Not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        serializer = self.serializer_class(interview)
+        return Response(
+            {"status": "success", "message": "Recording found", "data": serializer.data}
+        )
