@@ -274,7 +274,7 @@ def process_interview_video_and_generate_and_store_feedback(self):
                 {
                     "interviewer_name": interviewer_name,
                     "candidate_name": candidate_name,
-                    "dashboard_link": "https://app.hdiplatform.in/",
+                    "dashboard_link": f"https://{settings.SITE_DOMAIN}/",
                     "type": "feedback_notification",
                     "email": interview.interviewer.email,
                     "from_email": INTERVIEW_EMAIL,
