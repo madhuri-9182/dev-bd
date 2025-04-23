@@ -14,10 +14,12 @@ from .models import (
     Candidate,
     InternalInterviewer,
     Interview,
-    InterviewerAvailability
+    InterviewerAvailability,
+    InterviewFeedback,
 )
 
 admin.site.register(Interview)
+
 
 @admin.register(InternalInterviewer)
 class InternalInterviewer(admin.ModelAdmin):
@@ -85,3 +87,4 @@ class CandidateAdmin(admin.ModelAdmin):
 
 
 admin.site.register(InterviewerAvailability)
+admin.site.register(InterviewFeedback)

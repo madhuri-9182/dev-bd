@@ -35,7 +35,9 @@ def password_reset_token_created(sender, reset_password_token, *args, **kwargs):
         "current_user": reset_password_token.user,
         "name": reset_password_token.user.email,
         "email": reset_password_token.user.email,
-        "reset_password_url": "/auth/password-reset/{}".format(reset_password_token.key),
+        "reset_password_url": "/auth/password-reset/{}".format(
+            reset_password_token.key
+        ),
         "site_domain": settings.SITE_DOMAIN,
     }
 
@@ -43,9 +45,9 @@ def password_reset_token_created(sender, reset_password_token, *args, **kwargs):
     email_plaintext_message = render_to_string("reset_password.txt", context)
 
     msg = EmailMultiAlternatives(
-        "Password Reset for {}".format(site_full_name),
+        f"Password Reset for {site_full_name}",
         email_plaintext_message,
-        settings.EMAIL_HOST_USER,
+        (settings.EMAIL_HOST_USER if settings.DEBUG else settings.CONTACT_EMAIL),
         [reset_password_token.user.email],
     )
     msg.attach_alternative(email_html_message, "text/html")

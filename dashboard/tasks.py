@@ -20,6 +20,11 @@ from externals.feedback.interview_feedback import (
     analyze_transcription_and_generate_feedback,
 )
 
+CONTACT_EMAIL = settings.EMAIL_HOST_USER if settings.DEBUG else settings.CONTACT_EMAIL
+INTERVIEW_EMAIL = (
+    settings.EMAIL_HOST_USER if settings.DEBUG else settings.INTERVIEW_EMAIL
+)
+
 
 @shared_task(bind=True, max_retries=3, rate_limit="10/m")
 def send_mail(
@@ -27,8 +32,8 @@ def send_mail(
     to,
     subject,
     template,
-    reply_to=settings.EMAIL_HOST_USER,
-    attachmenets=[],
+    reply_to=CONTACT_EMAIL,
+    attachments=[],
     bcc=None,
     **kwargs,
 ):
@@ -41,10 +46,19 @@ def send_mail(
     try:
         content = render_to_string(template, context=context)
         email_message = EmailMultiAlternatives(
-            subject, "", settings.EMAIL_HOST_USER, [to], reply_to=[reply_to], bcc=[bcc]
+            subject,
+            "",
+            (
+                INTERVIEW_EMAIL
+                if email_type and email_type in ["feedback_notification"]
+                else CONTACT_EMAIL
+            ),
+            [to],
+            reply_to=[reply_to],
+            bcc=[bcc],
         )
         email_message.attach_alternative(content, "text/html")
-        for attachment in attachmenets:
+        for attachment in attachments:
             email_message.attach_file(attachment)
         email_message.send(fail_silently=True)
     except Exception as exc:
@@ -57,7 +71,7 @@ def send_email_to_multiple_recipients(
     contexts,
     subject,
     template,
-    reply_to=settings.EMAIL_HOST_USER,
+    reply_to=CONTACT_EMAIL,
     attachments=[],
     bcc=None,
     **kwargs,
@@ -82,7 +96,7 @@ def send_email_to_multiple_recipients(
             email = EmailMultiAlternatives(
                 subject=subject,
                 body="This is an HTML email. Please view it in an HTML-compatible email client.",
-                from_email=from_email if from_email else settings.EMAIL_HOST_USER,
+                from_email=from_email if from_email else CONTACT_EMAIL,
                 to=[email_address],
                 reply_to=[reply_to],
                 bcc=[bcc],
@@ -116,7 +130,7 @@ def send_schedule_engagement_email(self, engagement_operation_id):
         email = EmailMultiAlternatives(
             subject=engagement_operation_obj.template.subject,
             body="This is an email.",
-            from_email=settings.EMAIL_HOST_USER,
+            from_email=CONTACT_EMAIL,
             to=[
                 getattr(
                     engagement_operation_obj.engagement.candidate,
@@ -263,7 +277,7 @@ def process_interview_video_and_generate_and_store_feedback(self):
                     "dashboard_link": "https://app.hdiplatform.in/",
                     "type": "feedback_notification",
                     "email": interview.interviewer.email,
-                    "from_email": settings.EMAIL_HOST_USER,
+                    "from_email": INTERVIEW_EMAIL,
                     "subject": f"Ready to Review? Feedback for {candidate_name} is Live",
                     "template": "interview_feedback_notification_email.html",
                 },
@@ -277,7 +291,7 @@ def process_interview_video_and_generate_and_store_feedback(self):
                     ),
                     "candidate_name": candidate_name,
                     "email": interview.candidate.organization.internal_client.assigned_to.user.email,
-                    "from_email": settings.EMAIL_HOST_USER,
+                    "from_email": INTERVIEW_EMAIL,
                     "subject": f"Feedback Report Generated: Insights from {interviewer_name}'s Interview with {candidate_name}",
                     "template": "internal_interview_feedback_report_generated_conformation.html",
                 },

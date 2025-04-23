@@ -30,6 +30,10 @@ from ..tasks import send_mail, send_email_to_multiple_recipients
 
 ONBOARD_EMAIL_TEMPLATE = "onboard.html"
 WELCOME_MAIL_SUBJECT = "Welcome to Hiring Dog"
+CONTACT_EMAIL = settings.EMAIL_HOST_USER if settings.DEBUG else settings.CONTACT_EMAIL
+INTERVIEW_EMAIL = (
+    settings.EMAIL_HOST_USER if settings.DEBUG else settings.INTERVIEW_EMAIL
+)
 
 
 class InternalClientDomainSerializer(serializers.ModelSerializer):
@@ -532,7 +536,7 @@ class InterviewerSerializer(serializers.ModelSerializer):
             contexts = [
                 {
                     "subject": WELCOME_MAIL_SUBJECT,
-                    "from_email": settings.EMAIL_HOST_USER,
+                    "from_email": INTERVIEW_EMAIL,
                     "email": email,
                     "template": ONBOARD_EMAIL_TEMPLATE,
                     "user_name": name,
@@ -543,7 +547,7 @@ class InterviewerSerializer(serializers.ModelSerializer):
                 },
                 {
                     "subject": f"Confirmation: {interviewer_obj.name} Successfully Onboarded as Interviewer",
-                    "from_email": settings.EMAIL_HOST_USER,
+                    "from_email": INTERVIEW_EMAIL,
                     "email": "ashok@mailsac.com",
                     "template": "internal_interviewer_onboarded_confirmation_notification.html",
                     "internal_user_name": "Admin",

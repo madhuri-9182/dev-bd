@@ -40,6 +40,12 @@ from externals.google.google_calendar import GoogleCalendar
 from externals.google.google_meet import create_meet_and_calendar_invite
 
 
+CONTACT_EMAIL = settings.EMAIL_HOST_USER if settings.DEBUG else settings.CONTACT_EMAIL
+INTERVIEW_EMAIL = (
+    settings.EMAIL_HOST_USER if settings.DEBUG else settings.INTERVIEW_EMAIL
+)
+
+
 @extend_schema(tags=["Interviewer"])
 class InterviewerAvailabilityView(APIView, LimitOffsetPagination):
     serializer_class = InterviewerAvailabilitySerializer
@@ -155,7 +161,7 @@ class InterviewerAvailabilityView(APIView, LimitOffsetPagination):
         return_response = {
             "status": "success",
             "message": "Successfully retrieve the availability.",
-            **serializer.data,
+            "results": serializer.data,
         }
 
         return Response(
@@ -250,7 +256,7 @@ class InterviewerReqeustView(APIView):
                         "site_domain": settings.SITE_DOMAIN,
                         "accept_link": "/confirmation/{}/".format(accept_uid),
                         "reject_link": "/confirmation/{}/".format(reject_uid),
-                        "from_email": settings.EMAIL_HOST_USER,
+                        "from_email": INTERVIEW_EMAIL,
                     }
                     contexts.append(context)
 
@@ -527,7 +533,7 @@ class InterviewerRequestResponseView(APIView):
                             "template": "interview_confirmation_candidate_notification.html",
                             "subject": f"Interview Scheduled - {candidate.designation.get_name_display()}",
                             "meeting_link": meeting_link,
-                            "from_email": settings.EMAIL_HOST_USER,
+                            "from_email": INTERVIEW_EMAIL,
                         },
                         {
                             "name": interviewer_availability.interviewer.name,
@@ -539,7 +545,7 @@ class InterviewerRequestResponseView(APIView):
                             "template": "interview_confirmation_interviewer_notification.html",
                             "subject": f"Interview Assigned - {candidate.name}",
                             "meeting_link": meeting_link,
-                            "from_email": settings.EMAIL_HOST_USER,
+                            "from_email": INTERVIEW_EMAIL,
                         },
                         {
                             "name": candidate.organization.name,
@@ -555,7 +561,7 @@ class InterviewerRequestResponseView(APIView):
                             "template": "interview_confirmation_client_notification.html",
                             "subject": f"Interview Scheduled - {candidate.name}",
                             "meeting_link": meeting_link,
-                            "from_email": settings.EMAIL_HOST_USER,
+                            "from_email": INTERVIEW_EMAIL,
                         },
                         {
                             "organization_name": candidate.organization.name,
@@ -568,7 +574,7 @@ class InterviewerRequestResponseView(APIView):
                             "template": "internal_interview_scheduling_confirmation.html",
                             "subject": f"Interview Scheduled - {candidate.name}",
                             "meeting_link": meeting_link,
-                            "from_email": settings.EMAIL_HOST_USER,
+                            "from_email": INTERVIEW_EMAIL,
                         },
                     ]
 
