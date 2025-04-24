@@ -889,7 +889,7 @@ class InternalClientUserSerializer(serializers.ModelSerializer):
         allowed_keys = []
         if self.partial:
             required_keys = []
-            allowed_keys = ["role", "accessibility", "name"]
+            allowed_keys = ["role", "accessibility", "name", "email", "phone"]
         errors = validate_incoming_data(
             self.initial_data,
             required_keys=required_keys,
@@ -942,14 +942,14 @@ class InternalClientUserSerializer(serializers.ModelSerializer):
         return client_user
 
     def update(self, instance, validated_data):
-        validated_data.pop("email", None)
-        validated_data.pop("phone", None)
-        role = validated_data.pop("role", None)
+        new_email = validated_data.pop("email", None)
+        new_phone = validated_data.pop("phone", None)
+        new_role = validated_data.pop("role", None)
+        current_email = instance.user.email
 
         with transaction.atomic():
-            if role:
-                instance.user.role = role
-                instance.user.save()
+            if new_role:
+                instance.user.role = new_role
 
             if "name" in validated_data:
                 instance.user.profile.name = validated_data["name"]
@@ -957,10 +957,25 @@ class InternalClientUserSerializer(serializers.ModelSerializer):
 
                 internal_client = instance.organization.internal_client
                 ClientPointOfContact.objects.filter(
-                    client=internal_client, email=instance.user.email
-                ).update(name=validated_data["name"])
+                    client=internal_client, email=current_email
+                ).update(name=validated_data["name"], email=new_email, phone=new_phone)
+
+            if new_email:
+                instance.user.email = new_email
+            if new_phone:
+                instance.user.phone = new_phone
+
+            instance.user.save()
 
             instance = super().update(instance, validated_data)
+            if new_email and current_email != new_email:
+                send_mail.delay(
+                    to=current_email,
+                    subject=f"{instance.name}, Your Email Is Updated",
+                    template="user_email_changed_confirmation_notification.html",
+                    name=instance.name,
+                    new_email=instance.user.email,
+                )
 
         return instance
 
@@ -1026,7 +1041,7 @@ class HDIPUsersSerializer(serializers.ModelSerializer):
         allowed_keys = ["client_ids"]
         if self.partial:
             required_keys = []
-            allowed_keys.extend(["role", "name"])
+            allowed_keys.extend(["role", "name", "email", "phone"])
 
         errors = validate_incoming_data(
             self.initial_data,
@@ -1097,16 +1112,21 @@ class HDIPUsersSerializer(serializers.ModelSerializer):
         return hdip_user
 
     def update(self, instance, validated_data):
-        validated_data.pop("email", None)
-        validated_data.pop("phone", None)
+        email = validated_data.pop("email", None)
+        phone = validated_data.pop("phone", None)
         role = validated_data.pop("role", None)
         client_ids = validated_data.pop("client_ids", None)
+        current_email = instance.user.email
 
         with transaction.atomic():
 
             if role is not None:
                 instance.user.role = role
-                instance.user.save()
+            if email is not None:
+                instance.user.email = email
+            if phone is not None:
+                instance.user.phone = phone
+            instance.user.save()
 
             if validated_data.get("name"):
                 instance.user.profile.name = validated_data["name"]
@@ -1132,5 +1152,13 @@ class HDIPUsersSerializer(serializers.ModelSerializer):
                     )
 
             super().update(instance, validated_data)
+            if email and current_email != email:
+                send_mail.delay(
+                    to=current_email,
+                    subject=f"{instance.name}, Your Email Is Updated",
+                    template="user_email_changed_confirmation_notification.html",
+                    name=instance.name,
+                    new_email=instance.user.email,
+                )
 
         return instance
