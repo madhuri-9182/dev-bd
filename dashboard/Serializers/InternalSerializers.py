@@ -391,6 +391,9 @@ class InternalClientSerializer(serializers.ModelSerializer):
                 user.profile.name = name
                 user.profile.save()
                 ClientPointOfContact.objects.create(client=instance, **point_of_contact)
+                ClientUser.objects.create(
+                    organization=instance.organization, user=user, name=name
+                )
 
         return instance
 
@@ -951,6 +954,11 @@ class InternalClientUserSerializer(serializers.ModelSerializer):
             if "name" in validated_data:
                 instance.user.profile.name = validated_data["name"]
                 instance.user.profile.save()
+
+                internal_client = instance.organization.internal_client
+                ClientPointOfContact.objects.filter(
+                    client=internal_client, email=instance.user.email
+                ).update(name=validated_data["name"])
 
             instance = super().update(instance, validated_data)
 
