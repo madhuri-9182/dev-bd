@@ -788,7 +788,9 @@ class InternalClientUserView(APIView, LimitOffsetPagination):
 
         if search_term:
             internal_user = internal_user.filter(
-                organization__name__icontains=search_term
+                Q(organization__name__icontains=search_term)
+                | Q(name__icontains=search_term)
+                | Q(user__email__icontains=search_term)
             )
 
         paginated_queryset = self.paginate_queryset(internal_user, request)
@@ -883,7 +885,9 @@ class HDIPUsersViews(APIView, LimitOffsetPagination):
         hdip_users = HDIPUsers.objects.all()
 
         if search_term:
-            hdip_users = hdip_users.filter(name__icontains=search_term)
+            hdip_users = hdip_users.filter(
+                Q(name__icontains=search_term) | Q(user__email__icontains=search_term)
+            )
 
         paginated_queryset = self.paginate_queryset(hdip_users, request)
         serializer = self.serializer_class(paginated_queryset, many=True)

@@ -48,6 +48,11 @@ class ClientUser(CreateUpdateDateTimeAndArchivedField):
         max_length=5, choices=ACCESSIBILITY_CHOICES, blank=True, default="AJ"
     )
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["name", "status"]),
+        ]
+
 
 class Job(CreateUpdateDateTimeAndArchivedField):
     REASON_FOR_ARCHIVED_CHOICES = (
