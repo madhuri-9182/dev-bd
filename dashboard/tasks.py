@@ -326,13 +326,14 @@ def download_feedback_pdf(self, interview_uid):
         "http://localhost:3000/generate-pdf", json=data, stream=True
     )
     if response.status_code == 200:
-        save_path = f"/tmp/{interview_feedback.interview.candidate.name}-Feedback.pdf"
+        candidate = interview_feedback.interview.candidate
+        save_path = f"/tmp/{candidate.name}-{candidate.id}-Feedback.pdf"
         with open(save_path, "wb") as f:
             for chunk in response.iter_content(chunk_size=8192):
                 f.write(chunk)
         with open(save_path, "rb") as f:
             interview_feedback.pdf_file.save(
-                f"{interview_feedback.interview.candidate.name}-Feedback.pdf", f
+                f"{candidate.name}-{candidate.id}-Feedback.pdf", f
             )
         if os.path.exists(save_path):
             os.remove(save_path)
