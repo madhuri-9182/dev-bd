@@ -44,10 +44,11 @@ class InternalClientDomainSerializer(serializers.ModelSerializer):
 
 class ClientPointOfContactSerializer(serializers.ModelSerializer):
     created_at = serializers.DateTimeField(format="%d/%m/%Y", read_only=True)
+    poc_id = serializers.IntegerField(write_only=True, required=False)
 
     class Meta:
         model = ClientPointOfContact
-        fields = ["id", "name", "email", "phone", "created_at"]
+        fields = ["id", "poc_id", "name", "email", "phone", "created_at"]
         read_only_fields = ["created_at"]
 
     def run_validation(self, data=...):
@@ -64,6 +65,7 @@ class ClientPointOfContactSerializer(serializers.ModelSerializer):
         errors = validate_incoming_data(
             data,
             ["name", "email", "phone"],
+            ["poc_id"],
             partial=self.partial,
         )
         if errors:
@@ -144,13 +146,17 @@ class InternalClientSerializer(serializers.ModelSerializer):
 
         contact_ids = []
         for i, contact in enumerate(points_of_contact):
-            if contact.get("id"):
+            if contact.get("poc_id"):
                 contact["email"] = ""
                 contact["phone"] = ""
-                contact_ids.append(contact.get("id"))
+                contact_ids.append(contact.get("poc_id"))
             serializer = ClientPointOfContactSerializer(data=contact)
             if not serializer.is_valid():
-                errors[f"{i + 1}"] = serializer.errors["errors"]
+                errors[f"{i + 1}"] = (
+                    serializer.errors["errors"]
+                    if "errors" in serializer.errors
+                    else serializer.errors
+                )
 
         if errors:
             raise serializers.ValidationError(errors)
@@ -322,32 +328,46 @@ class InternalClientSerializer(serializers.ModelSerializer):
 
         to_archive = existing_contacts.exclude(id__in=contact_ids)
         for contact in to_archive:
-            User.objects.filter(email=contact.email).update(is_active=False)
+            suffix = f".deleted.{contact.id}-{contact.client.organization.id}"
+            user = User.objects.filter(email=contact.email).first()
+            if user:
+                user.is_active = False
+                user.email += suffix
+                user.phone = str(user.phone) + suffix
+                user.save()
             contact.archived = True
+            contact.email += suffix
+            contact.phone = str(contact.phone) + suffix
             contact.save()
 
         for index, point_of_contact in enumerate(point_of_contact_data):
-            contact_id = contact_ids[index] if index < len(contact_ids) else None
+            # contact_id = contact_ids[index] if index < len(contact_ids) else None
+            # print(
+            #     index, contact_id, contact_ids, point_of_contact, existing_contacts_dict
+            # )
 
-            """ --> keep it for future reference.
-                if not contact_id and len(existing_contacts_dict) >= 3:
-                    raise serializers.ValidationError(
-                        {
-                            "errors": {
-                                "points_of_contact": [
-                                    "Maximum 3 points of contact are allowed"
-                                ]
-                            }
+            """--> keep it for future reference.
+            if not contact_id and len(existing_contacts_dict) >= 3:
+                raise serializers.ValidationError(
+                    {
+                        "errors": {
+                            "points_of_contact": [
+                                "Maximum 3 points of contact are allowed"
+                            ]
                         }
-                    )
+                    }
+                )
             """
 
-            if contact_id in existing_contacts_dict:
-                contact = existing_contacts_dict[contact_id]
+            if point_of_contact.get("poc_id"):
+                contact = existing_contacts_dict.get(point_of_contact["poc_id"])
+                if not contact:
+                    continue
                 point_of_contact.pop("email", None)
                 point_of_contact.pop("phone", None)
                 for key, value in point_of_contact.items():
                     setattr(contact, key, value)
+                    setattr(contact.client.organization.internal_client, key, value)
                 contact.save()
             else:
                 email = point_of_contact.get("email")

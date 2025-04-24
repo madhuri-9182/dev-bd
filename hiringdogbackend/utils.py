@@ -76,7 +76,7 @@ def check_for_email_and_phone_uniqueness(
         except vde as e:
             errors.setdefault("email", []).extend(e.messages)
         else:
-            if user.objects.filter(email=email).exists():
+            if email and user.objects.filter(email=email).exists():
                 errors.setdefault("email", []).append("This email is already used.")
 
     if phone:
@@ -86,7 +86,7 @@ def check_for_email_and_phone_uniqueness(
             or not phone.startswith("+91")
         ):
             errors.setdefault("phone", []).append("Invalid phone number")
-        elif user.objects.filter(phone=phone).exists():
+        elif phone and user.objects.filter(phone=phone).exists():
             errors.setdefault("phone", []).append("This phone is already used.")
 
     return errors
