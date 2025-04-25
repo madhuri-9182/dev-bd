@@ -34,6 +34,7 @@ CONTACT_EMAIL = settings.EMAIL_HOST_USER if settings.DEBUG else settings.CONTACT
 INTERVIEW_EMAIL = (
     settings.EMAIL_HOST_USER if settings.DEBUG else settings.INTERVIEW_EMAIL
 )
+CHANGE_EMAIL_NOTIFICATION_TEMPLATE = "user_email_changed_confirmation_notification.html"
 
 
 class InternalClientDomainSerializer(serializers.ModelSerializer):
@@ -590,6 +591,7 @@ class InterviewerSerializer(serializers.ModelSerializer):
         email = validated_data.get("email", instance.email)
         phone = validated_data.get("phone_number", instance.phone_number)
         assigned_domain_ids = set(validated_data.get("assigned_domain_ids", []))
+        current_email = instance.email
 
         with transaction.atomic():
             changes = {}
@@ -603,28 +605,18 @@ class InterviewerSerializer(serializers.ModelSerializer):
                 changes["phone"] = phone
 
             if changes:
-                instance.user.email_verified = False
-                instance.user.phone_verified = False
-                instance.user.save(
-                    update_fields=["email", "phone", "email_verified", "phone_verified"]
-                )
+                instance.user.save(update_fields=["email", "phone"])
 
             instance.assigned_domains.set(assigned_domain_ids)
             instance = super().update(instance, validated_data)
 
-            if changes:
-                verification_data = f"{instance.user.id}:{int(datetime.datetime.now().timestamp() + 86400)}"
-                verification_data_uid = urlsafe_base64_encode(
-                    force_bytes(verification_data)
-                )
+            if "email" in changes:
                 send_mail.delay(
-                    to=email,
-                    user_name=instance.name,
-                    template=ONBOARD_EMAIL_TEMPLATE,
-                    subject=WELCOME_MAIL_SUBJECT,
-                    login_url=settings.LOGIN_URL,
-                    site_domain=settings.SITE_DOMAIN,
-                    verification_link=f"/verification/{verification_data_uid}/",
+                    to=current_email,
+                    template=CHANGE_EMAIL_NOTIFICATION_TEMPLATE,
+                    subject=f"{instance.name} - Your Email is updated",
+                    name=instance.name,
+                    new_email=instance.email,
                 )
 
         return instance
@@ -985,7 +977,7 @@ class InternalClientUserSerializer(serializers.ModelSerializer):
                 send_mail.delay(
                     to=current_email,
                     subject=f"{instance.name}, Your Email Is Updated",
-                    template="user_email_changed_confirmation_notification.html",
+                    template=CHANGE_EMAIL_NOTIFICATION_TEMPLATE,
                     name=instance.name,
                     new_email=instance.user.email,
                 )
@@ -1169,7 +1161,7 @@ class HDIPUsersSerializer(serializers.ModelSerializer):
                 send_mail.delay(
                     to=current_email,
                     subject=f"{instance.name}, Your Email Is Updated",
-                    template="user_email_changed_confirmation_notification.html",
+                    template=CHANGE_EMAIL_NOTIFICATION_TEMPLATE,
                     name=instance.name,
                     new_email=instance.user.email,
                 )
