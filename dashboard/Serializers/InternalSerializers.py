@@ -334,6 +334,9 @@ class InternalClientSerializer(serializers.ModelSerializer):
                 user.is_active = False
                 user.email += suffix
                 user.phone = str(user.phone) + suffix
+                if hasattr(user, "clientuser"):
+                    user.clientuser.archived = True
+                    user.clientuser.save()
                 user.save()
             contact.archived = True
             contact.email += suffix
