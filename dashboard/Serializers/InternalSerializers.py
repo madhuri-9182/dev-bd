@@ -974,7 +974,8 @@ class InternalClientUserSerializer(serializers.ModelSerializer):
                     poc.phone = new_phone
 
             instance.user.save()
-            poc.save()
+            if poc:
+                poc.save()
 
             instance = super().update(instance, validated_data)
             if new_email and current_email != new_email:
