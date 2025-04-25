@@ -948,24 +948,33 @@ class InternalClientUserSerializer(serializers.ModelSerializer):
         current_email = instance.user.email
 
         with transaction.atomic():
+
+            internal_client = instance.organization.internal_client
+            poc = ClientPointOfContact.objects.filter(
+                client=internal_client, email=current_email
+            ).first()
+
             if new_role:
                 instance.user.role = new_role
 
             if "name" in validated_data:
                 instance.user.profile.name = validated_data["name"]
                 instance.user.profile.save()
-
-                internal_client = instance.organization.internal_client
-                ClientPointOfContact.objects.filter(
-                    client=internal_client, email=current_email
-                ).update(name=validated_data["name"], email=new_email, phone=new_phone)
+                if poc:
+                    poc.name = validated_data["name"]
 
             if new_email:
                 instance.user.email = new_email
+                if poc:
+                    poc.email = new_email
+
             if new_phone:
                 instance.user.phone = new_phone
+                if poc:
+                    poc.phone = new_phone
 
             instance.user.save()
+            poc.save()
 
             instance = super().update(instance, validated_data)
             if new_email and current_email != new_email:
