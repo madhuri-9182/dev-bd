@@ -531,6 +531,7 @@ class InterviewerRequestResponseView(APIView):
                             "interviewer": interviewer_availability.interviewer.name,
                             "email": candidate.email,
                             "template": "interview_confirmation_candidate_notification.html",
+                            "recruiter_email": candidate.added_by.user.email,
                             "subject": f"Interview Scheduled - {candidate.designation.get_name_display()}",
                             "meeting_link": meeting_link,
                             "from_email": INTERVIEW_EMAIL,

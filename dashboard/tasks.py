@@ -80,8 +80,14 @@ def send_email_to_multiple_recipients(
 
     with get_connection() as connection:
         for context in contexts:
+            replies_to = [reply_to]
             email_address = context.get("email")
             from_email = context.get("from_email")
+            recruiter_email = context.get("recruiter_email")
+
+            if recruiter_email:
+                replies_to.append(recruiter_email)
+
             if context.get("subject"):
                 subject = context["subject"]
 
@@ -98,7 +104,7 @@ def send_email_to_multiple_recipients(
                 body="This is an HTML email. Please view it in an HTML-compatible email client.",
                 from_email=from_email if from_email else CONTACT_EMAIL,
                 to=[email_address],
-                reply_to=[reply_to],
+                reply_to=replies_to,
                 bcc=[bcc],
                 connection=connection,
             )
