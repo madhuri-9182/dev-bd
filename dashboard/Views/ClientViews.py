@@ -44,7 +44,7 @@ from ..serializer import (
 )
 from ..permissions import CanDeleteUpdateUser, UserRoleDeleteUpdateClientData
 from externals.parser.resume_parser import ResumerParser
-from externals.parser.resumeparser2 import process_resume
+from externals.parser.resumeparser2 import process_resumes
 from externals.analytics import get_candidate_analytics
 from core.permissions import (
     IsClientAdmin,
@@ -526,8 +526,7 @@ class JobView(APIView, LimitOffsetPagination):
 
 
 @extend_schema(tags=["Client"])
-class ResumeParserView(APIView, LimitOffsetPagination):
-    serializer_class = None
+class ResumeParserView(APIView):
     permission_classes = [
         IsAuthenticated,
         IsClientAdmin | IsClientUser | IsClientOwner | IsAgency | IsSuperAdmin,
@@ -543,51 +542,61 @@ class ResumeParserView(APIView, LimitOffsetPagination):
                     "message": "Invalid request.",
                     "error": {
                         "resume": [
-                            "This field is required. It supports multiple resume files in PDF and DOCX formats."
+                            "This field is required. Up to 15 PDF or DOCX resumes are supported."
                         ]
                     },
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        for file in resume_files:
-            errors = validate_attachment("resume", file, ["pdf", "docx"], 5)
-            if errors:
-                return Response(
-                    {
-                        "status": "failed",
-                        "message": "Invalid File Format",
-                        "error": errors,
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+        if len(resume_files) > 15:
+            return Response(
+                {"status": "failed", "message": "You can upload up to 15 files only."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        temp_dir = tempfile.mkdtemp()  # Create a persistent temp directory
-        parsed_resumes = []
+        errors = {}
+        for f in resume_files:
+            err = validate_attachment("resume", f, ["pdf", "docx", "doc"], 5)
+            if err:
+                errors[f.name] = err
+        if errors:
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "Some files are invalid.",
+                    "error": errors,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        temp_dir = tempfile.mkdtemp()
+        temp_paths = []
 
         try:
-            for file in resume_files:
-                temp_path = os.path.join(temp_dir, file.name)
+            for f in resume_files:
+                temp_path = os.path.join(temp_dir, f.name)
                 with open(temp_path, "wb") as temp_file:
-                    for chunk in file.chunks():
+                    for chunk in f.chunks():
                         temp_file.write(chunk)
+                temp_paths.append(temp_path)
 
-                # Pass file paths to processing function
-                parsed_data = process_resume(temp_path)
-                if parsed_data:
-                    parsed_resumes.append(parsed_data)
-
+            parsed_data = process_resumes(temp_paths)
             return Response(
                 {
                     "status": "success",
-                    "message": "Resume parsed successfully.",
-                    "data": parsed_resumes,
+                    "message": "Resumes parsed successfully.",
+                    "data": parsed_data,
                 },
                 status=status.HTTP_200_OK,
             )
+
         finally:
-            for file in os.listdir(temp_dir):
-                os.remove(os.path.join(temp_dir, file))
+            for path in temp_paths:
+                try:
+                    os.remove(path)
+                except Exception:
+                    pass
             os.rmdir(temp_dir)
 
 
