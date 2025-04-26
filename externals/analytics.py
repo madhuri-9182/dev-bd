@@ -25,27 +25,26 @@ def get_candidate_analytics(queryset):
     )
 
     # Group selected and rejected by current company
-    selected_by_company = (
+    candidate_by_companies = (
         queryset.filter(final_selection_status__in=["SLD", "RJD"])
         .values("company")
-        .annotate(count=Count("id"))
-    )
-    rejected_by_company = (
-        queryset.filter(final_selection_status__in=["SLD", "RJD"])
-        .values("company")
-        .annotate(count=Count("id"))
+        .annotate(total_count=Count("id"))
+        .annotate(
+            selected_count=Count("id", filter=Q(final_selection_status="SLD")),
+            rejected_count=Count("id", filter=Q(final_selection_status="RJD")),
+        )
     )
 
     selected_dict = {
-        entry["company"]: int((entry["count"] / analytics["total_candidates"]) * 100)
-        for entry in selected_by_company
-        if entry["company"] and analytics["total_candidates"]
+        entry["company"]: int((entry["selected_count"] / entry["total_count"]) * 100)
+        for entry in candidate_by_companies
+        if entry["company"] and entry["total_count"]
     }
 
     rejected_dict = {
-        entry["company"]: int((entry["count"] / analytics["total_candidates"]) * 100)
-        for entry in rejected_by_company
-        if entry["company"] and analytics["total_candidates"]
+        entry["company"]: int((entry["rejected_count"] / entry["total_count"]) * 100)
+        for entry in candidate_by_companies
+        if entry["company"] and entry["total_count"]
     }
 
     # Ratios
