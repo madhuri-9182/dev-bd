@@ -26,12 +26,12 @@ def get_candidate_analytics(queryset):
 
     # Group selected and rejected by current company
     selected_by_company = (
-        queryset.filter(final_selection_status="SLD")
+        queryset.filter(final_selection_status__in=["SLD", "RJD"])
         .values("company")
         .annotate(count=Count("id"))
     )
     rejected_by_company = (
-        queryset.filter(final_selection_status="RJD")
+        queryset.filter(final_selection_status__in=["SLD", "RJD"])
         .values("company")
         .annotate(count=Count("id"))
     )
