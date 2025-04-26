@@ -40,15 +40,15 @@ def analyze_transcription_and_generate_feedback(transcription):
         2. Categorize each question under a generalized skill category (e.g., Python, AI, JavaScript, Machine Learning, etc.).
 
         3. For each skill category:
-            - Summarize the candidate's performance concisely (word limit: 900 words).
+            - Summarize the candidate's performance concisely (word limit: 900 characters).
 
         4. For each extracted question-answer pair:
             - Include start and end timestamps in seconds (relative to interview start).
             - Group questions by skill area into a single block.
 
         5. Provide an overall evaluation:
-            - Candidate strengths (word limit: 400 words).
-            - Points of improvement (word limit: 400 words).
+            - Candidate strengths (word limit: 400 characters).
+            - Points of improvement (word limit: 400 characters).
 
         6. Additionally, rate the candidate on:
             - Communication: Choose one — poor, average, good, excellent.
@@ -58,11 +58,11 @@ def analyze_transcription_and_generate_feedback(transcription):
         {{
             "skill_based_performance": {{
                 "skill_name (e.g., Python, JavaScript)": {{
-                    "summary": "Concise skill-specific feedback (up to 900 words).",
+                    "summary": "Concise skill-specific feedback (up to 900 characters).",
                     "questions": [
                         {{
-                            "que": "Meaningful interviewer's question (up to 900 words).",
-                            "ans": "Meaningful candidate's answer (up to 5000 words).",
+                            "que": "Meaningful interviewer's question (up to 900 characters).",
+                            "ans": "Meaningful candidate's answer (up to 4000 characters).",
                             "start_time": "Start time in seconds.",
                             "end_time": "End time in seconds."
                         }}
@@ -75,8 +75,8 @@ def analyze_transcription_and_generate_feedback(transcription):
                 "Communication": "poor/average/good/excellent",
                 "Attitude": "poor/average/good/excellent"
             }},
-            "strength": "Overall strengths (if available, up to 400 words).",
-            "improvement_points": "Improvement areas (if available, up to 400 words)."
+            "strength": "Overall strengths (if available, up to 400 characters).",
+            "improvement_points": "Improvement areas (if available, up to 400 characters)."
         }}
 
         Important rules:
