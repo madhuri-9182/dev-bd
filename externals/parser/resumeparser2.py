@@ -123,7 +123,7 @@ def calculate_experience(experiences):
 
     years = total_months // 12
     months = total_months % 12
-    return {"years": years, "months": months}
+    return {"year": years, "month": months}
 
 
 def normalize_phone(number):
