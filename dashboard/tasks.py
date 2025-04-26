@@ -333,13 +333,15 @@ def download_feedback_pdf(self, interview_uid):
     )
     if response.status_code == 200:
         candidate = interview_feedback.interview.candidate
-        save_path = f"/tmp/{candidate.name}-{candidate.id}-Feedback.pdf"
+        designation = candidate.designation.get_name_display()
+        save_path = f"/tmp/{candidate.name}_{designation}_Feedback_Round 1_{timezone.now().strftime('%Y%m%d-%H%M%S')}.pdf"
         with open(save_path, "wb") as f:
             for chunk in response.iter_content(chunk_size=8192):
                 f.write(chunk)
         with open(save_path, "rb") as f:
             interview_feedback.pdf_file.save(
-                f"{candidate.name}-{candidate.id}-Feedback.pdf", f
+                f"{candidate.name}_{designation}_Feedback_Round 1_{timezone.now().strftime('%Y%m%d-%H%M%S')}.pdf",
+                f,
             )
         if os.path.exists(save_path):
             os.remove(save_path)

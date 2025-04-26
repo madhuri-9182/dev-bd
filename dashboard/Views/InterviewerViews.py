@@ -513,6 +513,8 @@ class InterviewerRequestResponseView(APIView):
                         candidate.email,
                         schedule_time,
                         schedule_time + datetime.timedelta(hours=1),
+                        candidate_name=candidate.name,
+                        designation_name=candidate.designation.get_name_display(),
                     )
 
                     interview.scheduled_service_account_event_id = event_id

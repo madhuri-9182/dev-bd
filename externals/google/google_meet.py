@@ -19,10 +19,12 @@ drive_service = build("drive", "v3", credentials=credentials)
 
 
 def create_meet_and_calendar_invite(
-    interviewer_email, candidate_email, start_time, end_time
+    interviewer_email, candidate_email, start_time, end_time, **kwargs
 ):
+    candidate_name = kwargs.get("candidate_name")
+    designation_name = kwargs.get("designation_name")
     event = {
-        "summary": f"Interview of {candidate_email} with {interviewer_email}",
+        "summary": f"{candidate_name}_{designation_name}_Technical_Round",
         "description": """ 
         - Please join the Interview at least 3 mins before.  
         - Please keep the video on during the entire interview.  
