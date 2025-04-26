@@ -28,49 +28,66 @@ def analyze_transcription_and_generate_feedback(transcription):
     Group questions by skills.
     """
     prompt = f"""
-    Below is a transcription of an interview. Perform the following tasks:
-    1. Extract the interviewer's questions and the candidate's answers.
-    2. Categorize each question with generalize skill (e.g., Python, AI, JavaScript, ML etc.).
-    3. For each skill pair generate feedback including:
-       - A summary of the candidate's performance.
-       - A score (0-100 scale) for the skill.
-    4. Include the start and end timestamps for each skill section in seconds.
-    5. Group questions with the same skill into a single block.
-    6. Add overall candidate strengths and point of imporvements.
+        Below is a transcription of an interview. Perform the following tasks:
 
-    Transcription:
-    {transcription}
+        1. Extract the interviewer's questions and the candidate's answers:
+            - Ignore filler words like "okay," "hmm," "uh," etc., unless part of a meaningful question/answer.
+            - Only include complete sentences or meaningful phrases.
+            - Skip any exchange where:
+                - The question is filler (e.g., "Okay", "Hmm", "Got it").
+                - The answer is too short, incomplete, or irrelevant (e.g., "Yes", "No", "Maybe", "I think so").
 
-    Return the data in STRICT JSON format as follows:
-    {{
-        "skill_based_performance": {{
-            "skill_name eg.(generalize skills such as python, Javascript, etc.)": {{
-                "summary": "Overall performance summary for current skill",
-                "questions": [
-                    {{
-                        "que": "Interviewer's question?",
-                        "ans": "Candidate's answer",
-                        "start_time": "Start time of the question in seconds (relative to video start)",
-                        "end_time": "End time of the answer in seconds (relative to video start)"
-                    }}
-                    ...
-                ]
-            }}
-            ...
-        }},
-        "skill_evaluation": {{
-            "Communication": "Communication score according to interview performance, can be poor, average, good or excellent",
-            "Attitude": "Attitude score according to interview performance, can be poor, average, good or excellent"
-        }},
-        "strength": "overall candidate strengths",
-        "improvement_points": "overall candidate improvement points",
-    }}
+        2. Categorize each question under a generalized skill category (e.g., Python, AI, JavaScript, Machine Learning, etc.).
 
-    IMPORTANT:
-    - Return ONLY valid JSON. Do not include any additional text or explanations.
-    - Ensure the JSON is properly formatted and can be parsed by a JSON parser.
-    - Ensure all timestamps are relative to the start of the video.
-    - Try to summarize the feedback for each question-answer pair, it don't have to be same word to word as in the transcript but must conatain the main points not too short or too long and write question in understandable way even though some has not attended the interview they must able to understand.
+        3. For each skill category:
+            - Summarize the candidate's performance concisely (word limit: 900 words).
+
+        4. For each extracted question-answer pair:
+            - Include start and end timestamps in seconds (relative to interview start).
+            - Group questions by skill area into a single block.
+
+        5. Provide an overall evaluation:
+            - Candidate strengths (word limit: 400 words).
+            - Points of improvement (word limit: 400 words).
+
+        6. Additionally, rate the candidate on:
+            - Communication: Choose one — poor, average, good, excellent.
+            - Attitude: Choose one — poor, average, good, excellent.
+
+        Output STRICTLY in the following JSON structure:
+        {{
+            "skill_based_performance": {{
+                "skill_name (e.g., Python, JavaScript)": {{
+                    "summary": "Concise skill-specific feedback (up to 900 words).",
+                    "questions": [
+                        {{
+                            "que": "Meaningful interviewer's question (up to 900 words).",
+                            "ans": "Meaningful candidate's answer (up to 5000 words).",
+                            "start_time": "Start time in seconds.",
+                            "end_time": "End time in seconds."
+                        }}
+                        ...
+                    ]
+                }},
+                ...
+            }},
+            "skill_evaluation": {{
+                "Communication": "poor/average/good/excellent",
+                "Attitude": "poor/average/good/excellent"
+            }},
+            "strength": "Overall strengths (if available, up to 400 words).",
+            "improvement_points": "Improvement areas (if available, up to 400 words)."
+        }}
+
+        Important rules:
+        - Return ONLY valid JSON. No extra text, titles, explanations, or notes outside JSON.
+        - Ensure JSON is properly formatted, parsable, and complete.
+        - Summarize feedback clearly but concisely.
+        - Remove filler words and incomplete exchanges.
+        - All timestamps must be relative to the start of the interview.
+
+        Transcription:
+        {transcription}
     """
 
     try:
