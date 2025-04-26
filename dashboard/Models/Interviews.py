@@ -181,8 +181,8 @@ class InterviewFeedback(CreateUpdateDateTimeAndArchivedField):
     )
     skill_based_performance = models.JSONField(default=dict)
     skill_evaluation = models.JSONField(default=dict)
-    strength = models.CharField(max_length=500, null=True)
-    improvement_points = models.CharField(max_length=500, null=True)
+    strength = models.CharField(max_length=800, null=True)
+    improvement_points = models.CharField(max_length=800, null=True)
     overall_remark = models.CharField(
         max_length=10,
         null=True,
