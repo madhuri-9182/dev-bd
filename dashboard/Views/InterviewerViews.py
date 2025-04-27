@@ -59,65 +59,60 @@ class InterviewerAvailabilityView(APIView, LimitOffsetPagination):
         try:
             oauth_obj = OAuthToken.objects.get(user=request.user)
         except OAuthToken.DoesNotExist:
-            return Response(
-                {
-                    "status": "failed",
-                    "message": "Invalid Request. Please give the calendar permission.",
-                },
-                status=status.HTTP_404_NOT_FOUND,
-            )
+            oauth_obj = None
 
         if serializer.is_valid():
             with transaction.atomic():
                 try:
                     interviewer = serializer.save(interviewer=request.user.interviewer)
 
-                    combine_start_datetime = datetime.datetime.combine(
-                        interviewer.date, interviewer.start_time
-                    )
-                    combine_end_datetime = datetime.datetime.combine(
-                        interviewer.date, interviewer.end_time
-                    )
+                    if oauth_obj:
+                        combine_start_datetime = datetime.datetime.combine(
+                            interviewer.date, interviewer.start_time
+                        )
+                        combine_end_datetime = datetime.datetime.combine(
+                            interviewer.date, interviewer.end_time
+                        )
 
-                    iso_format_start_time = combine_start_datetime.isoformat()
-                    iso_format_end_time = combine_end_datetime.isoformat()
+                        iso_format_start_time = combine_start_datetime.isoformat()
+                        iso_format_end_time = combine_end_datetime.isoformat()
 
-                    recurrence = serializer.validated_data.get("recurrence")
-                    calender = GoogleCalendar()
-                    event_details = {
-                        "summary": "Interview Available Time",
-                        # "location": "123 Main St, Virtual",
-                        # "description": "Discussing project milestones and deadlines.",
-                        "start": {
-                            "dateTime": iso_format_start_time,
-                            "timeZone": "Asia/Kolkata",
-                        },
-                        "end": {
-                            "dateTime": iso_format_end_time,
-                            "timeZone": "Asia/Kolkata",
-                        },
-                        "reminders": {
-                            "useDefault": False,
-                            "overrides": [],
-                        },
-                        # "attendees": [
-                        #     {"email": "attendee1@example.com"},
-                        #     {"email": "attendee2@example.com"},
-                        # ],
-                    }
-                    if recurrence:
-                        event_details["recurrence"] = [
-                            calender.generate_rrule_string(recurrence)
-                        ]
+                        recurrence = serializer.validated_data.get("recurrence")
+                        calender = GoogleCalendar()
+                        event_details = {
+                            "summary": "Interview Available Time",
+                            # "location": "123 Main St, Virtual",
+                            # "description": "Discussing project milestones and deadlines.",
+                            "start": {
+                                "dateTime": iso_format_start_time,
+                                "timeZone": "Asia/Kolkata",
+                            },
+                            "end": {
+                                "dateTime": iso_format_end_time,
+                                "timeZone": "Asia/Kolkata",
+                            },
+                            "reminders": {
+                                "useDefault": False,
+                                "overrides": [],
+                            },
+                            # "attendees": [
+                            #     {"email": "attendee1@example.com"},
+                            #     {"email": "attendee2@example.com"},
+                            # ],
+                        }
+                        if recurrence:
+                            event_details["recurrence"] = [
+                                calender.generate_rrule_string(recurrence)
+                            ]
 
-                    event = calender.create_event(
-                        access_token=oauth_obj.access_token,
-                        refresh_token=oauth_obj.refresh_token,
-                        user=request.user,
-                        event_details=event_details,
-                    )
-                    interviewer.google_calendar_id = event.pop("id", "")
-                    interviewer.save()
+                        event = calender.create_event(
+                            access_token=oauth_obj.access_token,
+                            refresh_token=oauth_obj.refresh_token,
+                            user=request.user,
+                            event_details=event_details,
+                        )
+                        interviewer.google_calendar_id = event.pop("id", "")
+                        interviewer.save()
 
                 except Exception as e:
                     transaction.set_rollback(True)
