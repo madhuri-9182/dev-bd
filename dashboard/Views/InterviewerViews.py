@@ -38,6 +38,7 @@ from core.permissions import (
 from core.models import OAuthToken, Role
 from externals.google.google_calendar import GoogleCalendar
 from externals.google.google_meet import create_meet_and_calendar_invite
+from hiringdogbackend.utils import get_boolean
 
 
 CONTACT_EMAIL = settings.EMAIL_HOST_USER if settings.DEBUG else settings.CONTACT_EMAIL
@@ -52,6 +53,7 @@ class InterviewerAvailabilityView(APIView, LimitOffsetPagination):
     permission_classes = [IsAuthenticated, IsInterviewer]
 
     def post(self, request):
+        sync = get_boolean(request.query_params, "sync")
         serializer = self.serializer_class(
             data=request.data, context={"interviewer_user": request.user.interviewer}
         )
@@ -66,7 +68,7 @@ class InterviewerAvailabilityView(APIView, LimitOffsetPagination):
                 try:
                     interviewer = serializer.save(interviewer=request.user.interviewer)
 
-                    if oauth_obj:
+                    if oauth_obj and sync:
                         combine_start_datetime = datetime.datetime.combine(
                             interviewer.date, interviewer.start_time
                         )
@@ -130,7 +132,7 @@ class InterviewerAvailabilityView(APIView, LimitOffsetPagination):
                     "status": "success",
                     "message": "Interviewer Availability added successfully.",
                     "data": serializer.data,
-                    "event_details": event,
+                    "event_details": event if oauth_obj and sync else None,
                 },
                 status=status.HTTP_201_CREATED,
             )
