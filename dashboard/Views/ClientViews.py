@@ -41,6 +41,7 @@ from ..serializer import (
     FinanceSerializer,
     AnalyticsQuerySerializer,
     FeedbackPDFVideoSerializer,
+    FinanceSerializerForInterviewer,
 )
 from ..permissions import CanDeleteUpdateUser, UserRoleDeleteUpdateClientData
 from externals.parser.resume_parser import ResumerParser
@@ -1918,7 +1919,10 @@ class FinanceView(APIView, LimitOffsetPagination):
             )
 
         paginated_queryset = self.paginate_queryset(finance_qs, request)
-        serializer = self.serializer_class(paginated_queryset, many=True)
+        if request.user.role == Role.INTERVIEWER:
+            serializer = FinanceSerializerForInterviewer(paginated_queryset, many=True)
+        else:
+            serializer = self.serializer_class(paginated_queryset, many=True)
         paginated_data = self.get_paginated_response(serializer.data)
         response_data = {
             "status": "success",

@@ -10,6 +10,7 @@ from .ClientSerializers import (
     FinanceSerializer,
     AnalyticsQuerySerializer,
     FeedbackPDFVideoSerializer,
+    FinanceSerializerForInterviewer,
 )
 from .InternalSerializers import (
     ClientPointOfContactSerializer,

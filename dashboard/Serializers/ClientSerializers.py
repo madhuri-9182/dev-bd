@@ -1008,6 +1008,15 @@ class FinanceSerializer(serializers.ModelSerializer):
         fields = ("candidate", "scheduled_time", "client_amount")
 
 
+class FinanceSerializerForInterviewer(serializers.ModelSerializer):
+    candidate = FinanceCandidateSerializer(read_only=True)
+    scheduled_time = serializers.DateTimeField(format="%d/%m/%Y %H:%M:%S")
+
+    class Meta:
+        model = Interview
+        fields = ("candidate", "scheduled_time", "interviewer_amount")
+
+
 class AnalyticsQuerySerializer(serializers.Serializer):
     from_date = serializers.DateField(required=False, input_formats=["%d/%m/%Y"])
     to_date = serializers.DateField(required=False, input_formats=["%d/%m/%Y"])

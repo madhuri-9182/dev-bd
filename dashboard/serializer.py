@@ -26,4 +26,5 @@ from .Serializers import (
     FinanceSerializer,
     AnalyticsQuerySerializer,
     FeedbackPDFVideoSerializer,
+    FinanceSerializerForInterviewer,
 )
