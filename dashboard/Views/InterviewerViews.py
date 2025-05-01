@@ -193,10 +193,14 @@ class InterviewerReqeustView(APIView):
                 # rescheduling when candidate is scheduled already to an interviewer
                 if candidate.status == "CSCH":
                     candidate.status = "NSCH"
-                    interview_obj = candidate.interviews.last()
-                    interview_obj.status = "RSCH"
+                    interview_obj = (
+                        Interview.objects.select_for_update()
+                        .filter(candidate=candidate)
+                        .order_by("-id")
+                        .first()
+                    )
+                    interview_obj.status = "RESCH"
                     scheduled_time = interview_obj.scheduled_time
-                    interview_obj.scheduled_time = None
                     interviewer = interview_obj.interviewer
                     if hasattr(interview_obj, "availability"):
                         interview_obj.availability.booked_by = None
@@ -321,9 +325,11 @@ class InterviewerRequestResponseView(APIView):
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 
-                interviewer_availability = InterviewerAvailability.objects.filter(
-                    pk=interviewer_availability_id
-                ).first()
+                interviewer_availability = (
+                    InterviewerAvailability.objects.select_for_update()
+                    .filter(pk=interviewer_availability_id)
+                    .first()
+                )
                 candidate = (
                     Candidate.objects.select_for_update()
                     .filter(pk=candidate_id)
@@ -414,9 +420,10 @@ class InterviewerRequestResponseView(APIView):
                 if action == "accept":
                     try:
                         interview_obj = (
-                            candidate.interviews.last()
-                            if hasattr(candidate, "interviews")
-                            else None
+                            Interview.objects.select_for_update()
+                            .filter(candidate=candidate)
+                            .order_by("-id")
+                            .first()
                         )
 
                         interview = Interview.objects.create(
