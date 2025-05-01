@@ -19,42 +19,53 @@ from .models import (
     BillingRecord,
 )
 
+
 @admin.register(Interview)
 class InterviewAdmin(admin.ModelAdmin):
     list_display = (
-        'id',
-        'get_candidate_name',
-        'get_interviewer_name',
-        'client_amount',
-        'interviewer_amount',
-        'get_organization_name',
-        'created_at',
+        "id",
+        "get_candidate_name",
+        "get_interviewer_name",
+        "client_amount",
+        "interviewer_amount",
+        "get_organization_name",
+        "created_at",
         "scheduled_time",
         "status",
     )
-    list_filter = ('interviewer__name', 'candidate__organization__internal_client__name')
-    search_fields = ('candidate__name', 'interviewer__name', 'candidate__organization__internal_client__name')
+    list_filter = (
+        "interviewer__name",
+        "candidate__organization__internal_client__name",
+    )
+    search_fields = (
+        "candidate__name",
+        "interviewer__name",
+        "candidate__organization__internal_client__name",
+    )
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         return qs.select_related(
-            'candidate',
-            'candidate__organization',
-            'candidate__organization__internal_client',
-            'interviewer'
+            "candidate",
+            "candidate__organization",
+            "candidate__organization__internal_client",
+            "interviewer",
         )
 
     def get_candidate_name(self, obj):
-        return obj.candidate.name if hasattr(obj.candidate, 'name') else None
-    get_candidate_name.short_description = 'Candidate'
+        return obj.candidate.name if hasattr(obj.candidate, "name") else None
+
+    get_candidate_name.short_description = "Candidate"
 
     def get_interviewer_name(self, obj):
-        return obj.interviewer.name if hasattr(obj.interviewer, 'name') else None
-    get_interviewer_name.short_description = 'Interviewer'
+        return obj.interviewer.name if hasattr(obj.interviewer, "name") else None
+
+    get_interviewer_name.short_description = "Interviewer"
 
     def get_organization_name(self, obj):
         return obj.candidate.organization.internal_client.name
-    get_organization_name.short_description = 'Organization'
+
+    get_organization_name.short_description = "Organization"
 
 
 @admin.register(InternalInterviewer)
@@ -128,44 +139,50 @@ admin.site.register(InterviewerAvailability)
 @admin.register(InterviewFeedback)
 class InterviewFeedbackAdmin(admin.ModelAdmin):
     list_display = (
-        'id',
-        'get_interview_name',
-        'overall_remark',
-        'overall_score',
-        'is_submitted'
+        "id",
+        "get_interview_name",
+        "overall_remark",
+        "overall_score",
+        "is_submitted",
     )
-    list_filter = ('is_submitted',)
-    search_fields = ('interview__candidate__name', 'interview__interviewer__name')
-    
+    list_filter = ("is_submitted",)
+    search_fields = ("interview__candidate__name", "interview__interviewer__name")
+
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        return qs.select_related('interview', 'interview__candidate', 'interview__interviewer')
+        return qs.select_related(
+            "interview", "interview__candidate", "interview__interviewer"
+        )
 
     def get_interview_name(self, obj):
         return f"{obj.interview.candidate.name} - {obj.interview.interviewer.name}"
+
     get_interview_name.short_description = "Interview"
 
 
 @admin.register(BillingRecord)
 class BillingRecordAdmin(admin.ModelAdmin):
     list_display = (
-        'id',
-        'amount_due',
+        "id",
+        "amount_due",
         "due_date",
-        'get_client_name',
-        'get_interviewer_name',
+        "get_client_name",
+        "get_interviewer_name",
+        "created_at",
     )
-    list_filter = ('client', 'interviewer')
-    search_fields = ('client__name', 'interviewer__name')
+    list_filter = ("client", "interviewer")
+    search_fields = ("client__name", "interviewer__name")
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        return qs.select_related('client', 'interviewer')
+        return qs.select_related("client", "interviewer")
 
     def get_client_name(self, obj):
-        return obj.client.name if hasattr(obj.client, 'name') else None
-    get_client_name.short_description = 'Client'
+        return obj.client.name if hasattr(obj.client, "name") else None
+
+    get_client_name.short_description = "Client"
 
     def get_interviewer_name(self, obj):
-        return obj.interviewer.name if hasattr(obj.interviewer, 'name') else None
-    get_interviewer_name.short_description = 'Interviewer'
+        return obj.interviewer.name if hasattr(obj.interviewer, "name") else None
+
+    get_interviewer_name.short_description = "Interviewer"

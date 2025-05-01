@@ -82,10 +82,7 @@ class Interview(CreateUpdateDateTimeAndArchivedField):
         unique_together = ("interviewer", "scheduled_time")
 
     def save(self, *args, **kwargs):
-        if transaction.get_autocommit():
-            with transaction.atomic():
-                self._perform_save(*args, **kwargs)
-        else:
+        with transaction.atomic():
             self._perform_save(*args, **kwargs)
 
     def _perform_save(self, *args, **kwargs):
