@@ -126,16 +126,29 @@ def validate_json(
     return errors
 
 
-def add_interviewer_prices():
+def create_or_update_interviewer_prices():
     from dashboard.models import InterviewerPricing
 
     prices = (
-        ("0-4", "1200"),
-        ("4-6", "1600"),
-        ("6-8", "2000"),
-        ("8-10", "2500"),
-        ("10+", "2800"),
+        ("0-4", 1400),
+        ("4-7", 1800),
+        ("7-10", 2200),
+        ("10+", 2500),
     )
-    InterviewerPricing.objects.bulk_create(
-        [InterviewerPricing(experience_level=year, price=rate) for year, rate in prices]
+
+    existing_pricings = set(
+        InterviewerPricing.objects.values_list("experience_level", flat=True)
     )
+    print("Existing pricings:", existing_pricings)
+
+    for year, rate in prices:
+        obj, created = InterviewerPricing.objects.update_or_create(
+            experience_level=year,
+            defaults={"price": rate},
+        )
+        print(f"Created: {created}, {obj}")
+
+    for pricing in InterviewerPricing.objects.all():
+        if pricing.experience_level not in dict(prices):
+            pricing.delete()
+            print(f"Deleted: {pricing}")

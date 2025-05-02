@@ -199,15 +199,13 @@ class Agreement(CreateUpdateDateTimeAndArchivedField):
 
     @classmethod
     def get_years_of_experience(cls, year, month):
-        if month > 5:
-            year += 1
-        if year < 4:
+        if year < 4 or (year == 4 and month == 0):
             return "0-4"
-        elif year < 6:
+        elif year < 6 or (year == 6 and month == 0):
             return "4-6"
-        elif year < 8:
+        elif year < 8 or (year == 8 and month == 0):
             return "6-8"
-        elif year < 10:
+        elif year < 10 or (year == 10 and month == 0):
             return "8-10"
         else:
             return "10+"
@@ -219,9 +217,8 @@ class InterviewerPricing(CreateUpdateDateTimeAndArchivedField):
 
     EXPERIENCE_LEVEL_CHOICES = [
         ("0-4", "0 - 4 Years"),
-        ("4-6", "4 - 6 Years"),
-        ("6-8", "6 - 8 Years"),
-        ("8-10", "8 - 10 Years"),
+        ("4-7", "4 - 7 Years"),
+        ("7-10", "7 - 10 Years"),
         ("10+", "10+ Years"),
     ]
 
@@ -232,3 +229,14 @@ class InterviewerPricing(CreateUpdateDateTimeAndArchivedField):
 
     def __str__(self):
         return f"{self.experience_level} - ₹{self.price}"
+
+    @classmethod
+    def get_year_of_experience(cls, year, month):
+        if year < 4 or (year == 4 and month == 0):
+            return "0-4"
+        elif year < 7 or (year == 7 and month == 0):
+            return "4-7"
+        elif year < 10 or (year == 10 and month == 0):
+            return "7-10"
+        else:
+            return "10+"

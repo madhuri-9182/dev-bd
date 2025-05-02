@@ -237,11 +237,11 @@ class InternalClientSerializer(serializers.ModelSerializer):
                     )
 
                     agreement_rates = [
-                        {"years_of_experience": "0-4", "rate": 2800},
-                        {"years_of_experience": "4-6", "rate": 3500},
-                        {"years_of_experience": "6-8", "rate": 4500},
-                        {"years_of_experience": "8-10", "rate": 6000},
-                        {"years_of_experience": "10+", "rate": 6500},
+                        {"years_of_experience": "0-4", "rate": 2300},
+                        {"years_of_experience": "4-6", "rate": 2800},
+                        {"years_of_experience": "6-8", "rate": 3300},
+                        {"years_of_experience": "8-10", "rate": 3500},
+                        {"years_of_experience": "10+", "rate": 4000},
                     ]
 
                     agreements = [

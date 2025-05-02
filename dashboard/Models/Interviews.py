@@ -77,6 +77,7 @@ class Interview(CreateUpdateDateTimeAndArchivedField):
     client_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     interviewer_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     meeting_link = models.URLField(null=True, blank=True)
+    is_billing_completed = models.BooleanField(default=False)
 
     class Meta:
         unique_together = ("interviewer", "scheduled_time")
@@ -89,11 +90,12 @@ class Interview(CreateUpdateDateTimeAndArchivedField):
         # Save the Interview object after calculating the amounts for Client and Interviewer
         # using the Agreement model and InterviewerPricing model
         candidate = self.candidate
-        years_of_experience = Agreement.get_years_of_experience(
-            candidate.year, candidate.month
-        )
 
         if not self.client_amount:
+            # for client year_of_experience_calculation
+            years_of_experience = Agreement.get_years_of_experience(
+                candidate.year, candidate.month
+            )
             self.client_amount = (
                 Agreement.objects.filter(
                     organization=candidate.organization,
@@ -104,6 +106,10 @@ class Interview(CreateUpdateDateTimeAndArchivedField):
             )
 
         if not self.interviewer_amount:
+            # for interviewer year_of_experience calcuclation
+            years_of_experience = InterviewerPricing.get_year_of_experience(
+                candidate.year, candidate.month
+            )
             self.interviewer_amount = (
                 InterviewerPricing.objects.filter(experience_level=years_of_experience)
                 .first()
@@ -115,56 +121,6 @@ class Interview(CreateUpdateDateTimeAndArchivedField):
         candidate.score = self.score
         candidate.total_score = self.total_score
         candidate.save()
-
-        if hasattr(self, "interview_feedback") and self.interview_feedback.is_submitted:
-            today = timezone.now()
-            first_day_of_month = today.replace(day=1)
-            due_date = today.replace(
-                day=calendar.monthrange(today.year, today.month)[1]
-            ) + dt.timedelta(days=10)
-
-            bill_record = (
-                BillingRecord.objects.filter(
-                    client=self.candidate.organization.internal_client,
-                    created_at__gte=first_day_of_month,
-                    status="PED",
-                )
-                .select_for_update()
-                .first()
-            )  # Lock the row if it exists
-            if not bill_record:
-                BillingRecord.objects.create(
-                    client=self.candidate.organization.internal_client,
-                    record_type="CLB",
-                    amount_due=self.client_amount,
-                    due_date=due_date,
-                    status="PED",
-                )
-            else:
-                bill_record.amount_due += self.client_amount
-                bill_record.save()
-
-            bill_record = (
-                BillingRecord.objects.filter(
-                    interviewer=self.interviewer,
-                    created_at__gte=first_day_of_month,
-                    status="PED",
-                )
-                .select_for_update()
-                .first()
-            )
-
-            if bill_record is None:
-                BillingRecord.objects.create(
-                    interviewer=self.interviewer,
-                    status="PED",
-                    record_type="INP",
-                    amount_due=self.interviewer_amount,
-                    due_date=due_date,
-                )
-            else:
-                bill_record.amount_due += self.interviewer_amount
-                bill_record.save()
 
 
 class InterviewFeedback(CreateUpdateDateTimeAndArchivedField):
@@ -211,9 +167,82 @@ class InterviewFeedback(CreateUpdateDateTimeAndArchivedField):
     )
 
     def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        if self.is_submitted:
-            interview = self.interview
-            interview.status = self.overall_remark
-            interview.score = self.overall_score
-            interview.save(update_fields=["status", "score"])
+        with transaction.atomic():
+            super().save(*args, **kwargs)
+
+            if self.is_submitted and self.interview:
+                interview = self.interview
+                interview.status = self.overall_remark
+                interview.score = self.overall_score
+                interview.save(update_fields=["status", "score"])
+                self.create_or_update_billing_record(interview)
+
+    def create_or_update_billing_record(self, interview):
+        if interview.is_billing_completed:
+            return
+
+        today = timezone.now()
+        billing_month = today.replace(day=1).date()
+        due_date = (
+            today.replace(day=calendar.monthrange(today.year, today.month)[1])
+            + dt.timedelta(days=10)
+        ).date()
+
+        # Get data from interview
+        candidate = interview.candidate
+        interviewer = interview.interviewer
+        client = candidate.organization.internal_client
+        client_amount = interview.client_amount
+        interviewer_amount = interview.interviewer_amount
+
+        # Client Billing
+        client_record = (
+            BillingRecord.objects.select_for_update()
+            .filter(
+                client=client,
+                billing_month=billing_month,
+                status="PED",
+            )
+            .first()
+        )
+
+        if not client_record:
+            BillingRecord.objects.create(
+                client=client,
+                record_type="CLB",
+                amount_due=client_amount,
+                due_date=due_date,
+                billing_month=billing_month,
+                status="PED",
+            )
+        else:
+            client_record.amount_due += client_amount
+            client_record.save()
+
+        # Interviewer Billing
+        interviewer_record = (
+            BillingRecord.objects.select_for_update()
+            .filter(
+                interviewer=interviewer,
+                billing_month=billing_month,
+                status="PED",
+            )
+            .first()
+        )
+
+        if not interviewer_record:
+            BillingRecord.objects.create(
+                interviewer=interviewer,
+                record_type="INP",
+                amount_due=interviewer_amount,
+                due_date=due_date,
+                billing_month=billing_month,
+                status="PED",
+            )
+        else:
+            interviewer_record.amount_due += interviewer_amount
+            interviewer_record.save()
+
+        # Mark billing as done
+        interview.is_billing_completed = True
+        interview.save(update_fields=["is_billing_completed"])

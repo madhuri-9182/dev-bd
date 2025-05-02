@@ -1,4 +1,5 @@
 from django.db import models
+from django.core.exceptions import ValidationError
 from hiringdogbackend.ModelUtils import SoftDelete, CreateUpdateDateTimeAndArchivedField
 from .Internal import InternalClient, InternalInterviewer
 
@@ -20,6 +21,10 @@ class BillingRecord(CreateUpdateDateTimeAndArchivedField):
 
     objects = SoftDelete()
     object_all = models.Manager()
+
+    billing_month = models.DateField(
+        null=True, blank=True, db_index=True, editable=False
+    )  # stores first day of month
 
     record_type = models.CharField(
         max_length=15, choices=RECORD_TYPE_CHOICES, null=True, blank=True
@@ -56,6 +61,16 @@ class BillingRecord(CreateUpdateDateTimeAndArchivedField):
         indexes = [
             models.Index(fields=["record_type", "status"]),
         ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["client", "billing_month"],
+                name="unique_client_billing_per_month",
+            ),
+            models.UniqueConstraint(
+                fields=["interviewer", "billing_month"],
+                name="unique_interviewer_billing_per_month",
+            ),
+        ]
 
     def __str__(self):
         if self.record_type == "CLB":
@@ -64,7 +79,11 @@ class BillingRecord(CreateUpdateDateTimeAndArchivedField):
 
     def save(self, *args, **kwargs):
         if self.record_type == "CLB" and not self.client:
-            raise ValueError("Client is required for client billing records")
+            raise ValidationError("Client is required for client billing records")
         if self.record_type == "INP" and not self.interviewer:
-            raise ValueError("Interviewer is required for interviewer payment records")
+            raise ValidationError(
+                "Interviewer is required for interviewer payment records"
+            )
+        if not self.billing_month:
+            raise ValidationError("Can't save the Billing record without billing month")
         super().save(*args, **kwargs)
