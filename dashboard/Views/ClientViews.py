@@ -1923,8 +1923,10 @@ class FinanceView(APIView, LimitOffsetPagination):
             "status": "success",
             "message": "Finance records retreived successfully.",
         }
-        if request.user.role in [Role.CLIENT_OWNER, Role.INTERVIEWER] and billing_info:
-            response_data["total_amount"] = billing_info.amount_due
+        if request.user.role in [Role.CLIENT_OWNER, Role.INTERVIEWER]:
+            response_data["total_amount"] = (
+                billing_info.amount_due if billing_info else 0
+            )
         response_data.update(paginated_data.data)
         return Response(response_data)
 
