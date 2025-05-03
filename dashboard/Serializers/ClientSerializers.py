@@ -18,6 +18,7 @@ from ..models import (
     EngagementOperation,
     EngagementTemplates,
     Interview,
+    BillingLog,
 )
 from phonenumber_field.serializerfields import PhoneNumberField
 from hiringdogbackend.utils import (
@@ -1000,21 +1001,31 @@ class FinanceCandidateSerializer(serializers.ModelSerializer):
 
 
 class FinanceSerializer(serializers.ModelSerializer):
-    candidate = FinanceCandidateSerializer(read_only=True)
-    scheduled_time = serializers.DateTimeField(format="%d/%m/%Y %H:%M:%S")
+    candidate = FinanceCandidateSerializer(source="interview.candidate", read_only=True)
+    scheduled_time = serializers.DateTimeField(
+        source="interview.scheduled_time", format="%d/%m/%Y %H:%M:%S"
+    )
+    amount = serializers.DecimalField(
+        source="amount_for_client", max_digits=10, decimal_places=2
+    )
 
     class Meta:
-        model = Interview
-        fields = ("candidate", "scheduled_time", "client_amount")
+        model = BillingLog
+        fields = ("candidate", "scheduled_time", "amount")
 
 
 class FinanceSerializerForInterviewer(serializers.ModelSerializer):
-    candidate = FinanceCandidateSerializer(read_only=True)
-    scheduled_time = serializers.DateTimeField(format="%d/%m/%Y %H:%M:%S")
+    candidate = FinanceCandidateSerializer(source="interview.candidate", read_only=True)
+    scheduled_time = serializers.DateTimeField(
+        source="interview.scheduled_time", format="%d/%m/%Y %H:%M:%S"
+    )
+    amount = serializers.DecimalField(
+        source="amount_for_interviewer", max_digits=10, decimal_places=2
+    )
 
     class Meta:
-        model = Interview
-        fields = ("candidate", "scheduled_time", "interviewer_amount")
+        model = BillingLog
+        fields = ("candidate", "scheduled_time", "amount")
 
 
 class AnalyticsQuerySerializer(serializers.Serializer):

@@ -28,6 +28,7 @@ from ..models import (
     EngagementOperation,
     Interview,
     BillingRecord,
+    BillingLog,
 )
 from ..serializer import (
     ClientUserSerializer,
@@ -1873,52 +1874,46 @@ class FinanceView(APIView, LimitOffsetPagination):
                 day=calendar.monthrange(today.year, today.month)[1]
             ) + dt.timedelta(days=1)
 
-        first_day_of_month = today.replace(day=1)
+        first_day_of_last_month = today.replace(day=1) - dt.timedelta(days=1)
+        first_day_of_last_month = first_day_of_last_month.replace(day=1)
 
-        last_day_of_last_month = first_day_of_month - dt.timedelta(days=1)
-        last_day_of_last_month = timezone.make_aware(
-            dt.datetime.combine(last_day_of_last_month, dt.time.max)
-        )
-
-        first_day_of_last_month = last_day_of_last_month.replace(day=1)
-        first_day_of_last_month = timezone.make_aware(
-            dt.datetime.combine(first_day_of_last_month, dt.time.min)
-        )
-
-        finance_qs = Interview.objects.filter(
-            created_at__range=(first_day_of_last_month, last_day_of_last_month),
-            status__in=["REC", "NREC", "NJ", "HREC", "SNREC"],
+        billing_log = BillingLog.objects.filter(
+            billing_month=first_day_of_last_month,
         ).select_related(
-            "candidate", "interviewer", "candidate__organization", "interviewer__user"
+            "client",
+            "interviewer",
+            "interviewer__user",
+            "interview",
+            "interview__candidate",
         )
         if request.user.role == Role.CLIENT_OWNER:
-            finance_qs = finance_qs.filter(
-                candidate__organization=request.user.clientuser.organization
+            billing_log = billing_log.filter(
+                client=request.user.clientuser.organization
             )
             billing_info = BillingRecord.objects.filter(
                 client__organization=request.user.clientuser.organization,
-                created_at__range=(first_day_of_last_month, last_day_of_last_month),
+                billing_month=first_day_of_last_month,
             ).first()
         elif request.user.role == Role.INTERVIEWER:
-            finance_qs = finance_qs.filter(interviewer__user=request.user)
+            billing_log = billing_log.filter(interviewer__user=request.user)
             billing_info = BillingRecord.objects.filter(
                 interviewer__user=request.user,
-                created_at__range=(first_day_of_last_month, last_day_of_last_month),
+                billing_month=first_day_of_last_month,
             ).first()
         else:
             if organization_id:
-                finance_qs = finance_qs.filter(
+                billing_log = billing_log.filter(
                     candidate__organization_id=organization_id
                 )
             else:
-                finance_qs = finance_qs.filter(interviewer_id=interviewer_id)
+                billing_log = billing_log.filter(interviewer_id=interviewer_id)
 
         if start_date and end_date:
-            finance_qs = finance_qs.filter(
-                created_at__gte=start_date, created_at__lte=end_date
+            billing_log = billing_log.filter(
+                billing_month__gte=start_date, billing_month__lte=end_date
             )
 
-        paginated_queryset = self.paginate_queryset(finance_qs, request)
+        paginated_queryset = self.paginate_queryset(billing_log, request)
         if request.user.role == Role.INTERVIEWER:
             serializer = FinanceSerializerForInterviewer(paginated_queryset, many=True)
         else:
