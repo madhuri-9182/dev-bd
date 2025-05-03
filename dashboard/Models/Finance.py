@@ -1,7 +1,34 @@
 from django.db import models
+from django.utils import timezone
 from django.core.exceptions import ValidationError
 from hiringdogbackend.ModelUtils import SoftDelete, CreateUpdateDateTimeAndArchivedField
 from .Internal import InternalClient, InternalInterviewer
+from .Client import Organization
+from .Internal import InternalInterviewer
+from .Interviews import Interview
+
+
+class BillingLog(CreateUpdateDateTimeAndArchivedField):
+    BILLING_REASON_CHOICES = [
+        ("feedback_submitted", "Feedback Submitted"),
+        ("late_rescheduled", "Late Rescheduled"),
+    ]
+
+    interview = models.ForeignKey(Interview, on_delete=models.CASCADE)
+    client = models.ForeignKey(Organization, on_delete=models.CASCADE)
+    interviewer = models.ForeignKey(InternalInterviewer, on_delete=models.CASCADE)
+
+    amount_for_client = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    amount_for_interviewer = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0
+    )
+
+    reason = models.CharField(max_length=50, choices=BILLING_REASON_CHOICES)
+    billing_month = models.DateField()
+    is_billing_calculated = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = (("interview", "reason"),)
 
 
 class BillingRecord(CreateUpdateDateTimeAndArchivedField):
@@ -23,7 +50,7 @@ class BillingRecord(CreateUpdateDateTimeAndArchivedField):
     object_all = models.Manager()
 
     billing_month = models.DateField(
-        null=True, blank=True, db_index=True, editable=False
+        db_index=True, editable=False
     )  # stores first day of month
 
     record_type = models.CharField(
@@ -85,5 +112,5 @@ class BillingRecord(CreateUpdateDateTimeAndArchivedField):
                 "Interviewer is required for interviewer payment records"
             )
         if not self.billing_month:
-            raise ValidationError("Can't save the Billing record without billing month")
+            self.billing_month = timezone.now().replace(day=1).date()
         super().save(*args, **kwargs)

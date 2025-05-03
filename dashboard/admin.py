@@ -17,6 +17,7 @@ from .models import (
     InterviewerAvailability,
     InterviewFeedback,
     BillingRecord,
+    BillingLog,
 )
 
 
@@ -26,8 +27,6 @@ class InterviewAdmin(admin.ModelAdmin):
         "id",
         "get_candidate_name",
         "get_interviewer_name",
-        "client_amount",
-        "interviewer_amount",
         "get_organization_name",
         "created_at",
         "scheduled_time",
@@ -155,6 +154,8 @@ class InterviewFeedbackAdmin(admin.ModelAdmin):
         )
 
     def get_interview_name(self, obj):
+        if not obj.interview:
+            return "None"
         return f"{obj.interview.candidate.name} - {obj.interview.interviewer.name}"
 
     get_interview_name.short_description = "Interview"
@@ -169,6 +170,7 @@ class BillingRecordAdmin(admin.ModelAdmin):
         "get_client_name",
         "get_interviewer_name",
         "created_at",
+        "billing_month",
     )
     list_filter = ("client", "interviewer")
     search_fields = ("client__name", "interviewer__name")
@@ -184,5 +186,49 @@ class BillingRecordAdmin(admin.ModelAdmin):
 
     def get_interviewer_name(self, obj):
         return obj.interviewer.name if hasattr(obj.interviewer, "name") else None
+
+    get_interviewer_name.short_description = "Interviewer"
+
+
+@admin.register(BillingLog)
+class BillingLogAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "get_interview_name",
+        "get_client_name",
+        "get_interviewer_name",
+        "amount_for_client",
+        "amount_for_interviewer",
+        "reason",
+        "billing_month",
+        "is_billing_calculated",
+    )
+    list_filter = ("reason", "billing_month", "is_billing_calculated")
+    search_fields = (
+        "interview__candidate__name",
+        "client__name",
+        "interviewer__name",
+    )
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.select_related("interview", "client", "interviewer")
+
+    def get_interview_name(self, obj):
+        return (
+            f"{obj.interview.candidate.name} - {obj.interview.interviewer.name}"
+            if obj.interview
+            else "None"
+        )
+
+    get_interview_name.short_description = "Interview"
+
+    def get_client_name(self, obj):
+        return obj.client.name if obj.client else "None"
+
+    get_client_name.short_description = "Client"
+
+    def get_interviewer_name(self, obj):
+        return obj.interviewer.name if obj.interviewer else "None"
 
     get_interviewer_name.short_description = "Interviewer"

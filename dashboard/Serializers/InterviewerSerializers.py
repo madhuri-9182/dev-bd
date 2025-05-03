@@ -1,6 +1,8 @@
 import json
+import calendar
 import datetime
 from django.utils import timezone
+from django.db import transaction
 from rest_framework import serializers
 from ..models import (
     InterviewerAvailability,
@@ -9,6 +11,10 @@ from ..models import (
     InterviewFeedback,
     InternalInterviewer,
     Job,
+    BillingLog,
+    BillingRecord,
+    InterviewerPricing,
+    Agreement,
 )
 from hiringdogbackend.utils import validate_incoming_data, validate_attachment
 
@@ -503,6 +509,98 @@ class InterviewFeedbackSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"errors": errors})
 
         return data
+
+    def update(self, instance, validated_data):
+        with transaction.atomic():
+            feedback = super().update(instance, validated_data)
+
+            interview = instance.interview
+            candidate = interview.candidate
+            interviewer = interview.interviewer
+            client = candidate.organization
+            billing_month = timezone.now().replace(day=1).date()
+
+            # Fetch experience levels
+            interviewer_exp = InterviewerPricing.get_year_of_experience(
+                candidate.year, candidate.month
+            )
+            client_exp = Agreement.get_years_of_experience(
+                candidate.year, candidate.month
+            )
+
+            try:
+                interviewer_pricing = InterviewerPricing.objects.get(
+                    experience_level=interviewer_exp
+                )
+                client_pricing = Agreement.objects.get(
+                    organization=client, years_of_experience=client_exp
+                )
+            except (InterviewerPricing.DoesNotExist, Agreement.DoesNotExist):
+                raise serializers.ValidationError(
+                    "Pricing information not configured for given experience."
+                )
+
+            # Calculate amounts
+            interviewer_amount = interviewer_pricing.price
+            client_amount = client_pricing.rate
+
+            if instance.overall_remark == "NJ":
+                interviewer_amount = (interviewer_amount / 60) * 15
+                client_amount = (client_amount / 60) * 15
+
+            billinglog, created = BillingLog.objects.get_or_create(
+                interview=interview,
+                reason="feedback_submitted",
+                defaults={
+                    "billing_month": billing_month,
+                    "client": client,
+                    "interviewer": interviewer,
+                    "amount_for_client": client_amount,
+                    "amount_for_interviewer": interviewer_amount,
+                },
+            )
+
+            if not billinglog.is_billing_calculated:
+                today = timezone.now()
+                end_of_month = calendar.monthrange(today.year, today.month)[1]
+                due_date = (
+                    today.replace(day=end_of_month) + datetime.timedelta(days=10)
+                ).date()
+
+                # Update Client BillingRecord
+                client_record, _ = BillingRecord.objects.get_or_create(
+                    client=client.internal_client,
+                    billing_month=billing_month,
+                    defaults={
+                        "record_type": "CLB",
+                        "amount_due": client_amount,
+                        "due_date": due_date,
+                        "status": "PED",
+                    },
+                )
+                if not _:
+                    client_record.amount_due += client_amount
+                    client_record.save()
+
+                # Update Interviewer BillingRecord
+                interviewer_record, _ = BillingRecord.objects.get_or_create(
+                    interviewer=interviewer,
+                    billing_month=billing_month,
+                    defaults={
+                        "record_type": "INP",
+                        "amount_due": interviewer_amount,
+                        "due_date": due_date,
+                        "status": "PED",
+                    },
+                )
+                if not _:
+                    interviewer_record.amount_due += interviewer_amount
+                    interviewer_record.save()
+
+                billinglog.is_billing_calculated = True
+                billinglog.save()
+
+            return feedback
 
 
 class InterviewerDashboardSerializer(serializers.ModelSerializer):

@@ -18,4 +18,5 @@ from .Models import (
     InterviewerPricing,
     BillingRecord,
     InterviewScheduleAttempt,
+    BillingLog,
 )

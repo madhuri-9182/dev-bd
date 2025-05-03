@@ -18,4 +18,4 @@ from .Internal import (
 )
 from .Interviewer import InterviewerAvailability, InterviewerRequest
 from .Interviews import Interview, InterviewFeedback
-from .Finance import BillingRecord
+from .Finance import BillingRecord, BillingLog
