@@ -108,7 +108,7 @@ class Candidate(CreateUpdateDateTimeAndArchivedField):
         ("CNA", "Candidate Not Available"),
         ("CNR", "Candidate Not Responded"),
         ("OTH", "Others"),
-        ("RJD", "Rejected By HDIP")
+        ("RJD", "Rejected By HDIP"),
     )
     FINAL_SELECTION_STATUS_CHOICES = (
         ("R1R", "Round 1 Reject"),
