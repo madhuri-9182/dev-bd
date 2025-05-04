@@ -81,10 +81,12 @@ def analyze_transcription_and_generate_feedback(transcription):
 
         Important rules:
         - Return ONLY valid JSON. No extra text, titles, explanations, or notes outside JSON.
+        - JSON should contain only mentioned keys and their values.
         - Ensure JSON is properly formatted, parsable, and complete.
         - Summarize feedback clearly but concisely.
         - Remove filler words and incomplete exchanges.
         - All timestamps must be relative to the start of the interview.
+        - Ensure that nothing outside keys present in the JSON aprart from the mentioned keys.
 
         Transcription:
         {transcription}
