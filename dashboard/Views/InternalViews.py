@@ -129,7 +129,7 @@ class InternalClientView(APIView, LimitOffsetPagination):
         status_ = request.query_params.get("status")
         search_term = request.query_params.get("q")
 
-        query = InternalClient.objects.values("id", "name")
+        query = InternalClient.objects.order_by("-id").values("id", "name")
 
         if client_ids:
             query = query.filter(pk__in=client_ids.split(","))
