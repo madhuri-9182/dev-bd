@@ -795,7 +795,12 @@ class CandidateView(APIView, LimitOffsetPagination):
         if isinstance(candidate_instance, Response):
             return candidate_instance
 
-        if candidate_instance.status != "NSCH":
+        if (
+            candidate_instance.status == ["SNREC", "NREC", "NJ"]
+            and reason_for_dropping != "RJD"
+        ):
+            return Response({"status": "failed", "message": "Invalid reason."})
+        elif candidate_instance.status == ["HREC", 'REC', 'CSCH']:
             return Response(
                 {
                     "status": "failed",
