@@ -414,6 +414,16 @@ class DesignationDomainSerializer(serializers.ModelSerializer):
         return role_choice.get(obj.name)
 
 
+def validate_social_links(value):
+    if not isinstance(value, dict) or not all(
+        isinstance(key, str) and isinstance(val, str) and val.startswith("http")
+        for key, val in value.items()
+    ):
+        raise serializers.ValidationError(
+            "Invalid social links format. It should be a dictionary with string keys and HTTP URLs values."
+        )
+
+
 class InterviewerSerializer(serializers.ModelSerializer):
     strength = serializers.ChoiceField(
         choices=InternalInterviewer.STRENGTH_CHOICES,
@@ -427,6 +437,9 @@ class InterviewerSerializer(serializers.ModelSerializer):
         max_length=100,
         required=False,
         write_only=True,
+    )
+    social_links = serializers.JSONField(
+        validators=[validate_social_links], required=False
     )
 
     class Meta:
@@ -449,6 +462,9 @@ class InterviewerSerializer(serializers.ModelSerializer):
             "strength",
             "interviewer_level",
             "cv",
+            "account_number",
+            "ifsc_code",
+            "social_links",
         )
 
     def run_validation(self, data=...):
@@ -480,6 +496,7 @@ class InterviewerSerializer(serializers.ModelSerializer):
                 "interviewer_level",
                 "cv",
             ],
+            allowed_keys=["account_number", "ifsc_code", "social_links"],
             partial=self.partial,
             original_data=data,
             form=True,

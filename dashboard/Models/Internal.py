@@ -153,6 +153,17 @@ class InternalInterviewer(CreateUpdateDateTimeAndArchivedField):
     )  # e.g., Backend
     cv = models.FileField(upload_to="interviewer_cvs", blank=True)
     interviewer_level = models.IntegerField(default=0)
+    account_number = models.CharField(
+        max_length=20, help_text="bank a/c number", null=True, blank=True
+    )
+    ifsc_code = models.CharField(
+        max_length=15, help_text="bank ifsc code", null=True, blank=True
+    )
+    social_links = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="A dictionary of social media links related to the interviewer.",
+    )
 
     def __str__(self):
         return f"{self.name} - {self.organization}"
