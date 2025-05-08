@@ -301,6 +301,7 @@ class JobSerializer(serializers.ModelSerializer):
                     errors.setdefault("recruiter_ids", []).append(
                         f"Invalid recruiter_ids(clientuser_ids): {recruiter_ids - client_user_ids}"
                     )
+
             except (json.JSONDecodeError, ValueError, TypeError):
                 errors.setdefault("recruiter_ids", []).append(
                     "Invalid data format. It should be a list of integers."
@@ -381,8 +382,7 @@ class JobSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         recruiter_ids = validated_data.pop("recruiter_ids")
         job = super().create(validated_data)
-        for recruiter_id in recruiter_ids:
-            job.clients.add(recruiter_id)
+        job.clients.add(*recruiter_ids)
         return job
 
     def update(self, instance, validated_data):
