@@ -151,6 +151,7 @@ class CookieTokenRefreshSerializer(TokenRefreshSerializer):
             except Exception:
                 raise ValidationError({"errors": "Invalid Token"})
             data = super().validate(data)
+            data["id"] = user_obj.id
             data["email"] = user_obj.email
             data["role"] = user_obj.role
             data["name"] = user_obj.profile.name
