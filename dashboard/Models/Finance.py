@@ -61,7 +61,7 @@ class BillingRecord(CreateUpdateDateTimeAndArchivedField):
     amount_due = models.DecimalField(max_digits=10, decimal_places=2)
 
     due_date = models.DateField()
-    payment_date = models.DateTimeField(null=True, blank=True)
+    payment_date = models.DateTimeField(null=True, blank=True) #unused one
 
     invoice_number = models.CharField(max_length=20, unique=True, null=True, blank=True)
 
@@ -79,10 +79,6 @@ class BillingRecord(CreateUpdateDateTimeAndArchivedField):
         null=True,
         blank=True,
     )
-
-    razorpay_order_id = models.CharField(max_length=50, null=True, blank=True)
-    razorpay_payment_id = models.CharField(max_length=50, null=True, blank=True)
-    razorpay_signature = models.TextField(null=True, blank=True)
 
     class Meta:
         indexes = [
@@ -114,3 +110,46 @@ class BillingRecord(CreateUpdateDateTimeAndArchivedField):
         if not self.billing_month:
             self.billing_month = timezone.now().replace(day=1).date()
         super().save(*args, **kwargs)
+
+
+class BillPayments(CreateUpdateDateTimeAndArchivedField):
+    objects = SoftDelete()
+    object_all = models.Manager()
+
+    PAYMENT_STATUS_CHOICES = [
+        ("SUC", "Success"),
+        ("FLD", "Failed"),
+        ("UDP", "User Dropped"),
+        ("CNL", "Cancelled"),
+        ("VOD", "Void"),
+    ]
+
+    billing_record = models.ForeignKey(
+        BillingRecord, on_delete=models.DO_NOTHING, related_name="billing_payments"
+    )
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    payment_link_id = models.CharField(max_length=100, unique=True)
+    payment_status = models.CharField(max_length=15, choices=PAYMENT_STATUS_CHOICES)
+    payment_date = models.DateField(auto_now_add=True)
+    transaction_id = models.CharField(
+        max_length=100, unique=True, null=True, blank=True
+    )
+    link_expired_time = models.DateTimeField()
+    cf_link_id = models.CharField(max_length=100, unique=True)
+    order_id = models.CharField(max_length=100, unique=True, null=True, blank=True)
+
+    # Customer Details
+    customer_name = models.CharField(max_length=255)
+    customer_phone = models.CharField(max_length=15)
+    customer_email = models.EmailField()
+
+    # both link generation and webhook response
+    meta_data = models.JSONField(default=dict)
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if self.payment_status == "SUC":
+            billing_record = self.billing_record
+            billing_record.amount_due = 0
+            billing_record.status = "PAI"
+            billing_record.save()
