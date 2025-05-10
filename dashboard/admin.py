@@ -18,6 +18,7 @@ from .models import (
     InterviewFeedback,
     BillingRecord,
     BillingLog,
+    BillPayments,
 )
 
 
@@ -232,3 +233,41 @@ class BillingLogAdmin(admin.ModelAdmin):
         return obj.interviewer.name if obj.interviewer else "None"
 
     get_interviewer_name.short_description = "Interviewer"
+
+
+@admin.register(BillPayments)
+class BillPaymentsAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "get_billing_record",
+        "amount",
+        "payment_link_id",
+        "payment_status",
+        "payment_date",
+        "transaction_id",
+        "link_expired_time",
+        "cf_link_id",
+        "order_id",
+        "customer_name",
+        "customer_email",
+    )
+    list_filter = ("payment_status", "payment_date")
+    search_fields = (
+        "billing_record__invoice_number",
+        "payment_link_id",
+        "transaction_id",
+        "cf_link_id",
+        "order_id",
+        "customer_name",
+        "customer_phone",
+        "customer_email",
+    )
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.select_related("billing_record")
+
+    def get_billing_record(self, obj):
+        return obj.billing_record.invoice_number if obj.billing_record else "None"
+
+    get_billing_record.short_description = "Billing Record"
