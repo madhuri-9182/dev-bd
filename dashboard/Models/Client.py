@@ -133,6 +133,11 @@ class Candidate(CreateUpdateDateTimeAndArchivedField):
         ("android", "Android"),
         ("ios", "iOS"),
         ("mobile", "Mobile (Android + iOS)"),
+        ("flutter", "Flutter"),
+        ("database", "Database"),
+        ("cloud", "Cloud"),
+        ("mobile_flutter", "Mobile (Flutter)"),
+        ("mobile_react_native", "Mobile (React Native)"),
     )
     objects = SoftDelete()
     object_all = models.Manager()

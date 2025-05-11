@@ -103,6 +103,19 @@ class InternalInterviewer(CreateUpdateDateTimeAndArchivedField):
         ("SR_DEE", "Sr. Data Engineer"),
         ("LD_DEE", "Lead Data Engineer"),
         ("P_DEE", "Principal Data Engineer"),
+        ("SEM", "Senior Engineering Manager"),
+        ("SPM", "Senior Principal Engineer"),
+        ("STL", "Senior Technical Lead"),
+        ("AVPE", "AVP Engineer"),
+        ("SDE", "Senior Director Of Engineering"),
+        ("SM_SDET", "Senior Manager SDET"),
+        ("SP_MLS", "Senior Principal ML Scientist"),
+        ("SL_DEE", "Senior Lead Data Engineer"),
+        ("SP_DEE", "Senior Principal Data Engineer"),
+        ("IN", "Intern"),
+        ("AR", "Architecht"),
+        ("SA", "Senior Architect"),
+        ("PA", "Principal Architect"),
     )
 
     STRENGTH_CHOICES = (
@@ -116,6 +129,11 @@ class InternalInterviewer(CreateUpdateDateTimeAndArchivedField):
         ("android", "Android"),
         ("ios", "iOS"),
         ("mobile", "Mobile (Android + iOS)"),
+        ("flutter", "Flutter"),
+        ("database", "Database"),
+        ("cloud", "Cloud"),
+        ("mobile_flutter", "Mobile (Flutter)"),
+        ("mobile_react_native", "Mobile (React Native)"),
     )
 
     organization = models.ManyToManyField(

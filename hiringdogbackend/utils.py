@@ -152,3 +152,27 @@ def create_or_update_interviewer_prices():
         if pricing.experience_level not in dict(prices):
             pricing.delete()
             print(f"Deleted: {pricing}")
+
+
+def add_domain_designation():
+    from dashboard.models import DesignationDomain
+
+    existing_domains = set(DesignationDomain.objects.values_list("name", flat=True))
+    predefined_domains = [
+        ("SEM", "Senior Engineering Manager"),
+        ("SPM", "Senior Principal Engineer"),
+        ("STL", "Senior Technical Lead"),
+        ("AVPE", "AVP Engineer"),
+        ("SDE", "Senior Director Of Engineering"),
+        ("SM_SDET", "Senior Manager SDET"),
+        ("SP_MLS", "Senior Principal ML Scientist"),
+        ("SL_DEE", "Senior Lead Data Engineer"),
+        ("SP_DEE", "Senior Principal Data Engineer"),
+        ("IN", "Intern"),
+        ("AR", "Architecht"),
+        ("SA", "Senior Architect"),
+        ("PA", "Principal Architect"),
+    ]
+    for domain, _ in predefined_domains:
+        if domain not in existing_domains:
+            DesignationDomain.objects.create(name=domain)

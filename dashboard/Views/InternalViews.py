@@ -506,8 +506,20 @@ class DomainDesignationView(APIView, LimitOffsetPagination):
     permission_classes = [IsAuthenticated]
     serializer_class = DesignationDomainSerializer
 
+    def get_matching_db_values(self, choices, search_param):
+        return [db for db, label in choices if search_param in label.lower()]
+
     def get(self, request):
+        search_param = request.query_params.get("q")
         domain_qs = DesignationDomain.objects.all()
+
+        if search_param:
+            domain_qs = domain_qs.filter(
+                name__in=self.get_matching_db_values(
+                    InternalInterviewer.ROLE_CHOICES, search_param.lower()
+                )
+            )
+
         paginated_qs = self.paginate_queryset(domain_qs, request)
         serializer = self.serializer_class(paginated_qs, many=True)
         paginated_response = self.get_paginated_response(serializer.data)
