@@ -18,7 +18,7 @@ def get_candidate_analytics(queryset):
         ),
         top_performers=Count("id", filter=Q(score__gte=80)),
         good_candidates=Count("id", filter=Q(score__gte=70, score__lt=80)),
-        rejected=Count("id", filter=Q(final_selection_status="RJD")),
+        rejected=Count("id", filter=Q(status__in=["NREC", "SNREC"])),
         declined_by_candidate=Count("id", filter=Q(status="NJ")),
         male_count=Count("id", filter=Q(gender="M")),
         female_count=Count("id", filter=Q(gender="F")),
@@ -26,12 +26,12 @@ def get_candidate_analytics(queryset):
 
     # Group selected and rejected by current company
     candidate_by_companies = (
-        queryset.filter(final_selection_status__in=["SLD", "RJD"])
+        queryset.filter(status__in=["HREC", "REC", "NREC", "SNREC"])
         .values("company")
         .annotate(total_count=Count("id"))
         .annotate(
-            selected_count=Count("id", filter=Q(final_selection_status="SLD")),
-            rejected_count=Count("id", filter=Q(final_selection_status="RJD")),
+            selected_count=Count("id", filter=Q(status__in=["HREC", "REC"])),
+            rejected_count=Count("id", filter=Q(status__in=["NREC", "SNREC"])),
         )
     )
 
