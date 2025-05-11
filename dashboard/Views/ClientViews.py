@@ -1120,7 +1120,11 @@ class EngagementView(APIView, LimitOffsetPagination):
             data=request.data, context={"request": request}
         )
         if serializer.is_valid():
+            candidate = serializer.validated_data.get("candidate")
             serializer.save(organization=request.user.clientuser.organization)
+            if candidate:
+                candidate.is_engagement_pushed = True
+                candidate.save()
             return Response(
                 {
                     "status": "success",

@@ -200,6 +200,7 @@ class Candidate(CreateUpdateDateTimeAndArchivedField):
         blank=True,
         null=True,
     )
+    is_engagement_pushed = models.BooleanField(default=False)
 
 
 class Engagement(CreateUpdateDateTimeAndArchivedField):
