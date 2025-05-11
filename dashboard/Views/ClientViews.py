@@ -1,6 +1,7 @@
 import os
 import calendar
 import tempfile
+import uuid
 import datetime as dt
 from celery import group
 from celery.result import AsyncResult
@@ -29,6 +30,7 @@ from ..models import (
     Interview,
     BillingRecord,
     BillingLog,
+    BillPayments,
 )
 from ..serializer import (
     ClientUserSerializer,
@@ -45,9 +47,9 @@ from ..serializer import (
     FinanceSerializerForInterviewer,
 )
 from ..permissions import CanDeleteUpdateUser, UserRoleDeleteUpdateClientData
-from externals.parser.resume_parser import ResumerParser
 from externals.parser.resumeparser2 import process_resumes
 from externals.analytics import get_candidate_analytics
+from externals.payment.cashfree import create_payment_link, is_valid_signature
 from core.permissions import (
     IsClientAdmin,
     IsClientOwner,
@@ -800,7 +802,7 @@ class CandidateView(APIView, LimitOffsetPagination):
             and reason_for_dropping != "RJD"
         ):
             return Response({"status": "failed", "message": "Invalid reason."})
-        elif candidate_instance.status == ["HREC", 'REC', 'CSCH']:
+        elif candidate_instance.status == ["HREC", "REC", "CSCH"]:
             return Response(
                 {
                     "status": "failed",
@@ -1932,6 +1934,9 @@ class FinanceView(APIView, LimitOffsetPagination):
             response_data["total_amount"] = (
                 billing_info.amount_due if billing_info else 0
             )
+            response_data["billing_record_uid"] = (
+                billing_info.public_id if billing_info else None
+            )
         response_data.update(paginated_data.data)
         return Response(response_data)
 
@@ -2058,4 +2063,222 @@ class FeedbackPDFVideoView(APIView):
         serializer = self.serializer_class(interview)
         return Response(
             {"status": "success", "message": "Recording found", "data": serializer.data}
+        )
+
+
+class BillPaymentView(APIView):
+    permission_classes = [IsAuthenticated, IsClientOwner]
+
+    def serialize_obj(self, response_obj):
+        if isinstance(response_obj, list):
+            return [self.serialize_obj(item) for item in response_obj]
+        elif hasattr(response_obj, "__dict__"):
+            return {
+                key: self.serialize_obj(value)
+                for key, value in response_obj.__dict__.items()
+            }
+        else:
+            return response_obj
+
+    def post(self, request, billing_record_uid):
+
+        billing_record = BillingRecord.objects.filter(
+            public_id=billing_record_uid
+        ).first()
+        if not billing_record:
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "Billing record not found with the provided billing_record_uid.",
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if billing_record.status == "MMP" and billing_record.amount_due == 0:
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "Invalid request. As the payment processed already",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        bill_payment = (
+            BillPayments.objects.filter(billing_record=billing_record)
+            .order_by("-id")
+            .first()
+        )
+
+        if (
+            bill_payment
+            and bill_payment.payment_status == "PED"
+            and bill_payment.amount == billing_record.amount_due
+            and bill_payment.link_expired_time >= timezone.now()
+        ):
+            return Response(
+                {
+                    "status": "success",
+                    "message": "Payment Link retrieved successfully",
+                    "data": {
+                        "payment_link_url": bill_payment.payment_link_url,
+                    },
+                },
+                status=status.HTTP_200_OK,
+            )
+        elif bill_payment:
+            bill_payment.payment_status = "INA"
+            bill_payment.save()
+
+        with transaction.atomic():
+            user = request.user
+            client_profile = user.clientuser
+            payment_link_id = f"{user.id}_{uuid.uuid4().hex[:8]}"
+
+            bill_payment = BillPayments.objects.create(
+                billing_record=billing_record,
+                amount=billing_record.amount_due,
+                payment_link_id=payment_link_id,
+                customer_name=client_profile.name,
+                customer_email=user.email,
+                customer_phone=str(user.phone),
+                link_expired_time=timezone.now() + timedelta(days=1),
+            )
+
+            response = create_payment_link(
+                user=user,
+                user_name=client_profile.name,
+                payment_link_id=payment_link_id,
+                amount=float(billing_record.amount_due),
+            )
+            if not response:
+                transaction.set_rollback(True)
+                return Response(
+                    {"status": "failed", "message": "Error generating payment link"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+            elif response.status_code != status.HTTP_200_OK:
+                transaction.set_rollback(True)
+                print(response.status_code, response.data)
+                return Response(
+                    {"status": "failed", "message": "Error generating payment link"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+            bill_payment.cf_link_id = response.data.cf_link_id
+            bill_payment.payment_link_url = response.data.link_url
+            bill_payment.meta_data.update(
+                {"Create_Response": self.serialize_obj(response.data)}
+            )
+            bill_payment.save()
+
+        return Response(
+            {
+                "status": "success",
+                "message": "Payment Link Generated Successfully",
+                "data": {
+                    "payment_link_url": bill_payment.payment_link_url,
+                },
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class CFWebhookView(APIView):
+    permission_classes = []
+
+    def post(self, request):
+        signature = request.headers.get("x-cashfree-signature") or request.headers.get(
+            "x-webhook-signature"
+        )
+        timestamp = request.headers.get("x-cashfree-timestamp") or request.headers.get(
+            "x-webhook-timestamp"
+        )
+
+        if not signature:
+            return Response(
+                {"status": "failed", "message": "Missing signature"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not is_valid_signature(request.body.decode("utf-8"), signature, timestamp):
+            return Response(
+                {"status": "failed", "message": "Invalid signature"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        data = request.data.get("data", {})
+
+        order = data.get("order")
+
+        payment_link_status_map = {
+            "PAID": "PAID",
+            "PARTIALLY_PAID": "PRT",
+            "EXPIRED": "EXP",
+            "CANCELLED": "CNL",
+        }
+        payment_status_map = {
+            "SUCCESS": "SUC",
+            "FAILED": "FLD",
+            "USER_DROPPED": "UDP",
+            "CANCELLED": "CNL",
+            "VOID": "VOD",
+            "PENDING": "PED",
+            "INACTIVE": "INA",
+        }
+        link_status = payment_link_status_map.get(data.get("link_status"))
+        payment_status = payment_status_map.get(
+            getattr(order, "transaction_status", "PENDING")
+        )
+        bill_payments = BillPayments.objects.filter(payment_link_id=data.get("link_id"))
+        bill_payments.update(
+            transaction_id=getattr(order, "transaction_id", None),
+            payment_status=payment_status,
+            order_id=getattr(order, "order_id", None),
+            link_status=link_status,
+        )
+        bill_payment = bill_payments.first()
+        if bill_payment and bill_payment.payment_status == "SUC":
+            if (
+                bill_payment.billing_record.billing_month.month
+                == bill_payment.updated_at.month
+            ):
+                bill_payment.billing_record.amount_due = 0
+                bill_payment.billing_record.status = "MMP"
+            else:
+                bill_payment.billing_record.status = "PAI"
+            bill_payment.billing_record.save()
+
+        if bill_payment:
+            bill_payment.meta_data.update({"Webhook_Response": data})
+            bill_payment.save()
+
+        return Response(
+            {"status": "success", "message": "Webhook call received"},
+            status=status.HTTP_200_OK,
+        )
+
+
+class PaymentStatusView(APIView):
+    permission_classes = [IsAuthenticated, IsClientOwner]
+
+    def get(self, request, payment_link_id):
+        bill_payment = BillPayments.objects.filter(
+            payment_link_id=payment_link_id
+        ).first()
+        if bill_payment:
+            return Response(
+                {
+                    "status": "success",
+                    "message": "Payment retrived successfully",
+                    "data": {
+                        "payment_status": bill_payment.payment_status,
+                        "amount": bill_payment.amount,
+                        "transaction_id": bill_payment.transaction_id,
+                    },
+                },
+                status=status.HTTP_200_OK,
+            )
+        return Response(
+            {"status": "failed", "message": "Payment link not found"},
+            status=status.HTTP_404_NOT_FOUND,
         )

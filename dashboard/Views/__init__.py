@@ -14,6 +14,9 @@ from .ClientViews import (
     FinanceView,
     CandidateAnalysisView,
     FeedbackPDFVideoView,
+    BillPaymentView,
+    CFWebhookView,
+    PaymentStatusView,
 )
 
 from .InternalViews import (

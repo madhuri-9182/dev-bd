@@ -1,3 +1,4 @@
+import uuid
 from django.db import models
 from django.utils import timezone
 from django.core.exceptions import ValidationError
@@ -40,15 +41,22 @@ class BillingRecord(CreateUpdateDateTimeAndArchivedField):
     STATUS_CHOICES = (
         ("PED", "Pending"),
         ("PAI", "Paid"),
-        ("OVER", "Overdue"),
+        ("OVD", "Overdue"),
         ("CAN", "Cancelled"),
         ("FLD", "Failed"),
         ("INP", "Inprogress"),
+        ("MMP", "Mid-Month Payment"),
+        ("PIP", "Post Invoice, Pre Due"),
+        ("LTD", "Late Payment"),
     )
 
     objects = SoftDelete()
     object_all = models.Manager()
 
+    # public_id is exposed to the frontend
+    public_id = models.UUIDField(
+        default=uuid.uuid4, unique=True, editable=False, db_index=True
+    )
     billing_month = models.DateField(
         db_index=True, editable=False
     )  # stores first day of month
@@ -61,7 +69,6 @@ class BillingRecord(CreateUpdateDateTimeAndArchivedField):
     amount_due = models.DecimalField(max_digits=10, decimal_places=2)
 
     due_date = models.DateField()
-    payment_date = models.DateTimeField(null=True, blank=True) #unused one
 
     invoice_number = models.CharField(max_length=20, unique=True, null=True, blank=True)
 
@@ -122,14 +129,29 @@ class BillPayments(CreateUpdateDateTimeAndArchivedField):
         ("UDP", "User Dropped"),
         ("CNL", "Cancelled"),
         ("VOD", "Void"),
+        ("PED", "Pending"),
+        ("INA", "Inactive"),
+    ]
+
+    LINK_STATUS_CHOICES = [
+        ("PAID", "Paid"),
+        ("PRT", "Partially Paid"),
+        ("EXP", "Expired"),
+        ("CNL", "Cancelled"),
     ]
 
     billing_record = models.ForeignKey(
         BillingRecord, on_delete=models.DO_NOTHING, related_name="billing_payments"
     )
     amount = models.DecimalField(max_digits=10, decimal_places=2)
-    payment_link_id = models.CharField(max_length=100, unique=True)
-    payment_status = models.CharField(max_length=15, choices=PAYMENT_STATUS_CHOICES)
+    payment_link_id = models.CharField(max_length=100, unique=True, db_index=True)
+    payment_link_url = models.URLField(null=True, blank=True)
+    payment_status = models.CharField(
+        max_length=15, choices=PAYMENT_STATUS_CHOICES, default="PED"
+    )
+    link_status = models.CharField(
+        max_length=15, choices=LINK_STATUS_CHOICES, null=True, blank=True
+    )
     payment_date = models.DateField(auto_now_add=True)
     transaction_id = models.CharField(
         max_length=100, unique=True, null=True, blank=True
@@ -145,11 +167,3 @@ class BillPayments(CreateUpdateDateTimeAndArchivedField):
 
     # both link generation and webhook response
     meta_data = models.JSONField(default=dict)
-
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        if self.payment_status == "SUC":
-            billing_record = self.billing_record
-            billing_record.amount_due = 0
-            billing_record.status = "PAI"
-            billing_record.save()

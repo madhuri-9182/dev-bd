@@ -15,6 +15,9 @@ from ..views import (
     FinanceView,
     CandidateAnalysisView,
     FeedbackPDFVideoView,
+    BillPaymentView,
+    CFWebhookView,
+    PaymentStatusView,
 )
 
 
@@ -86,5 +89,14 @@ urlpatterns = [
         "feedback-pdf-video/<str:interview_uid>/",
         FeedbackPDFVideoView.as_view(),
         name="feedback-pdf-video",
+    ),
+    path(
+        "billpay/<str:billing_record_uid>/", BillPaymentView.as_view(), name="billpay"
+    ),
+    path("cashfree-webhook/", CFWebhookView.as_view(), name="cashfree-webhook"),
+    path(
+        "payment-status/<str:payment_link_id>/",
+        PaymentStatusView.as_view(),
+        name="payment-status",
     ),
 ]

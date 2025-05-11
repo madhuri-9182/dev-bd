@@ -34,4 +34,7 @@ from dashboard.Views import (
     FinanceView,
     CandidateAnalysisView,
     FeedbackPDFVideoView,
+    BillPaymentView,
+    CFWebhookView,
+    PaymentStatusView,
 )

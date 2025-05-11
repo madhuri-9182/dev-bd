@@ -43,3 +43,6 @@ GOOGLE_API_KEY = "AIzaSyBIi5-B03yNolwRaQeWzy4n-XFpSUdzJBo"
 LOGIN_URL = "https://hdip.vercel.app/auth/signin/loginmail"
 BASE_URL = "https://hdip.vercel.app/api"
 SITE_DOMAIN = "localhost:5173"
+CF_CLIENTID = os.environ.get("CF_CLIENTID")
+CF_CLIENTSECRET = os.environ.get("CF_CLIENTSECRET")
+CF_RETURNURL = os.environ.get("CF_RETURNURL")
