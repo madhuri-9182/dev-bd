@@ -2207,8 +2207,7 @@ class CFWebhookView(APIView):
             )
 
         data = request.data.get("data", {})
-
-        order = data.get("order")
+        order_data = data.get("order", {})
 
         payment_link_status_map = {
             "PAID": "PAID",
@@ -2225,15 +2224,17 @@ class CFWebhookView(APIView):
             "PENDING": "PED",
             "INACTIVE": "INA",
         }
+        transaction_status = order_data.get("transaction_status", "PENDING")
+        transaction_id = order_data.get("transaction_id")
+        order_id = order_data.get("order_id")
+
         link_status = payment_link_status_map.get(data.get("link_status"))
-        payment_status = payment_status_map.get(
-            getattr(order, "transaction_status", "PENDING")
-        )
+        payment_status = payment_status_map.get(transaction_status)
         bill_payments = BillPayments.objects.filter(payment_link_id=data.get("link_id"))
         bill_payments.update(
-            transaction_id=getattr(order, "transaction_id", None),
+            transaction_id=transaction_id,
             payment_status=payment_status,
-            order_id=getattr(order, "order_id", None),
+            order_id=order_id,
             link_status=link_status,
         )
         bill_payment = bill_payments.first()
