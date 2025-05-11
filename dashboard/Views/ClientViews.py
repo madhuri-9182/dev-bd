@@ -31,6 +31,7 @@ from ..models import (
     BillingRecord,
     BillingLog,
     BillPayments,
+    DesignationDomain,
 )
 from ..serializer import (
     ClientUserSerializer,
@@ -615,7 +616,7 @@ class CandidateView(APIView, LimitOffsetPagination):
 
     def get(self, request, **kwargs):
         candidate_id = kwargs.get("candidate_id")
-        job_id = request.query_params.get("job_id")
+        domain_designation_id = request.query_params.get("job_id")
         status_ = request.query_params.get("status")
         search_term = request.query_params.get("q")
         specialization = request.query_params.get("specialization")
@@ -640,6 +641,28 @@ class CandidateView(APIView, LimitOffsetPagination):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        if domain_designation_id and not domain_designation_id.isdigit():
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "Invalid domain_designation_id format in query_params",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if domain_designation_id and not (
+            domain_designation := DesignationDomain.objects.filter(
+                pk=domain_designation_id
+            ).first()
+        ):
+            return Response(
+                {
+                    "status": "failed",
+                    "message": "Invalid domain_designation_id in query_params",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         candidates = (
             Candidate.objects.filter(organization=request.user.clientuser.organization)
             .select_related("designation")
@@ -658,8 +681,9 @@ class CandidateView(APIView, LimitOffsetPagination):
         recommended = candidates.filter(Q(status="REC") | Q(status="HREC")).count()
         rejected = candidates.filter(Q(status="SNREC") | Q(status="NREC")).count()
 
-        if job_id and job_id.isdigit():
-            candidates = candidates.filter(designation__id=job_id)
+        if domain_designation_id and domain_designation:
+            designation_name = domain_designation.name
+            candidates = candidates.filter(designation__name=designation_name)
 
         if status_:
             if status_ == "SCH":
