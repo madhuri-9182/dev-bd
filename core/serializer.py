@@ -1,4 +1,7 @@
+import hmac
+import hashlib
 from django.core.exceptions import ValidationError
+from django.conf import settings
 from django.http import Http404
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -17,9 +20,18 @@ from .models import User
 from hiringdogbackend.utils import validate_incoming_data
 
 
+def get_user_id_hash(user_id):
+    api_key = settings.TAWKTO_API
+    user_id_hash = hmac.new(
+        key=api_key.encode(),
+        msg=str(user_id).encode(),
+        digestmod=hashlib.sha256,
+    ).hexdigest()
+    return user_id_hash
+
+
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
-
     return {
         "refresh": str(refresh),
         "access": str(refresh.access_token),
@@ -28,6 +40,7 @@ def get_tokens_for_user(user):
         "name": user.profile.name,
         "is_password_change": user.is_password_change,
         "is_policy_and_tnc_accepted": user.is_policy_and_tnc_accepted,
+        "user_id_hash": get_user_id_hash(user.id),
     }
 
 
@@ -157,6 +170,7 @@ class CookieTokenRefreshSerializer(TokenRefreshSerializer):
             data["name"] = user_obj.profile.name
             data["is_password_change"] = user_obj.is_password_change
             data["is_policy_and_tnc_accepted"] = user_obj.is_policy_and_tnc_accepted
+            data["user_id_hash"] = get_user_id_hash(user_obj.id)
             return data
 
         raise ValidationError({"errors": "No valid token found in cookie"})

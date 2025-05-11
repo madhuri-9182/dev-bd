@@ -46,3 +46,5 @@ SITE_DOMAIN = "localhost:5173"
 CF_CLIENTID = os.environ.get("CF_CLIENTID")
 CF_CLIENTSECRET = os.environ.get("CF_CLIENTSECRET")
 CF_RETURNURL = os.environ.get("CF_RETURNURL")
+
+TAWKTO_API = os.environ.get("TAWKTO_API")
