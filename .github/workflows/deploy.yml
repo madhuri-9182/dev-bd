@@ -53,7 +53,7 @@ jobs:
           cd /var/www/hiringdogbackend
           
           # Create and activate virtual environment
-          python -m venv venv
+          python3 -m venv venv
           source venv/bin/activate
           
           # Install dependencies in venv
