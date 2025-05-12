@@ -51,10 +51,18 @@ jobs:
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
           cd /var/www/hiringdogbackend
-          sudo mv env .env python3 -m venv venv || true
+
+          # Rename env file if it exists
+          if [ -f env ]; then mv env .env; fi
+          
+          # Create and activate virtual environment
+          python3 -m venv venv
           source venv/bin/activate
-          pip install --upgrade pip
-          pip install -r requirements.txt
+          
+          # Install dependencies in venv
+          ./venv/bin/pip install --upgrade pip
+          ./venv/bin/pip install -r requirements.txt
+          
           python manage.py migrate
           python manage.py collectstatic --noinput
           sudo pkill gunicorn
