@@ -51,19 +51,13 @@ jobs:
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
           cd /var/www/hiringdogbackend
-
-          # Rename env file if it exists
-          if [ -f env ]; then mv env .env; fi
           
           # Create and activate virtual environment
-          python3 -m venv venv
+          python -m venv venv
           source venv/bin/activate
           
           # Install dependencies in venv
-          sudo apt-get update
-          sudo apt-get install -y build-essential python3-dev pkg-config
-          pip install --upgrade pip setuptools wheel
-          pip install --prefer-binary blis
+          sudo apt update
           pip install -r requirements.txt
 
           python manage.py migrate
