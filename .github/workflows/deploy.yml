@@ -24,6 +24,25 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
+    - name: Prepare target directory
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          sudo mkdir -p /var/www/hiringdogbackend
+          sudo chown -R $USER:$USER /var/www/hiringdogbackend
+      
+    - name: Copy project to EC2 via SCP
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        source: "."                         # Sends entire repo (adjust if needed)
+        target: "/var/www/hiringdogbackend"
+
     - name: Deploy to EC2
       uses: appleboy/ssh-action@v0.1.10
       with:
@@ -31,11 +50,12 @@ jobs:
         username: ${{ secrets.EC2_USER }}
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
-          mkdir -p /home/ubuntu/myproject
-          cd /home/ubuntu/myproject
-          git pull origin main
+          cd /var/www/hiringdogbackend
+          sudo mv env .env python3 -m venv venv || true
           source venv/bin/activate
+          pip install --upgrade pip
           pip install -r requirements.txt
           python manage.py migrate
           python manage.py collectstatic --noinput
+          sudo pkill gunicorn
           sudo systemctl restart gunicorn  # or your process manager
