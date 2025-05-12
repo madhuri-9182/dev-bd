@@ -50,6 +50,8 @@ jobs:
         username: ${{ secrets.EC2_USER }}
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
+          set -e
+
           cd /var/www/hiringdogbackend
           
           # Create and activate virtual environment
@@ -58,9 +60,10 @@ jobs:
           
           # Install dependencies in venv
           sudo apt update
+          sudo apt-get install -y build-essential python3-dev pkg-config libmysqlclient-dev
+          
           pip install -r requirements.txt
 
           python manage.py migrate
           #python manage.py collectstatic --noinput
-          sudo pkill gunicorn
           sudo systemctl restart gunicorn  # or your process manager

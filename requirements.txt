@@ -68,7 +68,7 @@ markdown-it-py==3.0.0
 MarkupSafe==3.0.2
 mdurl==0.1.2
 murmurhash==1.0.12
-mysqlclient==2.2.5
+mysqlclient==2.2.0
 nltk==3.9.1
 numpy==1.26.4
 oauthlib==3.2.2
