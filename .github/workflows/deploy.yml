@@ -60,8 +60,11 @@ jobs:
           source venv/bin/activate
           
           # Install dependencies in venv
-          #./venv/bin/python -m pip install --upgrade pip
-          ./venv/bin/pip install --prefer-binary -r requirements.txt
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3-dev pkg-config libmysqlclient-dev
+          python3 -m pip install --upgrade pip setuptools wheel
+          python3 -m pip install --prefer-binary blis
+          pip install --prefer-binary -r requirements.txt
 
           python manage.py migrate
           python manage.py collectstatic --noinput
