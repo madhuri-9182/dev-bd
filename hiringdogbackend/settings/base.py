@@ -3,8 +3,6 @@ import sys
 from datetime import timedelta
 from pathlib import Path
 from kombu import Exchange, Queue
-from dotenv import load_dotenv
-load_dotenv()
 
 
 
