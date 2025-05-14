@@ -17,31 +17,31 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9'
+        python-version: '3.12'
 
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Prepare target directory
-      uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ secrets.EC2_HOST }}
-        username: ${{ secrets.EC2_USER }}
-        key: ${{ secrets.EC2_SSH_KEY }}
-        script: |
-          sudo mkdir -p /var/www/hiringdog-backend
-          sudo chown -R $USER:$USER /var/www/hiringdog-backend
+   # - name: Prepare target directory
+    #  uses: appleboy/ssh-action@v1.0.3
+     # with:
+      #  host: ${{ secrets.EC2_HOST }}
+       # username: ${{ secrets.EC2_USER }}
+        #key: ${{ secrets.EC2_SSH_KEY }}
+        #script: |
+         # sudo mkdir -p /var/www/hiringdog-backend
+          #sudo chown -R $USER:$USER /var/www/hiringdog-backend
       
-    - name: Copy project to EC2 via SCP
-      uses: appleboy/scp-action@v0.1.4
-      with:
-        host: ${{ secrets.EC2_HOST }}
-        username: ${{ secrets.EC2_USER }}
-        key: ${{ secrets.EC2_SSH_KEY }}
-        source: "."                         # Sends entire repo (adjust if needed)
-        target: "/var/www/hiringdog-backend"
+   # - name: Copy project to EC2 via SCP
+    #  uses: appleboy/scp-action@v0.1.4
+     # with:
+      #  host: ${{ secrets.EC2_HOST }}
+       # username: ${{ secrets.EC2_USER }}
+         #key: ${{ secrets.EC2_SSH_KEY }}
+         #source: "."                         # Sends entire repo (adjust if needed)
+         #target: "/var/www/hiringdog-backend"
 
     - name: Deploy to EC2
       uses: appleboy/ssh-action@v0.1.10
@@ -59,7 +59,8 @@ jobs:
           
     
           sudo apt update
-          sudo apt-get install -y build-essential python3-dev pkg-config libmysqlclient-dev
+          git pull 
+          #sudo apt-get install -y build-essential python3-dev pkg-config libmysqlclient-dev
 
           pip install --upgrade pip setuptools wheel
           pip3 install -r requirements.txt
