@@ -24,24 +24,24 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-   # - name: Prepare target directory
-    #  uses: appleboy/ssh-action@v1.0.3
-     # with:
-      #  host: ${{ secrets.EC2_HOST }}
-       # username: ${{ secrets.EC2_USER }}
-        #key: ${{ secrets.EC2_SSH_KEY }}
-        #script: |
-         # sudo mkdir -p /var/www/hiringdog-backend
-          #sudo chown -R $USER:$USER /var/www/hiringdog-backend
+    - name: Prepare target directory
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          sudo mkdir -p /var/www/hiringdog-backend
+          sudo chown -R $USER:$USER /var/www/hiringdog-backend
       
-   # - name: Copy project to EC2 via SCP
-    #  uses: appleboy/scp-action@v0.1.4
-     # with:
-      #  host: ${{ secrets.EC2_HOST }}
-       # username: ${{ secrets.EC2_USER }}
-         #key: ${{ secrets.EC2_SSH_KEY }}
-         #source: "."                         # Sends entire repo (adjust if needed)
-         #target: "/var/www/hiringdog-backend"
+    - name: Copy project to EC2 via SCP
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        source: "."                         # Sends entire repo (adjust if needed)
+        target: "/var/www/hiringdog-backend"
 
     - name: Deploy to EC2
       uses: appleboy/ssh-action@v0.1.10
