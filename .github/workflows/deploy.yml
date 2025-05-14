@@ -31,8 +31,8 @@ jobs:
         username: ${{ secrets.EC2_USER }}
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
-          sudo mkdir -p /var/www/hiringdogbackend
-          sudo chown -R $USER:$USER /var/www/hiringdogbackend
+          sudo mkdir -p /var/www/hiringdog-backend
+          sudo chown -R $USER:$USER /var/www/hiringdog-backend
       
     - name: Copy project to EC2 via SCP
       uses: appleboy/scp-action@v0.1.4
@@ -41,7 +41,7 @@ jobs:
         username: ${{ secrets.EC2_USER }}
         key: ${{ secrets.EC2_SSH_KEY }}
         source: "."                         # Sends entire repo (adjust if needed)
-        target: "/var/www/hiringdogbackend"
+        target: "/var/www/hiringdog-backend"
 
     - name: Deploy to EC2
       uses: appleboy/ssh-action@v0.1.10
@@ -52,18 +52,16 @@ jobs:
         script: |
           set -e
 
-          cd /var/www/hiringdogbackend
+          cd /var/www/hiringdog-backend
           
-          # Create and activate virtual environment
           python3 -m venv venv
           source venv/bin/activate
           
-          # Install dependencies in venv
+    
           sudo apt update
           sudo apt-get install -y build-essential python3-dev pkg-config libmysqlclient-dev
 
           pip3 install -r requirements.txt
 
           python3 manage.py migrate
-          #python manage.py collectstatic --noinput
           sudo systemctl restart gunicorn  # or your process manager
