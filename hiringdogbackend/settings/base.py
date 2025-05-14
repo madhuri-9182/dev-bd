@@ -3,6 +3,8 @@ import sys
 from datetime import timedelta
 from pathlib import Path
 from kombu import Exchange, Queue
+from decouple import config
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -158,12 +160,12 @@ GOOGLE_SERVICE_ACCOUNT_CRED = os.path.join(
     BASE_DIR, "resources/hiringdog-interview-platform-aaed9eab6a69.json"
 )
 GOOGLE_REDIRECT_URI = "http://localhost:5173/interviewer/calendar"
-GOOGLE_CLIENT_ID = (
-    "187041398834-vukvfh0chir8ovqcvu1rh16qe6mrvlp9.apps.googleusercontent.com"
-)
-GOOGLE_CLIENT_SECRET = "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"
+GOOGLE_CLIENT_ID = config("GOOGLE_CLIENT_ID") # (
+    #"187041398834-vukvfh0chir8ovqcvu1rh16qe6mrvlp9.apps.googleusercontent.com"
+#)
+GOOGLE_CLIENT_SECRET =  config("GOOGLE_CLIENT_SECRET")  #"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"
 
-APILAYER_RESUME_PARSER_API_KEY = "KcP5hRnkLKxsuh3xSlAkG71xABdqBilD"
+APILAYER_RESUME_PARSER_API_KEY = config("APILAYER_RESUME_PARSER_API_KEY")   #"KcP5hRnkLKxsuh3xSlAkG71xABdqBilD"
 APILAYER_RESUME_PARSER_URL = "https://api.apilayer.com/resume_parser/upload"
 
 
