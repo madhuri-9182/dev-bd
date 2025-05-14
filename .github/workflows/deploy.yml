@@ -62,10 +62,8 @@ jobs:
           sudo apt-get install -y build-essential python3-dev pkg-config libmysqlclient-dev
 
           pip install --upgrade pip setuptools wheel
-          
-    - name: Install other dependencies
-      run: |
-           pip3 install -r requirements.txt
+    |
+          pip3 install -r requirements.txt
 
            python3 manage.py migrate
            sudo systemctl restart gunicorn  # or your process manager
